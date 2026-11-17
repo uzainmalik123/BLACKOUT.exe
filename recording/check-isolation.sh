@@ -10,7 +10,7 @@ fail() { echo "ISOLATION CHECK FAILED: $*" >&2; exit 1; }
 internal=$(docker network inspect rec_rec --format '{{.Internal}}' 2>/dev/null) || fail "network rec_rec does not exist (is the rig up?)"
 [ "$internal" = "true" ] || fail "network rec_rec is not internal"
 
-run() { docker compose -p rec --profile attack run --rm --no-deps -T tools "$@"; }
+run() { docker compose -p rec --profile attack run --rm --no-deps -T tools "$@" 2> >(grep -v "Container rec-tools-run" >&2); }
 
 code=$(run curl -s -o /dev/null -m 5 -w '%{http_code}' http://10.66.0.10/rest/admin/application-version) || true
 [ "$code" = "200" ] || fail "shop not reachable through nginx (got '$code')"
