@@ -294,7 +294,7 @@ Rows not listed here are `planned`. A PR that moves a row adds or updates its li
 
 | ID | Status | Note |
 |---|---|---|
-| REC-01 | done | `recording/`: isolated rig, `check-isolation.sh` passes |
+| REC-01 | done | `recording/`: isolated rig; `check-isolation.sh` checks the network is internal, no container asks for a published port, and nothing outside is reachable |
 | REC-02 | building | `recording/record.sh` + `npm run recording:convert`, format D-15. Exfil is read from sqlmap's traffic log only; curl-based souls moves (ATK-09, ATK-10) need a way to capture responses first |
 | REC-03 | building | One variant each so far: ATK-03.a, ATK-08.a |
 | ATK-03 | building | Recorded (ATK-03.a); not playable until SYS-03 |

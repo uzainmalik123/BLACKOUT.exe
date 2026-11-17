@@ -54,6 +54,46 @@ describe('validateRecording', () => {
     const r = valid() as unknown as { events: { kind: string }[] };
     r.events[1]!.kind = 'telepathy';
     expect(validateRecording(r)).toContainEqual(expect.stringContaining('events[1].kind'));
+    r.events[1]!.kind = 'constructor';
+    expect(validateRecording(r)).toContainEqual(expect.stringContaining('events[1].kind'));
+  });
+
+  it('rejects NaN times and durations, which typeof calls numbers', () => {
+    expect(validateRecording({ ...valid(), durationMs: NaN })).toContainEqual(expect.stringContaining('durationMs'));
+    const r = valid();
+    r.events[0]!.t = NaN;
+    expect(validateRecording(r)).toContainEqual(expect.stringContaining('events[0].t'));
+  });
+
+  it.each([
+    [0, 'status', 'x'],
+    [0, 'bytes', NaN],
+    [0, 'requestTimeMs', -1],
+    [0, 'userAgent', undefined],
+    [1, 'text', 3],
+    [2, 'op', 'upsert'],
+    [2, 'table', ''],
+    [2, 'key', {}],
+    [2, 'after', undefined],
+    [2, 'before', { role: { nested: true } }],
+    [3, 'size', 1.5],
+    [3, 'sha256', 'abc'],
+    [3, 'contentBase64', 7],
+    [4, 'keys', []],
+    [4, 'keys', [NaN]],
+    [4, 'columns', ['']],
+  ])('rejects events[%i].%s = %j', (i, field, value) => {
+    const r = valid();
+    r.events[i] = { ...r.events[i], [field]: value } as Recording['events'][number];
+    expect(validateRecording(r)).toContainEqual(expect.stringContaining(`events[${i}].${field}`));
+  });
+
+  it('wants before on deletes and after on inserts', () => {
+    const r = valid();
+    r.events[2] = { t: 20, kind: 'db', op: 'delete', table: 'Users', key: { id: 1 } };
+    expect(validateRecording(r)).toContainEqual(expect.stringContaining('events[2].before'));
+    r.events[2] = { t: 20, kind: 'db', op: 'insert', table: 'Users', key: { id: 1 } };
+    expect(validateRecording(r)).toContainEqual(expect.stringContaining('events[2].after'));
   });
 
   it('rejects a non-object and a wrong format version', () => {

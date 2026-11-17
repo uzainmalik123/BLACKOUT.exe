@@ -6,6 +6,13 @@
 | KI-02 | Kiro's credit cost per call is unknown, so the per-run cap (KIRO-10) can't be set yet; measure it with the first SYS-12 prototype | Major | Open |
 | KI-03 | Some Juice Shop behaviours in PRD §3/§5 are unconfirmed or need a team ruling; per-fact status below (checked 2026-11-17 against v20.4.0) | Major | Open |
 | KI-04 | No host picked for the page and the Kiro server (SYS-18); the rules require a working URL | Major | Open |
+| KI-05 | Recording timing assumes the host and the containers share one clock: `record.sh` stamps start/end with the host's `date`, while nginx and `docker logs` stamp with the containers' clocks. True on Linux Docker; Docker Desktop's VM can drift. `date +%s%3N` is GNU-only too, so re-recording is Linux-only | Minor | Open |
+| KI-06 | nginx has no healthcheck (`up --wait` only waits on the shop's), and `record.sh` throws away the output of `compose down`/`up`, so a broken rig shows up only as an isolation-check failure | Minor | Open |
+| KI-07 | The "no rig address" test reads the recording as text, so an address inside an embedded file (`contentBase64`) would get past it | Minor | Open |
+| KI-08 | Only the tools container's address (`10.66.0.66`) is rewritten into TEST-NET-3. nginx's own address (`10.66.0.10`, the shop's view of every client) is not; it appears in no recording yet, and the test above would fail if it did | Minor | Open |
+| KI-09 | `record.sh` writes `run.json` with a heredoc, unescaped: a `# tool:` or `# label:` line containing `"` or `\` breaks the JSON. The converter then refuses the run rather than saving bad data | Minor | Open |
+| KI-10 | Each recording has a few hundred ms of idle time at the start and end (container start-up before the first request, the exit after the last) | Minor | Open |
+| KI-11 | Juice Shop seeds its DB on start with the current time, so a re-recorded run's `before.sqlite` differs from the committed baseline in timestamp columns; a `db` event's `before` may not match the baseline exactly | Minor | Open |
 
 ### KI-03: Juice Shop facts (v20.4.0, checked 2026-11-17)
 
