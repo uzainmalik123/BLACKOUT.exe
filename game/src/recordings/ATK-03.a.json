@@ -1,0 +1,14 @@
+{
+  "format": 1,
+  "move": "ATK-03",
+  "variant": "a",
+  "label": "loud: one injected login, curl user agent",
+  "recordedAt": "2026-11-17T03:57:55.006Z",
+  "durationMs": 314,
+  "attackerIp": "203.0.113.23",
+  "juiceShop": "bkimminich/juice-shop:v20.4.0",
+  "tool": "curl 8.x",
+  "events": [
+    {"t":220,"kind":"access","ip":"203.0.113.23","method":"POST","target":"/rest/user/login","protocol":"HTTP/1.1","status":200,"bytes":784,"referer":"","userAgent":"curl/8.23.0","requestTimeMs":11}
+  ]
+}

@@ -65,6 +65,14 @@ describe('diffDatabases', () => {
     ]);
   });
 
+  it("ignores Juice Shop's scoreboard table (Challenges)", () => {
+    const before = new SQL.Database();
+    before.run('CREATE TABLE Challenges (id INTEGER PRIMARY KEY, solved INTEGER); INSERT INTO Challenges VALUES (45, 0);');
+    const after = new SQL.Database(before.export());
+    after.run('UPDATE Challenges SET solved = 1');
+    expect(diffDatabases(before, after, 0)).toEqual([]);
+  });
+
   it('keys a table without an id column by rowid, and sees deletes', () => {
     const before = new SQL.Database();
     before.run("CREATE TABLE Notes (body TEXT); INSERT INTO Notes VALUES ('hi');");
@@ -122,6 +130,16 @@ describe('exfilFromTraffic', () => {
   it('throws when a request does not match its access line', () => {
     const traffic = trafficEntry(1, '/s?q=1', '{}') + trafficEntry(2, '/s?q=X', '{}') + trafficEntry(3, '/s?q=3', '{}');
     expect(() => exfilFromTraffic(traffic, access, users)).toThrow('request #2');
+  });
+
+  it('reads bodies after CRLF headers, as sqlmap writes real responses', () => {
+    const leak = '{"data":[{"id":"qpjvqjim@juice-sh.operetjte541ca7ecf72b8d1286474fc613e5e45qbxxq"}]}';
+    const crlf = (n: number, target: string, body: string) =>
+      `HTTP request [#${n}]:\r\nGET ${target} HTTP/1.1\r\nHost: x\r\n\r\nHTTP response [#${n}] (200 OK):\r\nVary: Accept-Encoding\r\nURI: http://x${target}\n\r\n${body}\n\n${'#'.repeat(76)}\n\n`;
+    const traffic = crlf(1, '/s?q=1', '{}') + crlf(2, '/s?q=2', '{}') + crlf(3, '/s?q=3', leak);
+    expect(exfilFromTraffic(traffic, access, users)).toEqual([
+      { t: 300, kind: 'exfil', table: 'Users', keys: [2], columns: ['email', 'password'] },
+    ]);
   });
 
   it('stamps leaked rows at the response that carried them, once per row and column', () => {

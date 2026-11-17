@@ -41,6 +41,9 @@ const FLUSH_MS = 2000;
 /** Juice Shop's scoreboard chatter: a real shop doesn't log it (D-15). */
 const SCOREBOARD = /^(info: )?(Solved \d-star |Cheat score )/;
 
+/** Juice Shop's scoreboard table: solving a "challenge" isn't something a real shop records (D-15). */
+const SCOREBOARD_TABLES = new Set(['Challenges']);
+
 /** nginx `access.jsonl` (the `rec` log_format in recording/nginx/nginx.conf) → access events. */
 export function parseAccessJsonl(text: string, startMs: number): AccessEvent[] {
   return text
@@ -109,7 +112,7 @@ function userTables(db: Database): string[] {
 export function diffDatabases(before: Database, after: Database, t: number): DbEvent[] {
   const events: DbEvent[] = [];
   const afterTables = new Set(userTables(after));
-  for (const table of userTables(before).filter((name) => afterTables.has(name))) {
+  for (const table of userTables(before).filter((name) => afterTables.has(name) && !SCOREBOARD_TABLES.has(name))) {
     const b = tableRows(before, table);
     const a = tableRows(after, table);
     const keyOf = (k: string) => ({ [b.keyName]: Number.isNaN(Number(k)) ? k : Number(k) });
@@ -166,10 +169,11 @@ function parseTraffic(traffic: string): TrafficEntry[] {
     .filter((block) => block.startsWith('HTTP request'))
     .map((block) => {
       const n = Number(/^HTTP request \[#(\d+)\]/.exec(block)?.[1]);
-      const target = /^\S+ (\S+) HTTP\/[\d.]+$/m.exec(block)?.[1] ?? '';
+      const target = /^\S+ (\S+) HTTP\/[\d.]+\r?$/m.exec(block)?.[1] ?? '';
+      // Real response headers end in CRLF; sqlmap's own `URI:` line doesn't.
       const response = block.slice(block.search(/^HTTP response \[/m));
-      const bodyAt = response.indexOf('\n\n');
-      return { n, target, body: bodyAt < 0 ? '' : response.slice(bodyAt + 2) };
+      const gap = /\r?\n\r?\n/.exec(response);
+      return { n, target, body: gap ? response.slice(gap.index + gap[0].length) : '' };
     });
 }
 
