@@ -200,7 +200,7 @@ Look and feel: GAME_PLAN §11 (code-driven dot-matrix; data stays crisp text).
 | ID | Item | Spec | Pri |
 |---|---|---|---|
 | REC-01 | Recording rig | `docker compose`: Juice Shop behind nginx (real access log), on an isolated Docker network with no route out; attack tools in their own container on that network | M |
-| REC-02 | Capture | Per run: nginx access log, Juice Shop app log, a DB snapshot before and after, the uploads folder diff, timestamps. Stored as one JSON events file per move variant in `game/src/recordings/` | M |
+| REC-02 | Capture | Per run: nginx access log, Juice Shop app log, a DB snapshot before and after, the uploads folder diff, timestamps. Stored as one JSON events file per move variant in `game/src/recordings/`, format D-15 | M |
 | REC-03 | Variants | 2–3 per ATK move (IP, loud/quiet user agent, pacing); one script per variant, re-runnable | M |
 | REC-04 | Seed data | Juice Shop's own users, plus extra fake customers if needed so souls feel like a business (count decided at first recording) | M |
 | REC-05 | Minion recordings | One per MIN wave type, same rig | M |

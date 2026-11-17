@@ -16,6 +16,7 @@
 | D-12 | `docs/PRD.md` is the source of truth; changes go into the PRD and DECISIONS before code | Accepted |
 | D-13 | The Kiroween 2026 rules go into the PRD: Kiro-in-development rows (KDEV), submission rows (SUB), hosting is a must (SYS-18), property-based tests; Claude may build too, but the write-up only claims what Kiro did | Accepted |
 | D-14 | Grill gate: "grill me" and "take all the recommended options" in the same message is refused; the user must see the questions first | Accepted |
+| D-15 | The recording format: one JSON events file per move variant (`<MOVE>.<variant>.json`), five event kinds (access, app, db, file, exfil) timed in ms from the run start, attacker IPs rewritten into 203.0.113.0/24, one baseline DB | Accepted |
 
 ### D-01: Pivot to an incident-response game
 - **Context:** (2026-11-08) Reanimator raised dead repos so Death could attack them. Any agent can revive a repo on its own, so the product added nothing, and the UI had drifted into a pile of screens with no vision.
@@ -41,3 +42,17 @@
 - **Context:** (2026-11-09) On Reanimator the user often asked to be grilled and to "take all the recommended options" in the same message. The agent then answered its own questions, and the project drifted into things nobody had actually decided.
 - **Decision:** if a message asks for grilling (or any design questions) **and** to take all recommended options in the same breath, the agent refuses that combination, asks the questions with its recommendations, and stops. Only after the user has seen them may they say "take the recommended ones" or answer.
 - **Consequences:** a rule in `AGENTS.md` and Kiro steering; the old Claude memory saying the opposite is removed.
+
+### D-15: The recording format
+- **Context:** (2026-11-17) REC-02 says each move variant is stored as one JSON events file, but not what's in it. The replay engine (SYS-03), the shell (SYS-09) and the souls meter (SYS-05) all read it, so it's fixed before the converter is written.
+- **Decision:** one file `game/src/recordings/<MOVE>.<variant>.json` (e.g. `ATK-03.a.json`), typed in `game/src/recordings/format.ts`:
+  - **Header:** `format: 1`, `move`, `variant`, `label`, `recordedAt` (ISO, run start), `durationMs`, `attackerIp`, `juiceShop` (image tag), `tool`.
+  - **`events`**, sorted by `t` (ms since the run started, `0 ≤ t ≤ durationMs`), each one of:
+    - `access`: one nginx request as fields (`ip method target protocol status bytes referer userAgent requestTimeMs`), not the rendered line: the replay engine stamps game time and renders the `combined` line itself.
+    - `app`: one Juice Shop log line, verbatim. Lines outside the run window are dropped, and so are Juice Shop's scoreboard lines (`Solved … challenge`, `Cheat score …`): a real shop doesn't log them.
+    - `db`: one row inserted, updated or deleted (`table`, `key`, `before`/`after`), from diffing the before and after snapshots. `key` is `id` when the table has one, else `rowid`. Snapshots only bracket the run, so these are stamped at the run's last access event.
+    - `file`: one file added, changed or removed under `uploads/` (`path size sha256`, and `contentBase64` only when ≤ 64 KiB), stamped like `db`.
+    - `exfil`: rows that left the building in one response (`table`, `keys`, `columns`), found by matching the attack tool's own traffic log to the access log request by request; the converter refuses a run where the two disagree.
+  - **IPs:** the attacker's rig address is replaced in every string by `attackerIp`, always inside `203.0.113.0/24` (TEST-NET-3). No rig address (`10.66.0.0/24`) may appear in a committed recording; a test enforces it.
+  - **Baseline:** `game/src/recordings/juiceshop.sqlite` is the shop's DB before any attack (ATK-03.a's `before.sqlite`); every recording's `db` and `exfil` events apply on top of it.
+- **Consequences:** raw runs (`recording/runs/`) stay out of git; only the converted JSON and the baseline DB are committed. A new event kind needs a new decision and `format: 2`.
