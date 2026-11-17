@@ -7,3 +7,6 @@ dist/
 .superpowers/
 .claude/worktrees
 graphify-out/
+
+# raw recording runs (recording/record.sh); only converted JSON is committed
+recording/runs/

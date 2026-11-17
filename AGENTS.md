@@ -5,6 +5,7 @@ This repository is the team's **Kiroween 2026** entry: a horror-themed **cyber i
 ```
 <repo root>/
   game/        the game: React + Vite + TypeScript (a black screen so far)
+  recording/   the recording rig: Juice Shop + nginx + attack tools on an isolated Docker network (REC)
   docs/        GAME_PLAN.md (the why), PRD.md (the what), DECISIONS.md, KNOWN_ISSUES.md, KIRO_USAGE.md
   scripts/     the secrets guard (check-env-files.mjs)
   .github/     CI: `health` (game) and `env-files` (secrets guard), both required on main
