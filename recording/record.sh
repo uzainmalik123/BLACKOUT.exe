@@ -18,6 +18,7 @@ compose() { docker compose -p rec "$@"; }
 ms() { date +%s%3N; }
 
 echo "== fresh rig"
+compose --profile attack build -q tools >/dev/null   # the tools image is local-only; cleanup below needs it
 compose --profile attack down -v --remove-orphans >/dev/null 2>&1 || true
 # nginx writes its logs as root, so a throwaway container clears them; we recreate the dirs as us.
 docker run --rm --network none -v "$PWD/runs:/r" rec-tools:sqlmap-1.10.11 rm -rf /r/.nginx /r/.out "/r/$move.$variant"
