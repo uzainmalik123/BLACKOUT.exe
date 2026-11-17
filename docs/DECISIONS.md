@@ -19,6 +19,7 @@
 | D-15 | The recording format: one JSON events file per move variant (`<MOVE>.<variant>.json`), five event kinds (access, app, db, file, exfil) timed in ms from the run start, attacker IPs rewritten into 203.0.113.0/24, one baseline DB | Accepted |
 | D-16 | Row status lives in a new PRD §16 that lists only rows past `planned`, instead of a Status column in every table | Accepted |
 | D-17 | PRD rows corrected to what Juice Shop v20.4.0 really does (ATK-03, ATK-08, ATK-13, DEF-08); findings that would change a move's Needs go to KI-03 for the team | Accepted |
+| D-18 | ATK-15/16 need only `map`, held to stage 6 by the Director; ATK-12 needs `user-session`, which MIN-02 can supply | Accepted |
 
 ### D-01: Pivot to an incident-response game
 - **Context:** (2026-11-08) Reanimator raised dead repos so Death could attack them. Any agent can revive a repo on its own, so the product added nothing, and the UI had drifted into a pile of screens with no vision.
@@ -69,3 +70,8 @@
 - **Context:** (2026-11-17) Recording ATK-03.a and ATK-08.a, and reading Juice Shop v20.4.0's source in the image, showed some PRD text was wrong (KI-03 has the full list).
 - **Decision:** corrected the text that states facts: ATK-03 (Juice Shop doesn't log the injected email), ATK-08 (about 100 requests with small responses and errors with stack traces in the app log, not hundreds with huge ones), ATK-13 (only a `.zip`'s entries reach `uploads/complaints/`; no type bypass is needed), DEF-08 (lock with `deletedAt`, since nothing reads `isActive`). Findings that would change a move's Needs or the balance are left in KI-03 for the team: ATK-12 needs the victim's own token, and ATK-15/ATK-16 need no token at all (`PUT /api/Products/:id` has no auth).
 - **Consequences:** ATK-03 leaves the defender almost nothing to see except the login itself, which makes DEF-12/DEF-13 and Kiro's hints matter more. KI-03 stays open until the remaining ⚠ facts are recorded and the team rules on the Needs findings.
+
+### D-18: Needs for ATK-12, ATK-15 and ATK-16
+- **Context:** (2026-11-17) Juice Shop's source (KI-03) showed ATK-15/16's route needs no login and ATK-12 only changes the password of the token's own user, so their Needs in the PRD were wrong. The team ruled.
+- **Decision:** ATK-15/16 need only `map` (Juice Shop leaves product updates unauthenticated: broken access control, held back to stage 6 by the Director); ATK-12 needs `user-session`, which MIN-02 can supply, tying minions to Death's chain. ATK-15 is also stopped by DEF-12 (a WAF rule blocking `PUT /api/Products`). `user-session` comes from ATK-05 or a successful MIN-02 wave, so MIN-02's damage is 1 soul per success **and** a `user-session` for Death.
+- **Consequences:** ignoring MIN-02 now opens a stage-5 foothold (ATK-12), not just a soul drain. SYS-02 has no rule yet that holds a move to its stage (KI-12); until it does, "prefer later stages" would pick ATK-15/16 right after ATK-01.
