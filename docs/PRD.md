@@ -19,9 +19,9 @@ Every feature has one row with:
 | **ID** | `ATK` Death's moves · `MIN` minions · `DEF` player actions · `KIRO` Kiro · `SYS` game systems · `UI` screens · `CON` content · `REC` recording |
 | **Pri** | **M** must (the game isn't done without it) · **S** should (in the 23 days if must is done) · **X** stretch (after submission-ready) |
 | **Done when** | A check anyone can run. If it can't be checked, the row isn't finished being written |
-| **Status** | `planned` → `building` → `done` (Done-when passes and `npm run health` is green) |
+| **Status** | `planned` → `building` → `done` (Done-when passes and `npm run health` is green). Kept in **§16**, not in the tables |
 
-All rows start `planned`. Update the status in the same PR that changes it.
+All rows start `planned`. §16 lists only the rows that have left `planned` (D-16); update it in the same PR that changes a row.
 
 ---
 
@@ -58,17 +58,17 @@ Juice Shop facts marked ⚠ get confirmed while recording; if one turns out fals
 |---|---|---|---|---|---|---|---|---|---|
 | ATK-01 | 1 Scout | Directory scan | ffuf with a wordlist | Hundreds of `404`s per minute from one IP; user agent `Fuzz Faster U Fool` (Hard: hidden) | T1595.003 | — | `map` (knows `/ftp`, `/api`, `/rest`, `#/administration`) | DEF-06, DEF-12 (scanner rule) | M |
 | ATK-02 | 1 Scout | Loot the exposed `/ftp` folder | `curl /ftp/acquisitions.md`; null-byte trick for `package.json.bak` | `200`s on `/ftp/*` files; `%2500` in a URL | T1213 | `map`; `/ftp` on | `secrets-leaked` (company docs); reveals tech stack | DEF-10 (`/ftp` off) | S |
-| ATK-03 | 2 Break in | SQL injection on login | `POST /rest/user/login` with `' OR 1=1--` as the email | **One** successful admin login from a new IP, no failed attempts first (the injection is in the request body, so it isn't in the access log; the app log shows the odd email) | T1190 | `map` | `admin-session` | DEF-12 (SQLi rules), DEF-13 (login patch) | M |
+| ATK-03 | 2 Break in | SQL injection on login | `POST /rest/user/login` with `' OR 1=1--` as the email | **One** successful admin login from a new IP, no failed attempts first. The injection is in the request body, so it isn't in the access log, and Juice Shop doesn't log it either (recorded: ATK-03.a); the only trace is the login itself | T1190 | `map` | `admin-session` | DEF-12 (SQLi rules), DEF-13 (login patch) | M |
 | ATK-04 | 2 Break in | Guess the admin password | Hydra against the login with a short list (Juice Shop's admin password is `admin123`) | A burst of `401`s on `/rest/user/login`, then one `200` | T1110.001 | `map`; login not rate-limited | `admin-session`, `admin-password` | DEF-07 (login rate limit), DEF-16 (reset admin password) | M |
 | ATK-05 | 2 Break in | Reset a user's password via the security question | `POST /rest/user/reset-password` with a guessable answer ⚠ | Password-reset requests for one customer, then a login as them | T1110 | `map`; password reset on | `user-session` | DEF-10 (reset off), DEF-08 (lock that account) | S |
 | ATK-06 | 3 Admin | Register his own admin | `POST /api/Users` with `"role":"admin"` (mass assignment) | A new user created with role admin; admin-only requests from the same IP | T1136 | any foothold or `map` | `own-admin` (a real account in the DB) | DEF-10 (registration off), DEF-13 (registration patch), DEF-14 (delete account) | M |
 | ATK-07 | 3 Admin | Reuse a stolen admin token | Replays the admin JWT from ATK-03/04 | Admin requests with the same `Authorization` token from a second IP | T1550.001 | `admin-session` | keeps admin after the password changes | DEF-09 (rotate signing key + revoke sessions). Changing the password alone does **not** stop it | S |
-| ATK-08 | 4 Harvest | Dump customers through search | sqlmap on `/rest/products/search?q=` (UNION) | Hundreds of near-identical search requests with long encoded `q=`, huge response sizes; user agent `sqlmap` (Hard: random agent) | T1190, T1041 | `map` | **souls**: emails + password hashes | DEF-10 (search off), DEF-12 (SQLi rules; Death switches to sqlmap tamper scripts, which leak through on Medium/Hard), DEF-13 (search patch) | M |
+| ATK-08 | 4 Harvest | Dump customers through search | sqlmap on `/rest/products/search?q=` (UNION) | About a hundred near-identical search requests with long encoded `q=`: first a burst of `500`s (each a `SQLITE_ERROR` with a stack trace in the app log), then one small `200` per stolen row; user agent `sqlmap` (Hard: random agent) (recorded: ATK-08.a) | T1190, T1041 | `map` | **souls**: emails + password hashes | DEF-10 (search off), DEF-12 (SQLi rules; Death switches to sqlmap tamper scripts, which leak through on Medium/Hard), DEF-13 (search patch) | M |
 | ATK-09 | 4 Harvest | Scrape users through the admin API | `GET /api/Users` with the admin token, page by page | Admin token pulling the full user list; large `200`s | T1213 | `admin-session` or `own-admin` | **souls** | DEF-08 / DEF-14 (on the account he uses), DEF-09 | M |
 | ATK-10 | 4 Harvest | Walk other customers' baskets | `GET /rest/basket/1`, `/2`, `/3`… with one customer's token (IDOR) | One customer token reading many basket IDs in sequence | T1190 | `user-session` or any session | **souls**: orders, addresses | DEF-13 (basket ownership patch), DEF-08 | S |
 | ATK-11 | 5 Dig in | Plant a hidden second admin | A second `POST /api/Users` with a staff-looking email (`support-ops@juice-sh.op`) | One more admin in the users table; looks like a staff account | T1136 | `admin-session` or `own-admin` | `hidden-admin` (foothold) | DEF-14 (only if found), DEF-02 to find it | M |
 | ATK-12 | 5 Dig in | Take over a real customer | `GET /rest/user/change-password?new=…&repeat=…` with no current password ⚠ | A password change for a customer who isn't logged in from that IP | T1098 | any session | `hijacked-user` (foothold) | DEF-16 (force reset that user), DEF-13 (change-password patch) | S |
-| ATK-13 | 5 Dig in | Plant a file | Complaint upload at `/file-upload` with a type-check bypass ⚠. It can't execute on Juice Shop; it's a marker of compromise and a lure | A `.pdf`/`.zip` upload whose content isn't a PDF; a new file in uploads | T1105 | any session | `planted-file` (foothold) | DEF-15 (delete), DEF-10 (uploads off) | M |
+| ATK-13 | 5 Dig in | Plant a file | Complaint upload at `/file-upload` as a `.zip`: the type check never rejects anything, and only a zip's entries are written to `uploads/complaints/` (other uploads stay in memory) (source-checked, KI-03). It can't execute on Juice Shop; it's a marker of compromise and a lure | A `.zip` upload to `/file-upload`; new files in `uploads/complaints/` | T1105 | any session | `planted-file` (foothold) | DEF-15 (delete), DEF-10 (uploads off) | M |
 | ATK-14 | 5 Dig in | Forge his own login token | An unsigned JWT (`alg: none`) for a made-up user ⚠ | Requests with a token whose header says `none`, from an account that doesn't exist | T1606 | `map` + `secrets-leaked` or a stage-3 gain | `forged-token` (foothold) | DEF-13 (token-verify patch). Rotating the key does **not** stop it | S |
 | ATK-15 | 6 Strike | Deface products | `PUT /api/Products/:id` changing descriptions to his message | Product descriptions changed by an admin account; customers see it | T1491.002 | `admin-session` or `own-admin` or `hidden-admin` | `defaced` (heavy heartbeat drain) | DEF-17 (restore), DEF-13 (product-update patch) | M |
 | ATK-16 | 6 Strike | Booby-trap a product page | Stored XSS in a product description through the API ⚠ | A `<script>`/`<iframe>` in a product description | T1189 | same as ATK-15 | `xss-live` (heartbeat drain; souls drip from customers who visit) | DEF-17, DEF-13 | S |
@@ -113,7 +113,7 @@ Actions happen in two places, as in a real job:
 | DEF-05 | Preserve | Snapshot evidence | `tar czf /evidence/<name>.tgz /var/log …` then `sha256sum` | Marks evidence preserved before changes | Game time. Skipping it before eradication is marked down in the report | M |
 | DEF-06 | Contain | Block an IP | `iptables -A INPUT -s <ip> -j DROP` (`-L`, `-D` too) | Cuts that IP | Death **switches IP** (variant); you lose that thread in the logs | M |
 | DEF-07 | Contain | Rate-limit login | WAF console → rate limit on `/rest/user/login` | Stops ATK-04 and MIN-02 | Small heartbeat cost (real customers slowed) | M |
-| DEF-08 | Contain | Lock an account | `sqlite3 … UPDATE Users SET isActive=0 …` ⚠ or the Accounts console | That account stops working | Tips Death off; the real user is locked out | M |
+| DEF-08 | Contain | Lock an account | `sqlite3 … UPDATE Users SET deletedAt=datetime('now') …` or the Accounts console (Juice Shop never reads `isActive`; login refuses rows with `deletedAt` set, KI-03) | That account can't log in again (tokens it already has keep working until DEF-09) | Tips Death off; the real user is locked out | M |
 | DEF-09 | Contain | Revoke all sessions + rotate the signing key | Sessions console | Kills stolen tokens (ATK-07) | Logs **every** customer out: heartbeat dip. Too early (before you know his footholds) is marked down | M |
 | DEF-10 | Contain | Turn a feature off | Feature-flags console: search, registration, password reset, uploads, `/ftp`, feedback CAPTCHA (on) | Closes that route | Heartbeat drain **while off** (scaled by how important the feature is) | M |
 | DEF-11 | Contain | Pull the plug | `systemctl stop nginx` (or the big red console button) | Stops everything | Heartbeat drains fast while down | M |
@@ -287,3 +287,15 @@ From the Kiroween 2026 rules. Each one is a hard requirement unless marked bonus
 - **Name** (KI-01): the team decides.
 - **Who does what**: the team decides once both are online.
 - **Which host** for SYS-18 (KI-04).
+
+## 16. Status
+
+Rows not listed here are `planned`. A PR that moves a row adds or updates its line here (D-16).
+
+| ID | Status | Note |
+|---|---|---|
+| REC-01 | done | `recording/`: isolated rig, `check-isolation.sh` passes |
+| REC-02 | done | `recording/record.sh` + `npm run recording:convert`, format D-15 |
+| REC-03 | building | One variant each so far: ATK-03.a, ATK-08.a |
+| ATK-03 | building | Recorded (ATK-03.a); not playable until SYS-03 |
+| ATK-08 | building | Recorded (ATK-08.a); not playable until SYS-03 |

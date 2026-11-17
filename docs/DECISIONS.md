@@ -17,6 +17,8 @@
 | D-13 | The Kiroween 2026 rules go into the PRD: Kiro-in-development rows (KDEV), submission rows (SUB), hosting is a must (SYS-18), property-based tests; Claude may build too, but the write-up only claims what Kiro did | Accepted |
 | D-14 | Grill gate: "grill me" and "take all the recommended options" in the same message is refused; the user must see the questions first | Accepted |
 | D-15 | The recording format: one JSON events file per move variant (`<MOVE>.<variant>.json`), five event kinds (access, app, db, file, exfil) timed in ms from the run start, attacker IPs rewritten into 203.0.113.0/24, one baseline DB | Accepted |
+| D-16 | Row status lives in a new PRD §16 that lists only rows past `planned`, instead of a Status column in every table | Accepted |
+| D-17 | PRD rows corrected to what Juice Shop v20.4.0 really does (ATK-03, ATK-08, ATK-13, DEF-08); findings that would change a move's Needs go to KI-03 for the team | Accepted |
 
 ### D-01: Pivot to an incident-response game
 - **Context:** (2026-11-08) Reanimator raised dead repos so Death could attack them. Any agent can revive a repo on its own, so the product added nothing, and the UI had drifted into a pile of screens with no vision.
@@ -56,3 +58,14 @@
   - **IPs:** the attacker's rig address is replaced in every string by `attackerIp`, always inside `203.0.113.0/24` (TEST-NET-3). No rig address (`10.66.0.0/24`) may appear in a committed recording; a test enforces it.
   - **Baseline:** `game/src/recordings/juiceshop.sqlite` is the shop's DB before any attack (ATK-03.a's `before.sqlite`); every recording's `db` and `exfil` events apply on top of it.
 - **Consequences:** raw runs (`recording/runs/`) stay out of git; only the converted JSON and the baseline DB are committed. A new event kind needs a new decision and `format: 2`.
+
+### D-16: Row status in PRD §16
+- **Context:** (2026-11-17) PRD §0 says every row has a Status and PRs update it, but none of the tables has a Status column, so nothing could be marked.
+- **Decision:** a new §16 Status table lists only the rows that have left `planned` (absent = `planned`); §0 points at it. A PR that changes a row updates its line in §16.
+- **Consequences:** the feature tables stay as they are; §16 is the one place to see progress.
+
+### D-17: PRD rows corrected from the first recordings
+- **Context:** (2026-11-17) Recording ATK-03.a and ATK-08.a, and reading Juice Shop v20.4.0's source in the image, showed some PRD text was wrong (KI-03 has the full list).
+- **Decision:** corrected the text that states facts: ATK-03 (Juice Shop doesn't log the injected email), ATK-08 (about 100 requests with small responses and `SQLITE_ERROR`s in the app log, not hundreds with huge ones), ATK-13 (only a `.zip`'s entries reach `uploads/complaints/`; no type bypass is needed), DEF-08 (lock with `deletedAt`, since nothing reads `isActive`). Findings that would change a move's Needs or the balance are left in KI-03 for the team: ATK-12 needs the victim's own token, and ATK-15/ATK-16 need no token at all (`PUT /api/Products/:id` has no auth).
+- **Consequences:** ATK-03 leaves the defender almost nothing to see except the login itself, which makes DEF-12/DEF-13 and Kiro's hints matter more. KI-03 stays open until the remaining ⚠ facts are recorded and the team rules on the Needs findings.
+
