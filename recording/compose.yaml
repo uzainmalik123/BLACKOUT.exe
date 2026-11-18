@@ -1,0 +1,48 @@
+# The recording rig (docs/PRD.md REC-01). Juice Shop behind nginx on a Docker-internal network:
+# no route out and no published ports, so nothing here can touch anything but itself.
+# Attacks run only from the `tools` container, only while recording (AGENTS.md).
+# Use through record.sh; check-isolation.sh proves the isolation before every run.
+name: rec
+
+networks:
+  rec:
+    internal: true
+    ipam:
+      config:
+        - subnet: 10.66.0.0/24
+
+services:
+  juice:
+    image: bkimminich/juice-shop:v20.4.0
+    networks:
+      rec:
+        ipv4_address: 10.66.0.20
+    healthcheck:
+      # The image is distroless (no shell, no curl), so the check is node itself.
+      test: ["CMD", "/nodejs/bin/node", "-e", "fetch('http://127.0.0.1:3000/rest/admin/application-version').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"]
+      interval: 3s
+      timeout: 3s
+      retries: 60
+
+  nginx:
+    image: nginx:1.29-alpine
+    depends_on:
+      juice:
+        condition: service_healthy
+    networks:
+      rec:
+        ipv4_address: 10.66.0.10
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./runs/.nginx:/var/log/rec
+
+  tools:
+    build: ./tools
+    image: rec-tools:sqlmap-1.10.11
+    profiles: [attack]
+    networks:
+      rec:
+        ipv4_address: 10.66.0.66
+    volumes:
+      - ./attacks:/attacks:ro
+      - ./runs/.out:/out

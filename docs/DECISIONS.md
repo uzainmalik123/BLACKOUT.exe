@@ -16,6 +16,10 @@
 | D-12 | `docs/PRD.md` is the source of truth; changes go into the PRD and DECISIONS before code | Accepted |
 | D-13 | The Kiroween 2026 rules go into the PRD: Kiro-in-development rows (KDEV), submission rows (SUB), hosting is a must (SYS-18), property-based tests; Claude may build too, but the write-up only claims what Kiro did | Accepted |
 | D-14 | Grill gate: "grill me" and "take all the recommended options" in the same message is refused; the user must see the questions first | Accepted |
+| D-15 | The recording format: one JSON events file per move variant (`<MOVE>.<variant>.json`), five event kinds (access, app, db, file, exfil) timed in ms from the run start, attacker IPs rewritten into 203.0.113.0/24, one baseline DB | Accepted |
+| D-16 | Row status lives in a new PRD §16 that lists only rows past `planned`, instead of a Status column in every table | Accepted |
+| D-17 | PRD rows corrected to what Juice Shop v20.4.0 really does (ATK-03, ATK-08, ATK-13, DEF-08); findings that would change a move's Needs go to KI-03 for the team | Accepted |
+| D-18 | ATK-15/16 need only `map`, held to stage 6 by the Director; ATK-12 needs `user-session`, which MIN-02 can supply | Accepted |
 
 ### D-01: Pivot to an incident-response game
 - **Context:** (2026-11-08) Reanimator raised dead repos so Death could attack them. Any agent can revive a repo on its own, so the product added nothing, and the UI had drifted into a pile of screens with no vision.
@@ -41,3 +45,33 @@
 - **Context:** (2026-11-09) On Reanimator the user often asked to be grilled and to "take all the recommended options" in the same message. The agent then answered its own questions, and the project drifted into things nobody had actually decided.
 - **Decision:** if a message asks for grilling (or any design questions) **and** to take all recommended options in the same breath, the agent refuses that combination, asks the questions with its recommendations, and stops. Only after the user has seen them may they say "take the recommended ones" or answer.
 - **Consequences:** a rule in `AGENTS.md` and Kiro steering; the old Claude memory saying the opposite is removed.
+
+### D-15: The recording format
+- **Context:** (2026-11-17) REC-02 says each move variant is stored as one JSON events file, but not what's in it. The replay engine (SYS-03), the shell (SYS-09) and the souls meter (SYS-05) all read it, so it's fixed before the converter is written.
+- **Decision:** one file `game/src/recordings/<MOVE>.<variant>.json` (e.g. `ATK-03.a.json`), typed in `game/src/recordings/format.ts`:
+  - **Header:** `format: 1`, `move`, `variant`, `label`, `recordedAt` (ISO, run start), `durationMs`, `attackerIp`, `juiceShop` (image tag), `tool`.
+  - **`events`**, sorted by `t` (ms since the run started, `0 ≤ t ≤ durationMs`), each one of:
+    - `access`: one nginx request as fields (`ip method target protocol status bytes referer userAgent requestTimeMs`), not the rendered line: the replay engine stamps game time and renders the `combined` line itself.
+    - `app`: one Juice Shop log line, verbatim. The window is the run plus 2 s after the tool exits (the time `record.sh` waits for logs to flush); lines outside it are dropped, and so are Juice Shop's scoreboard lines (`Solved … challenge`, `Cheat score …`): a real shop doesn't log them.
+    - `db`: one row inserted, updated or deleted (`table`, `key`, `before`/`after`), from diffing the before and after snapshots, minus Juice Shop's scoreboard table (`Challenges`). `key` is `id` when the table has one, else `rowid`. An `insert` carries the whole row in `after`, a `delete` the whole row in `before`, and an `update` only the columns that changed, in both. Cell values are strings, numbers or `null`; a binary value (BLOB) becomes the string `base64:<data>`. Only tables in both snapshots are diffed: a table created or dropped during the run produces no events. Snapshots only bracket the run, so these are stamped at the run's last access event.
+    - `file`: one file added, changed or removed under `uploads/` (`path size sha256`, and `contentBase64` only when ≤ 64 KiB), stamped like `db`.
+    - `exfil`: rows that left the building in one response (`table`, `keys`, `columns`), found by matching the attack tool's own traffic log to the access log request by request; the converter refuses a run where the two disagree. Today only sqlmap's `-t` log is read, for `Users` emails and password hashes; a move made with curl records no `exfil` until it captures its responses too.
+  - **IPs:** the attacker's rig address is replaced in every string by `attackerIp`, always inside `203.0.113.0/24` (TEST-NET-3). No rig address (`10.66.0.0/24`) may appear in a committed recording; a test enforces it.
+  - **Validation:** `validateRecording` checks the header and every field of every event kind (types, whole numbers, no `NaN`, the right `before`/`after` per `op`). The converter refuses to write a recording it rejects, and a test runs it on every committed one.
+  - **Baseline:** `game/src/recordings/juiceshop.sqlite` is the shop's DB before any attack (ATK-03.a's `before.sqlite`); every recording's `db` and `exfil` events apply on top of it.
+- **Consequences:** raw runs (`recording/runs/`) stay out of git; only the converted JSON and the baseline DB are committed. A new event kind needs a new decision and `format: 2`.
+
+### D-16: Row status in PRD §16
+- **Context:** (2026-11-17) PRD §0 says every row has a Status and PRs update it, but none of the tables has a Status column, so nothing could be marked.
+- **Decision:** a new §16 Status table lists only the rows that have left `planned` (absent = `planned`); §0 points at it. A PR that changes a row updates its line in §16.
+- **Consequences:** the feature tables stay as they are; §16 is the one place to see progress.
+
+### D-17: PRD rows corrected from the first recordings
+- **Context:** (2026-11-17) Recording ATK-03.a and ATK-08.a, and reading Juice Shop v20.4.0's source in the image, showed some PRD text was wrong (KI-03 has the full list).
+- **Decision:** corrected the text that states facts: ATK-03 (Juice Shop doesn't log the injected email), ATK-08 (about 100 requests with small responses and errors with stack traces in the app log, not hundreds with huge ones), ATK-13 (only a `.zip`'s entries reach `uploads/complaints/`; no type bypass is needed), DEF-08 (lock with `deletedAt`, since nothing reads `isActive`). Findings that would change a move's Needs or the balance are left in KI-03 for the team: ATK-12 needs the victim's own token, and ATK-15/ATK-16 need no token at all (`PUT /api/Products/:id` has no auth).
+- **Consequences:** ATK-03 leaves the defender almost nothing to see except the login itself, which makes DEF-12/DEF-13 and Kiro's hints matter more. KI-03 stays open until the remaining ⚠ facts are recorded and the team rules on the Needs findings.
+
+### D-18: Needs for ATK-12, ATK-15 and ATK-16
+- **Context:** (2026-11-17) Juice Shop's source (KI-03) showed ATK-15/16's route needs no login and ATK-12 only changes the password of the token's own user, so their Needs in the PRD were wrong. The team ruled.
+- **Decision:** ATK-15/16 need only `map` (Juice Shop leaves product updates unauthenticated: broken access control, held back to stage 6 by the Director); ATK-12 needs `user-session`, which MIN-02 can supply, tying minions to Death's chain. ATK-15 is also stopped by DEF-12 (a WAF rule blocking `PUT /api/Products`). `user-session` comes from ATK-05 or a successful MIN-02 wave, so MIN-02's damage is 1 soul per success **and** a `user-session` for Death.
+- **Consequences:** ignoring MIN-02 now opens a stage-5 foothold (ATK-12), not just a soul drain. SYS-02 has no rule yet that holds a move to its stage (KI-12); until it does, "prefer later stages" would pick ATK-15/16 right after ATK-01.
