@@ -3,7 +3,7 @@
 import { describe, expect, it } from 'vitest';
 import { MINION_BY_ID } from '../rules/minions';
 import { MOVE_BY_ID } from '../rules/moves';
-import { FOOTHOLDS, type MinionId, type MoveId, type Patch, type PlayerAction, type Stopper } from '../rules/vocabulary';
+import { FOOTHOLDS, type Feature, type MinionId, type MoveId, type Patch, type PlayerAction, type Stopper } from '../rules/vocabulary';
 import type { GameEvent } from './log';
 import { eventsOfKind } from './log';
 import type { RecEvent } from '../recordings/format';
@@ -42,10 +42,10 @@ function closeMinion(minion: MinionId, act: Act): void {
 }
 
 /** The containment the playbook applies when a move starts: close the route it uses, fast, then the real fix. */
-function contain(move: MoveId, ip: string, w: World, act: Act, options: { noLoginRateLimit?: boolean; skipPatch?: Patch } = {}): void {
+function contain(move: MoveId, ip: string, w: World, act: Act, options: { noLoginRateLimit?: boolean; skipPatch?: Patch; skipFeature?: Feature } = {}): void {
   const stoppers: Stopper[] = MOVE_BY_ID[move].stoppedBy;
   for (const s of stoppers) {
-    if (s.action === 'DEF-10') act({ type: 'DEF-10', feature: s.feature, enabled: s.feature === 'feedback-captcha' });
+    if (s.action === 'DEF-10' && s.feature !== options.skipFeature) act({ type: 'DEF-10', feature: s.feature, enabled: s.feature === 'feedback-captcha' });
     if (s.action === 'DEF-12') act({ type: 'DEF-12', rule: s.rule });
     if (s.action === 'DEF-13' && s.patch !== options.skipPatch) act({ type: 'DEF-13', patch: s.patch });
     if (s.action === 'DEF-07' && !options.noLoginRateLimit) act({ type: 'DEF-07' });
@@ -117,9 +117,12 @@ describe('the playthrough sims (PRD §10, SYS-16)', () => {
   });
 
   it('SIM-4: containing well but never looking for footholds ends in "Banished", then the return through ATK-11', () => {
+    // D-30: closing or patching registration stops ATK-11 as well as ATK-06, so this player leaves registration open
+    // and gets rid of ATK-06's admin by deleting it (DEF-14, one of ATK-06's stoppers) instead.
     const r = sim(reactor((e, w, act) => {
-      if (e.kind === 'move-started') contain(e.move, e.ip, w, act);
+      if (e.kind === 'move-started') contain(e.move, e.ip, w, act, { skipFeature: 'registration', skipPatch: 'registration' });
       if (e.kind === 'wave-started') closeMinion(e.minion, act);
+      if (e.kind === 'move-landed' && e.move === 'ATK-06') for (const a of w.accounts) if (a.createdBy === 'ATK-06') act({ type: 'DEF-14', email: a.email });
       if (e.kind === 'move-landed') recover(e.move, w, act); // recovers, but never hunts for what he left behind
       bringBack(e, act);
     }));

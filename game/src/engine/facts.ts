@@ -60,7 +60,6 @@ export function needHolds(world: World, need: Need): boolean {
   const g = gains(world);
   if ('anySession' in need) return g.has('admin-session') || g.has('user-session') || g.has('own-admin') || footholds(world).has('hidden-admin');
   if ('anyFoothold' in need) return footholds(world).size > 0;
-  if ('anyAdmin' in need) return g.has('admin-session') || g.has('own-admin') || g.has('admin-password');
   if ('stageGain' in need) return MOVES.some((m) => m.stage === need.stageGain && m.gains.some((x) => g.has(x)));
   if ('featureOn' in need) return world.features[need.featureOn];
   return !loginRateLimited(world);
@@ -87,6 +86,7 @@ const allReset = (world: World, emails: string[]) => emails.length > 0 && emails
 
 /** True when this stopper currently closes the move (for the given variant, when the stopper depends on it). */
 export function stopperHolds(world: World, stopper: Stopper, variant?: VariantInfo): boolean {
+  if ('undo' in stopper) return false; // undo stoppers close a move after it lands; they never pre-empt it
   switch (stopper.action) {
     case 'DEF-06':
       return variant !== undefined && world.firewall.blocked.includes(variant.ip);
@@ -113,8 +113,6 @@ export function stopperHolds(world: World, stopper: Stopper, variant?: VariantIn
       return world.death.played.some((p) => p.outcome === 'landed' && (p.move === 'ATK-06' || p.move === 'ATK-11')) && !world.accounts.some((a) => a.createdBy !== 'seed');
     case 'DEF-16':
       return stopper.account === 'admin' ? account(world, 'admin@juice-sh.op')?.passwordResetAt !== undefined : allReset(world, variant?.targets ?? []);
-    default:
-      return false; // undo stoppers close a move after it lands; they never pre-empt it
   }
 }
 

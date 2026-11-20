@@ -2,7 +2,7 @@
 // never make souls go back up, and never leave heartbeat outside 0–100.
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
-import { FEATURES, type PlayerAction, type WafRule } from '../rules/vocabulary';
+import { FEATURES, PATCHES, type PlayerAction, type WafRule } from '../rules/vocabulary';
 import { applyAction } from './actions';
 import { advance } from './advance';
 import { EMPTY_LIBRARY, type RecordingLibrary } from './library';
@@ -14,7 +14,6 @@ import { FIXTURE_IPS, FIXTURE_LIBRARY } from './test-fixtures/recordings';
 const ips = ['203.0.113.23', '203.0.113.81', '203.0.113.100', '203.0.113.200', '10.0.0.1', 'nope', ...FIXTURE_IPS];
 const emails = [...SEED_ACCOUNTS.map((a) => a.email), 'death@juice-sh.op', 'support-ops@juice-sh.op', 'nobody@juice-sh.op'];
 const paths = ['complaints/invoice.zip', 'READ_ME_MORTAL.txt', 'nope.txt'];
-const patches = ['login', 'registration', 'search', 'basket-ownership', 'change-password', 'token-verify', 'product-update'] as const;
 const rules: WafRule[] = [
   { kind: 'sqli' }, { kind: 'block-user-agent', pattern: 'sqlmap' }, { kind: 'block-user-agent', pattern: 'scanner' },
   { kind: 'block-path', method: 'PUT', path: '/api/Products' }, { kind: 'rate-limit', path: '/api/*' }, { kind: 'rate-limit', path: '/rest/user/login' },
@@ -34,7 +33,7 @@ export const arbAction: fc.Arbitrary<PlayerAction> = fc.oneof(
   fc.record({ type: fc.constant('DEF-10' as const), feature: fc.constantFrom(...FEATURES), enabled: fc.boolean() }),
   fc.constant({ type: 'DEF-11' as const }),
   fc.record({ type: fc.constant('DEF-12' as const), rule: fc.constantFrom(...rules) }),
-  fc.record({ type: fc.constant('DEF-13' as const), patch: fc.constantFrom(...patches) }),
+  fc.record({ type: fc.constant('DEF-13' as const), patch: fc.constantFrom(...PATCHES) }),
   fc.record({ type: fc.constant('DEF-14' as const), email: fc.constantFrom(...emails) }),
   fc.record({ type: fc.constant('DEF-15' as const), path: fc.constantFrom(...paths) }),
   fc.record({ type: fc.constant('DEF-16' as const), email: fc.constantFrom(...emails) }),
