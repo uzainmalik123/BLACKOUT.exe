@@ -36,7 +36,9 @@ address the attacker gets in the recording (always inside `203.0.113.0/24`).
 | ATK-03.a | `attacks/ATK-03.a.sh` | 203.0.113.23 | Login SQLi, one request, curl's own user agent (its `before.sqlite` is the baseline) |
 | ATK-04.a | `attacks/ATK-04.a.sh` | 203.0.113.44 | Hydra against the admin login, 30 passwords, 4 tasks, Hydra's own user agent |
 | ATK-06.a | `attacks/ATK-06.a.sh` | 203.0.113.61 | Admin sign-up by mass assignment, then its login and the admin page's data |
-| ATK-08.a | `attacks/ATK-08.a.sh` | 203.0.113.81 | sqlmap UNION dump of Users through search, sqlmap's own user agent |
+| ATK-08.a | `attacks/ATK-08.a.sh` | 203.0.113.81 | sqlmap UNION dump of Users through search, sqlmap's own user agent, full speed (test-only, D-31) |
+| ATK-08.b | `attacks/ATK-08.b.sh` | 203.0.113.82 | Low and slow: the same dump with `--delay=0.36`, ~2.5 min |
+| ATK-08.c | `attacks/ATK-08.c.sh` | 203.0.113.83 | Loud: probing only with `--delay=1.2` (~90 s), then a fast `--dump` from the saved session |
 | ATK-09.a | `attacks/ATK-09.a.sh` | 203.0.113.91 | One `GET /api/Users` with the admin token (setup), responses captured |
 | ATK-11.a | `attacks/ATK-11.a.sh` | 203.0.113.111 | Staff-looking admin sign-up with the admin token (setup), browser user agent |
 | ATK-13.a | `attacks/ATK-13.a.sh` | 203.0.113.131 | Zipped PHP web shell through `/file-upload` |
