@@ -1,7 +1,7 @@
-import { SEED_ACCOUNTS } from './seed';
+import { LEAKED_PASSWORD_REUSERS, SEED_ACCOUNTS } from './seed';
 import { describe, expect, it } from 'vitest';
 import { eventsOfKind } from './log';
-import { soulsLeft, soulsStolen, steal, stealOneUnstolenCustomer } from './souls';
+import { soulsLeft, soulsStolen, steal, stuffOneReuser } from './souls';
 import { initialWorld } from './state';
 
 describe('souls (SYS-05)', () => {
@@ -31,16 +31,37 @@ describe('souls (SYS-05)', () => {
     ]);
   });
 
-  it('MIN-02 steals one customer not stolen before and returns undefined when none is left', () => {
+  it("never counts an account Death created himself (ATK-06's or ATK-11's admin), even when a dump takes its row", () => {
+    const w = initialWorld(1, 'medium');
+    w.accounts.push({ id: 326, email: 'reaper@example.org', role: 'admin', createdBy: 'ATK-06' }, { id: 327, email: 'support-ops@juice-sh.op', role: 'admin', createdBy: 'ATK-11' });
+    expect(steal(w, 'ATK-08', 'Users', [325, 326, 327])).toBe(1);
+    expect(steal(w, 'ATK-09', 'Users', [326])).toBe(0);
+    expect(w.souls.stolen).toEqual([{ table: 'Users', key: 325 }]);
+    expect(soulsLeft(w)).toBe(SEED_ACCOUNTS.length - 1);
+  });
+
+  it('MIN-02 only ever breaks into customers who reuse a leaked password (D-26), never an admin, each new one once', () => {
     const w = initialWorld(3, 'medium');
     const seen = new Set<number>();
-    for (let i = 0; i < SEED_ACCOUNTS.length; i++) {
-      const a = stealOneUnstolenCustomer(w, 'MIN-02');
-      expect(a).toBeDefined();
-      expect(seen.has(a!.id)).toBe(false);
-      seen.add(a!.id);
+    for (let i = 0; i < LEAKED_PASSWORD_REUSERS.length; i++) {
+      const a = stuffOneReuser(w, 'MIN-02')!;
+      expect(LEAKED_PASSWORD_REUSERS).toContain(a.id);
+      expect(a.role).toBe('customer');
+      expect(seen.has(a.id)).toBe(false);
+      seen.add(a.id);
     }
-    expect(soulsStolen(w)).toBe(SEED_ACCOUNTS.length);
-    expect(stealOneUnstolenCustomer(w, 'MIN-02')).toBeUndefined();
+    expect(soulsStolen(w)).toBe(LEAKED_PASSWORD_REUSERS.length);
+    const again = stuffOneReuser(w, 'MIN-02')!; // every reuser taken: still a login (a session for Death), no new soul
+    expect(LEAKED_PASSWORD_REUSERS).toContain(again.id);
+    expect(soulsStolen(w)).toBe(LEAKED_PASSWORD_REUSERS.length);
+  });
+
+  it('MIN-02 cannot use a locked or force-reset account, and finds nothing once every reuser is closed', () => {
+    const w = initialWorld(1, 'medium');
+    for (const a of w.accounts) if (LEAKED_PASSWORD_REUSERS.includes(a.id)) a.lockedAt = 0;
+    w.accounts.find((a) => a.id === LEAKED_PASSWORD_REUSERS[0])!.lockedAt = undefined;
+    w.accounts.find((a) => a.id === LEAKED_PASSWORD_REUSERS[0])!.passwordResetAt = 5;
+    expect(stuffOneReuser(w, 'MIN-02')).toBeUndefined();
+    expect(soulsStolen(w)).toBe(0);
   });
 });

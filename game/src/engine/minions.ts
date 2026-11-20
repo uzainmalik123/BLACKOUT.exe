@@ -9,7 +9,7 @@ import type { RecordingLibrary } from './library';
 import { emit } from './log';
 import { closeAlert, openAlert, startReplay } from './replay';
 import { nextRandom } from './rng';
-import { stealOneUnstolenCustomer } from './souls';
+import { stuffOneReuser } from './souls';
 import type { Wave, World } from './state';
 
 export function activeWaves(world: World): Wave[] {
@@ -66,7 +66,7 @@ function stuff(world: World, wave: Wave): void {
   const due = Math.min(min02SuccessesPerWave, Math.floor(((world.clock.gameMs - wave.startedAt) * 2) / waveDurationGameMs));
   while (wave.successesDone < due) {
     wave.successesDone++;
-    const victim = stealOneUnstolenCustomer(world, 'MIN-02');
+    const victim = stuffOneReuser(world, 'MIN-02');
     if (victim) world.sessions.push({ id: world.death.nextId++, email: victim.email, kind: 'user', issuedBy: 'MIN-02', keyVersion: world.signingKey.version });
   }
 }
