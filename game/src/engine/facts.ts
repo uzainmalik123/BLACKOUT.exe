@@ -102,8 +102,8 @@ export function stopperHolds(world: World, stopper: Stopper, variant?: VariantIn
     }
     case 'DEF-13':
       return world.patches.applied.includes(stopper.patch);
-    case 'DEF-14':
-      return usedAccountEmails(world).length === 0;
+    case 'DEF-14': // the account he registered or planted is gone (only meaningful once he had one)
+      return world.death.played.some((p) => p.outcome === 'landed' && (p.move === 'ATK-06' || p.move === 'ATK-11')) && !world.accounts.some((a) => a.createdBy !== 'seed');
     case 'DEF-16':
       return stopper.account === 'admin' ? account(world, 'admin@juice-sh.op')?.passwordResetAt !== undefined : allReset(world, variant?.targets ?? []);
     default:

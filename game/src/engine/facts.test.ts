@@ -120,7 +120,12 @@ describe('stopperHolds', () => {
     expect(stopperHolds(w, { action: 'DEF-08', account: 'used' })).toBe(true);
     expect(stopperHolds(w, { action: 'DEF-14', account: 'used' })).toBe(false);
     w.sessions = [];
-    expect(stopperHolds(w, { action: 'DEF-14', account: 'used' })).toBe(true);
+    expect(stopperHolds(w, { action: 'DEF-14', account: 'used' })).toBe(false); // he never had an account of his own
+    w.death.played.push({ move: 'ATK-06', variant: 'a', outcome: 'landed' });
+    expect(stopperHolds(w, { action: 'DEF-14', account: 'used' })).toBe(true); // he did, and it is gone
+    w.accounts.push({ id: 26, email: 'death@juice-sh.op', role: 'admin', createdBy: 'ATK-06' });
+    expect(stopperHolds(w, { action: 'DEF-14', account: 'used' })).toBe(false);
+    w.accounts.pop();
     const jim: VariantInfo = { ...loud, targets: ['jim@juice-sh.op'] };
     expect(stopperHolds(w, { action: 'DEF-08', account: 'target' }, jim)).toBe(false);
     w.accounts[1]!.lockedAt = 2;
