@@ -21,6 +21,8 @@
 | D-17 | PRD rows corrected to what Juice Shop v20.4.0 really does (ATK-03, ATK-08, ATK-13, DEF-08); findings that would change a move's Needs go to KI-03 for the team | Accepted |
 | D-18 | ATK-15/16 need only `map`, held to stage 6 by the Director; ATK-12 needs `user-session`, which MIN-02 can supply | Accepted |
 | D-19 | Stage order: Death plays a stage-N move only after a stage-(N-1) move (stage 1 always open); the return ignores it and a tip-off skips one stage; Needs stay technical | Accepted |
+| D-20 | Hosting on Fly.io: one small container serves the game page and the Kiro server (SYS-18); the team handles any cold-start | Accepted |
+| D-21 | Track split: Uzain (with Claude) takes Track A, the rules engine, plus the recordings and Kiro; the teammate takes the shell, the look and the writing (`docs/TEAMMATE_TASKS.md`) | Accepted |
 
 ### D-01: Pivot to an incident-response game
 - **Context:** (2026-11-08) Reanimator raised dead repos so Death could attack them. Any agent can revive a repo on its own, so the product added nothing, and the UI had drifted into a pile of screens with no vision.
@@ -81,3 +83,14 @@
 - **Context:** (2026-11-20) D-18 made ATK-15/16 need only `map`, and SYS-02 picked any move whose Needs hold, preferring later stages, so it would deface the shop right after the first scan (KI-12).
 - **Decision:** SYS-02 gets a stage-order rule: Death may pick a stage-N move only after he has played at least one stage-(N-1) move; stage 1 is always open. Needs stay purely technical. Exceptions: the return (SYS-07) ignores stage order; a tip-off lets him skip one stage. SYS-17 tests it: no seeded run plays a stage-N move before a stage-(N-1) move, except during the return or after a tip-off. ATK-16 is also stopped by DEF-12, like ATK-15.
 - **Consequences:** the chain always unfolds scout → break in → admin → harvest → dig in → strike unless the player tips him off, so a tip-off now costs more than a shorter wait. KI-12 is closed.
+
+### D-20: Hosting on Fly.io
+- **Context:** (2026-11-20) The rules require a working URL (SUB-01), and the Kiro server (SYS-12) has to stay up through judging, so a static host isn't enough (KI-04).
+- **Decision:** one small Fly.io container serves the built page and runs the Kiro server with `kiro-cli`. Uzain has a plan for cold starts if they show up.
+- **Consequences:** KI-04 closed. SYS-18 is built with SYS-12; the game still works with the Kiro server down (KIRO-09).
+
+### D-21: Track split
+- **Context:** (2026-11-20) `docs/TEAMMATE_TASKS.md` gave the teammate Track A (the rules engine), but no engine work had started and it's the critical path to the first playable version.
+- **Decision:** Uzain, with Claude, takes Track A plus the recordings and Kiro. The teammate takes the shell (SYS-09), the look (renderer, art, then the screens) and the writing (CON).
+- **Consequences:** the teammate builds screens against the engine's state types once A1 (SYS-04) lands, and wires them to the live engine when A5 (SYS-03) runs.
+
