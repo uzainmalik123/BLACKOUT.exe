@@ -77,6 +77,7 @@ export interface Replay {
   ips?: string[]; // a minion wave's addresses: its access lines rotate through them
   startedAt: number;
   cursor: number; // next recording event to apply
+  userIds?: Record<string, number>; // recorded Users id → the id it got here, when another account already had it (ATK-06.a and ATK-11.a both insert 326)
 }
 
 export interface Wave {
