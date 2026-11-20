@@ -134,3 +134,53 @@ describe('the Director (SYS-02)', () => {
     expect(w.ending).toBe('souls-lost');
   });
 });
+
+describe('the harvest variant (D-31)', () => {
+  const harvestLib = libraryFrom(['ATK-01', 'ATK-08'].flatMap((m) => lib.variantsOf(m as 'ATK-01').map((v) => v.recording)));
+
+  /** A world where ATK-01 has landed, so ATK-08 is the next candidate (stages 2 and 3 have no recording here). */
+  function readyToHarvest(difficulty: 'easy' | 'medium' | 'hard'): World {
+    const w = initialWorld(1, difficulty);
+    w.death.knowledge.push('map');
+    w.death.played.push({ move: 'ATK-01', variant: 'a', outcome: 'landed' });
+    return w;
+  }
+  const harvest = (w: World) => eventsOfKind(w, 'move-started').find((e) => e.move === 'ATK-08');
+
+  it('picks ATK-08.b on Easy and Medium and ATK-08.c on Hard', () => {
+    for (const [difficulty, variant] of [['easy', 'b'], ['medium', 'b'], ['hard', 'c']] as const) {
+      const w = readyToHarvest(difficulty);
+      directorTick(w, harvestLib);
+      expect(harvest(w)?.variant, difficulty).toBe(variant);
+    }
+  });
+
+  it('picks ATK-08.c after a tip-off on Easy and Medium', () => {
+    for (const difficulty of ['easy', 'medium'] as const) {
+      const w = readyToHarvest(difficulty);
+      applyAction(w, { type: 'DEF-04', ip: '203.0.113.10', mode: 'active' });
+      directorTick(w, harvestLib);
+      expect(harvest(w)?.variant, difficulty).toBe('c');
+    }
+  });
+
+  it('never picks ATK-08.a in play, even when b and c have been played or cut', () => {
+    for (let seed = 1; seed <= 10; seed++) {
+      for (const difficulty of ['easy', 'medium', 'hard'] as const) {
+        const w = initialWorld(seed, difficulty);
+        for (let t = 0; t < 15 * 60 * REAL_S && !w.ending; t += REAL_S) {
+          if (t === 60 * REAL_S) for (const v of lib.variantsOf('ATK-08')) applyAction(w, { type: 'DEF-06', ip: v.info.ip, op: 'add' });
+          advance(w, harvestLib, REAL_S);
+        }
+        expect(eventsOfKind(w, 'move-started').filter((e) => e.move === 'ATK-08' && e.variant === 'a'), `${difficulty} seed ${seed}`).toEqual([]);
+      }
+    }
+  });
+
+  it('a stopper on the pinned variant closes ATK-08: on Medium a SQLi rule stops loud .b and he does not fall back to .a or .c', () => {
+    const w = readyToHarvest('medium');
+    applyAction(w, { type: 'DEF-12', rule: { kind: 'sqli' } });
+    directorTick(w, harvestLib);
+    expect(harvest(w)).toBeUndefined();
+  });
+});

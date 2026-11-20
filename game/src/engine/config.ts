@@ -1,5 +1,5 @@
 // Every number the engine uses, per difficulty. PRD values cite their row; the rest are D-24 (all "tune").
-import type { ActionId, Difficulty, Feature, MinionId } from '../rules/vocabulary';
+import type { ActionId, Difficulty, Feature, MinionId, MoveId } from '../rules/vocabulary';
 
 const REAL_S = 30_000; // one real second in game ms (SYS-01: 1 real s = 30 game s)
 const GAME_MIN = 60_000;
@@ -28,6 +28,8 @@ export interface EngineConfig {
   };
   backupEveryGameMs: number; // DEF-17: hourly snapshots
   scenarioStartIso: string; // D-24
+  /** SYS-08, D-31: the only variant Death may play of these moves, normally and once tipped off. Other variants stay for reference. */
+  pinnedVariants: Partial<Record<MoveId, { normal: string; tippedOff: string }>>;
 }
 
 const MEDIUM: EngineConfig = {
@@ -54,10 +56,11 @@ const MEDIUM: EngineConfig = {
   },
   backupEveryGameMs: 60 * GAME_MIN,
   scenarioStartIso: '2026-10-31T22:00:00Z',
+  pinnedVariants: { 'ATK-08': { normal: 'b', tippedOff: 'c' } },
 };
 
 export const CONFIG: Readonly<Record<Difficulty, EngineConfig>> = {
   easy: { ...MEDIUM, pausable: true, moveGapGameMs: 60 * REAL_S, leakyWaf: false },
   medium: MEDIUM,
-  hard: { ...MEDIUM, moveGapGameMs: 25 * REAL_S },
+  hard: { ...MEDIUM, moveGapGameMs: 25 * REAL_S, pinnedVariants: { 'ATK-08': { normal: 'c', tippedOff: 'c' } } },
 };

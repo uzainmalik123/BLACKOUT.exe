@@ -27,6 +27,7 @@ function tipOff(world: World, by: ActionId): void {
   world.death.stageSkips += 1;
   world.death.nextMoveAt = world.clock.gameMs;
   world.death.skipWait = true;
+  world.death.tippedOff = true;
 }
 
 function confirmBreach(world: World): void {

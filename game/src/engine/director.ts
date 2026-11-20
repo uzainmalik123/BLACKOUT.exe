@@ -18,7 +18,16 @@ const landed = (world: World, move: Move) => world.death.played.some((p) => p.mo
  */
 export function playableVariants(world: World, library: RecordingLibrary, move: Move): Variant[] {
   if (landed(world, move) || !needsHold(world, move)) return [];
-  return library.variantsOf(move.id).filter((v) => !anyStopperHolds(world, move, { ...v.info, ip: 'fresh' }));
+  const allowed = allowedVariant(world, move);
+  return library
+    .variantsOf(move.id)
+    .filter((v) => (allowed === undefined || v.variant === allowed) && !anyStopperHolds(world, move, { ...v.info, ip: 'fresh' }));
+}
+
+/** SYS-08, D-31: the one variant of a pinned move Death may play (ATK-08: .b, .c on Hard or once tipped off). */
+export function allowedVariant(world: World, move: Move): string | undefined {
+  const pin = CONFIG[world.difficulty].pinnedVariants[move.id];
+  return pin && (world.death.tippedOff ? pin.tippedOff : pin.normal);
 }
 
 /** A new address in TEST-NET-3 for a variant whose recorded IP is blocked. */

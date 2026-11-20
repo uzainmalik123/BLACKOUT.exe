@@ -35,7 +35,29 @@ const access = (ip: string, method: string, target: string, status: number, user
 const many = (n: number, f: (i: number) => RecEvent): RecEvent[] => Array.from({ length: n }, (_, i) => f(i));
 
 /** The events each row describes in "What the defender sees", shrunk to a handful. */
-function eventsFor(id: MoveId | MinionId, ip: string, quiet: boolean): RecEvent[] {
+/**
+ * ATK-08.b/.c in the shape D-31 asks the recordings for: about a minute of probing (sqlmap's detection with a delay:
+ * 500s and SQLITE_ERRORs), then the dump without one, a row every 200 ms. A player who turns search off within 60 s of
+ * the first SQLITE_ERROR keeps 90% of the souls; an idle one loses all of them before an open door flatlines the
+ * shop (SYS-06 drains 30 heartbeat per real minute while he works, KI-21). .b is loud (sqlmap's agent), .c quiet.
+ */
+const PROBE_MS = 58_000;
+const ROW_EVERY_MS = 200;
+function slowHarvest(ip: string, quiet: boolean): RecEvent[] {
+  const ua = quiet ? 'Mozilla/5.0 (X11; Linux x86_64)' : 'sqlmap/1.10';
+  const errors = Array.from({ length: 20 }, (_, i): RecEvent[] => [
+    { ...access(ip, 'GET', `/rest/products/search?q=e${i}`, 500, ua), t: 1 + i * (PROBE_MS / 20) },
+    { t: 2 + i * (PROBE_MS / 20), kind: 'app', text: 'Error: SQLITE_ERROR: near "(": syntax error' },
+  ]).flat();
+  const rows = Array.from({ length: 325 }, (_, k): RecEvent[] => [
+    { ...access(ip, 'GET', `/rest/products/search?q=r${k}`, 200, ua), t: PROBE_MS + k * ROW_EVERY_MS },
+    { t: PROBE_MS + 1 + k * ROW_EVERY_MS, kind: 'exfil', table: 'Users', keys: [k + 1], columns: ['email', 'password'] },
+  ]).flat();
+  return [...errors, ...rows];
+}
+
+function eventsFor(id: MoveId | MinionId, ip: string, quiet: boolean, variant = 'a'): RecEvent[] {
+  if (id === 'ATK-08' && variant !== 'a') return slowHarvest(ip, quiet);
   const ua = quiet ? 'Mozilla/5.0' : undefined;
   switch (id) {
     case 'ATK-01': return many(60, (i) => access(ip, 'GET', `/w${i}`, 404, ua ?? 'Fuzz Faster U Fool v2.1')); // 6 s: long enough to be cut
@@ -52,7 +74,7 @@ function eventsFor(id: MoveId | MinionId, ip: string, quiet: boolean): RecEvent[
       { t: 0, kind: 'db', op: 'insert', table: 'Users', key: { id: 326 }, after: { id: 326, email: 'death@juice-sh.op', role: 'admin' } },
     ];
     case 'ATK-07': return many(5, (i) => ({ ...access(ip, 'GET', `/api/Users/${i + 1}`, 200, ua ?? 'curl/8.0'), t: i * 1000 + 1 })); // one a second
-    case 'ATK-08': return [ // a burst of errors first, then the rows, like ATK-08.a (first exfil at 1.8 s there)
+    case 'ATK-08': return [ // .a: fast, like the real ATK-08.a (never picked in play, D-31); .b/.c are slowHarvest()
       ...many(30, (i) => access(ip, 'GET', `/rest/products/search?q=${i}`, i < 20 ? 500 : 200, ua ?? 'sqlmap/1.10')),
       ...many(5, (i) => ({ t: 0, kind: 'exfil', table: 'Users', keys: Array.from({ length: 65 }, (_, k) => k + 1 + 65 * i), columns: ['email', 'password'] }) as RecEvent), // all 325 seed rows
     ];
@@ -105,7 +127,7 @@ function build(): RecordingLibrary {
     (['a', 'b', 'c'] as const).forEach((variant, v) => {
       const quiet = variant === 'c';
       const ip = `203.0.113.${10 + n + 70 * v}`; // unique per (move, variant); never a committed recording's IP
-      recordings.push(fakeRecording(id, variant, { ip, quiet, events: eventsFor(id, ip, quiet) }));
+      recordings.push(fakeRecording(id, variant, { ip, quiet, events: eventsFor(id, ip, quiet, variant) }));
     });
   });
   return libraryFrom(recordings);
