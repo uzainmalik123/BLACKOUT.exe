@@ -61,7 +61,32 @@ export const FEATURE_DEFAULTS: Readonly<Record<Feature, boolean>> = {
 /** A soul is one row of these tables (D-24, KI-15). */
 export const SOUL_TABLES = ['Users'] as const;
 
+export type Ending = 'banished' | 'souls-lost' | 'flatline' | 'return';
+
 export const STAGES: readonly Stage[] = [1, 2, 3, 4, 5, 6];
 export const FOOTHOLDS: readonly Foothold[] = ['hidden-admin', 'hijacked-user', 'planted-file', 'forged-token'];
 export const FEATURES: readonly Feature[] = ['search', 'registration', 'password-reset', 'uploads', 'ftp', 'feedback-captcha'];
 export const MINION_IDS: readonly MinionId[] = ['MIN-01', 'MIN-02', 'MIN-03', 'MIN-04'];
+
+/** One player action, as the shell, the consoles and the sims send it to the engine (PRD §5). */
+export type PlayerAction =
+  | { type: 'DEF-01'; query: string }
+  | { type: 'DEF-02'; sql: string }
+  | { type: 'DEF-03'; path: string }
+  | { type: 'DEF-04'; ip: string; mode: 'passive' | 'active' }
+  | { type: 'DEF-05'; name: string }
+  | { type: 'DEF-06'; ip: string; op: 'add' | 'delete' }
+  | { type: 'DEF-07' }
+  | { type: 'DEF-08'; email: string }
+  | { type: 'DEF-09' }
+  | { type: 'DEF-10'; feature: Feature; enabled: boolean }
+  | { type: 'DEF-11' }
+  | { type: 'DEF-12'; rule: WafRule }
+  | { type: 'DEF-13'; patch: Patch }
+  | { type: 'DEF-14'; email: string }
+  | { type: 'DEF-15'; path: string }
+  | { type: 'DEF-16'; email: string }
+  | { type: 'DEF-17'; backupId: number }
+  | { type: 'DEF-18'; what: 'nginx' | Feature }
+  | { type: 'DEF-19' }
+  | { type: 'DEF-20'; to: 'legal' | 'customers' };

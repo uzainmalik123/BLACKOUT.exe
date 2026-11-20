@@ -1,7 +1,8 @@
 // The world state (PRD SYS-04): one typed, JSON-plain model every DEF and ATK reads and writes through.
 // Times are game milliseconds since the scenario start (SYS-01). Derived facts (gains, footholds) live in facts.ts.
 import type { Row } from '../recordings/format';
-import type { Difficulty, Feature, Foothold, MinionId, MoveId, Patch, WafRule } from '../rules/vocabulary';
+import type { GameEvent } from './log';
+import type { Difficulty, Ending, Feature, Foothold, MinionId, MoveId, Patch, WafRule } from '../rules/vocabulary';
 import { FEATURE_DEFAULTS } from '../rules/vocabulary';
 import { CONFIG } from './config';
 import { SEED_ACCOUNTS } from './seed';
@@ -109,7 +110,7 @@ export interface Evidence {
   appLines: number;
 }
 
-export type Ending = 'banished' | 'souls-lost' | 'flatline' | 'return';
+export type { Ending } from '../rules/vocabulary';
 
 export interface World {
   seed: number;
@@ -148,7 +149,7 @@ export interface World {
   alerts: Alert[];
   quietAlertsSince: number;
   logs: { access: AccessLine[]; app: AppLine[]; dbChanges: DbChange[] };
-  events: unknown[]; // SYS-10 (log.ts) narrows this to GameEvent[]
+  events: GameEvent[]; // SYS-10
   ending?: Ending;
 }
 
