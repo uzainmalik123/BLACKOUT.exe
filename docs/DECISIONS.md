@@ -32,7 +32,7 @@
 | D-28 | The rig runs Juice Shop with its safety mode off, so the holes it switches off inside Docker (zip uploads written to disk, raw product descriptions) are live, as on a real unpatched shop | Accepted |
 | D-29 | nginx's rig address (the shop's view of every client) becomes `10.0.0.10`, the shop's front proxy, in every recording | Accepted |
 | D-30 | Needs stay technical; stage order (D-19) handles pacing. ATK-09 needs any session, ATK-11 and ATK-17 need `map`, and `map` is exactly what ATK-01.a found (no `#/administration`); stoppers added to match | Accepted |
-| D-31 | ATK-08 variants: low-and-slow (ATK-08.b, a paced dump over ~2.5 min) and loud (ATK-08.c, ~90 s of probing, then a dump in seconds from the saved session); ATK-08.a stays as a test-only recording (KI-18) | Accepted |
+| D-32 | ATK-08 variants recorded: low-and-slow (ATK-08.b, a paced dump over ~2.5 min) and loud (ATK-08.c, ~90 s of probing, then a dump in seconds from the saved session); ATK-08.a stays as a test-only recording (KI-18; the engine side is D-31) | Accepted |
 
 ### D-01: Pivot to an incident-response game
 - **Context:** (2026-11-08) Reanimator raised dead repos so Death could attack them. Any agent can revive a repo on its own, so the product added nothing, and the UI had drifted into a pile of screens with no vision.
@@ -152,10 +152,10 @@
   - **ATK-01:** `map` is exactly the paths ATK-01.a found (`/ftp`, `/api`, `/rest`, `robots.txt`); `#/administration` is dropped. No new variant for now.
 - **Consequences:** a MIN-02 success (a `user-session`) now opens ATK-09, so ignoring the wraiths costs souls twice. Closing registration (DEF-10) or patching it (DEF-13) now stops ATK-06 and ATK-11 together. DEF-13 gains a patchable hole (`/api/Users` access control), so CON-02 needs its vulnerable code and fix diff. The engine's rules data (`game/src/rules/moves.ts`, PR #57) must get the same edits.
 
-### D-31: ATK-08 variants: low-and-slow and loud
-- **Context:** (2026-11-20) KI-18: at the D-24 pace ATK-08.a steals every soul between 2.1 and 5.0 real seconds after it starts, so no player can read the alert and act before the first harvest is over. The team ruled to fix the pacing in the recordings rather than only in the engine.
+### D-32: ATK-08 variants: low-and-slow and loud (the recordings)
+- **Context:** (2026-11-20) KI-18: at the D-24 pace ATK-08.a steals every soul between 2.1 and 5.0 real seconds after it starts, so no player can read the alert and act before the first harvest is over. The team ruled to fix the pacing with new recordings; which variant plays when is the engine's side (D-31).
 - **Decision:** two new ATK-08 variants on the 325-customer baseline (D-26), both sqlmap's own user agent:
   - **ATK-08.b, low and slow:** one sqlmap run with `--delay=0.36`. 402 requests over 149 s: the same 62 probing `500`s first, then one row per request from 30 s to 149 s.
   - **ATK-08.c, loud:** run 1 only finds the injection (no `--dump`) with `--delay=1.2`, so the probing lasts about 90 s (75 requests: 61 `500`s, 14 `200`s, nothing stolen); run 2 dumps `Users` reusing run 1's session file (`--output-dir`), with no new probing and no delay: 328 requests, all 325 rows gone in 2.8 s. Both runs are one recording (their `-t` logs joined in order).
   - **ATK-08.a** (no delay) stays committed as a test-only recording: tests use it, the game's Death doesn't.
-- **Consequences:** ATK-08.b gives the player time to react while souls drain; ATK-08.c gives about 90 s of loud warning, then punishes ignoring it. Taking ATK-08.a out of Death's library is an engine change (`engine/engine.ts` loads it today); KI-18 closes with that change.
+- **Consequences:** ATK-08.b gives the player time to react while souls drain; ATK-08.c gives about 90 s of loud warning, then punishes ignoring it. D-31 picks ATK-08.b on Easy/Medium and ATK-08.c on Hard or after a tip-off, and never ATK-08.a; KI-18 closes with that engine change.

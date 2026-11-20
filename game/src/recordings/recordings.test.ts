@@ -63,7 +63,7 @@ describe('ATK-08.a: sqlmap UNION dump through search', () => {
   });
 });
 
-describe('ATK-08.b and ATK-08.c: the paced dumps (D-31)', () => {
+describe('ATK-08.b and ATK-08.c: the paced dumps (D-32)', () => {
   const leakedAll = async (r: Recording) => {
     const db = await baseline();
     const ids = db.exec('SELECT id FROM Users')[0]!.values.map((v) => Number(v[0])).sort();
