@@ -38,7 +38,7 @@ const many = (n: number, f: (i: number) => RecEvent): RecEvent[] => Array.from({
 function eventsFor(id: MoveId | MinionId, ip: string, quiet: boolean): RecEvent[] {
   const ua = quiet ? 'Mozilla/5.0' : undefined;
   switch (id) {
-    case 'ATK-01': return many(30, (i) => access(ip, 'GET', `/w${i}`, 404, ua ?? 'Fuzz Faster U Fool v2.1'));
+    case 'ATK-01': return many(60, (i) => access(ip, 'GET', `/w${i}`, 404, ua ?? 'Fuzz Faster U Fool v2.1')); // 6 s: long enough to be cut
     case 'ATK-02': return [access(ip, 'GET', '/ftp/acquisitions.md', 200, ua ?? 'curl/8.0'), access(ip, 'GET', '/ftp/package.json.bak%2500.md', 200, ua ?? 'curl/8.0')];
     case 'ATK-03': return [access(ip, 'POST', '/rest/user/login', 200, ua ?? 'curl/8.0')];
     case 'ATK-04': return [...many(5, () => access(ip, 'POST', '/rest/user/login', 401, ua ?? 'Mozilla/4.0 (Hydra)')), access(ip, 'POST', '/rest/user/login', 200, ua ?? 'Mozilla/4.0 (Hydra)')];
@@ -51,14 +51,14 @@ function eventsFor(id: MoveId | MinionId, ip: string, quiet: boolean): RecEvent[
       access(ip, 'POST', '/api/Users', 201, ua ?? 'curl/8.0'),
       { t: 0, kind: 'db', op: 'insert', table: 'Users', key: { id: 26 }, after: { id: 26, email: 'death@juice-sh.op', role: 'admin' } },
     ];
-    case 'ATK-07': return many(3, (i) => access(ip, 'GET', `/api/Users/${i + 1}`, 200, ua ?? 'curl/8.0'));
-    case 'ATK-08': return [
-      ...many(10, (i) => access(ip, 'GET', `/rest/products/search?q=${i}`, i < 5 ? 500 : 200, ua ?? 'sqlmap/1.10')),
+    case 'ATK-07': return many(5, (i) => ({ ...access(ip, 'GET', `/api/Users/${i + 1}`, 200, ua ?? 'curl/8.0'), t: i * 1000 + 1 })); // one a second
+    case 'ATK-08': return [ // a burst of errors first, then the rows, like ATK-08.a (first exfil at 1.8 s there)
+      ...many(30, (i) => access(ip, 'GET', `/rest/products/search?q=${i}`, i < 20 ? 500 : 200, ua ?? 'sqlmap/1.10')),
       ...many(5, (i) => ({ t: 0, kind: 'exfil', table: 'Users', keys: [1, 2, 3, 4, 5].map((k) => k + 5 * i), columns: ['email', 'password'] }) as RecEvent),
     ];
-    case 'ATK-09': return [
-      ...many(3, (i) => access(ip, 'GET', `/api/Users?page=${i}`, 200, ua ?? 'curl/8.0', 9000)),
-      { t: 0, kind: 'exfil', table: 'Users', keys: Array.from({ length: 25 }, (_, i) => i + 1), columns: ['email', 'password'] },
+    case 'ATK-09': return [ // page by page: one page a second
+      ...many(3, (i) => ({ ...access(ip, 'GET', `/api/Users?page=${i}`, 200, ua ?? 'curl/8.0', 9000), t: i * 1000 + 1 })),
+      ...many(3, (i) => ({ t: i * 1000 + 500, kind: 'exfil', table: 'Users', keys: Array.from({ length: i === 2 ? 5 : 10 }, (_, k) => k + 1 + 10 * i), columns: ['email', 'password'] }) as RecEvent),
     ];
     case 'ATK-10': return [
       ...many(3, (i) => access(ip, 'GET', `/rest/basket/${i + 1}`, 200, ua ?? 'curl/8.0')),

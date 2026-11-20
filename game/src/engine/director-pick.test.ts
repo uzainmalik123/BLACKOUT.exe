@@ -44,21 +44,29 @@ describe('the Director (SYS-02)', () => {
     expect(eventsOfKind(again, 'move-started')[0]!.move).toBe(started!.move);
   });
 
-  it('switches to another variant and IP after a cut, and skips a move whose variants are all blocked', () => {
+  it('switches to another variant and IP after a cut, and comes back from a fresh IP when every recorded one is blocked', () => {
     const w = run(1, 4 * REAL_S); // the first Director tick is at 3 real s
     expect(moves(w)).toEqual(['ATK-01.a']);
     const ip = eventsOfKind(w, 'move-started')[0]!.ip;
     applyAction(w, { type: 'DEF-06', ip, op: 'add' });
     advance(w, lib, REAL_S);
     expect(eventsOfKind(w, 'move-cut')).toMatchObject([{ move: 'ATK-01', variant: 'a', by: 'DEF-06' }]);
+    const linesBefore = w.logs.access.length;
     advance(w, lib, medium.cutRetryGameMs / 30 + 3 * REAL_S);
-    expect(moves(w)).toEqual(['ATK-01.a', 'ATK-01.b']);
+    expect(moves(w)).toEqual(['ATK-01.a', 'ATK-01.a']); // the same scan carries on from a fresh IP (D-24)
     expect(eventsOfKind(w, 'move-started')[1]!.ip).not.toBe(ip);
+    expect(w.logs.access.slice(linesBefore).every((l) => l.ip === eventsOfKind(w, 'move-started')[1]!.ip)).toBe(true);
+    expect(w.logs.access.slice(linesBefore).length).toBeLessThan(60); // it did not start over
     const blockedAll = run(1, 4 * REAL_S);
     for (const v of lib.variantsOf('ATK-01')) applyAction(blockedAll, { type: 'DEF-06', ip: v.info.ip, op: 'add' });
     advance(blockedAll, lib, 60 * REAL_S);
-    expect(moves(blockedAll)).toEqual(['ATK-01.a']);
-    expect(blockedAll.ending).toBe('banished'); // nothing left he can start, no foothold
+    expect(moves(blockedAll).length).toBeGreaterThanOrEqual(2); // he comes back from a fresh IP (D-24)
+    const fresh = eventsOfKind(blockedAll, 'move-started')[1]!.ip;
+    expect(lib.variantsOf('ATK-01').map((v) => v.info.ip)).not.toContain(fresh);
+    expect(blockedAll.logs.access.some((l) => l.ip === fresh)).toBe(true);
+    expect(blockedAll.ending).toBeUndefined();
+    applyAction(blockedAll, { type: 'DEF-12', rule: { kind: 'block-user-agent', pattern: 'Fuzz Faster U Fool' } });
+    advance(blockedAll, lib, 60 * REAL_S); // loud variants stopped; the quiet one leaks through and lands
   });
 
   it('pacing: more than 3 open alerts delays the next move once; no open alert for 60 real s brings it forward', () => {

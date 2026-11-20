@@ -307,3 +307,4 @@ Rows not listed here are `planned`. A PR that moves a row adds or updates its li
 | SYS-06 | done | `game/src/engine/heartbeat.ts`; a plug-only run flatlines at game minute 25 |
 | SYS-10 | done | `game/src/engine/log.ts`; the sims and the report read only `world.events` |
 | SYS-17 | done | Consistency tests in `game/src/rules/`, stage-order test in `game/src/engine/stage-order.test.ts`, fast-check suite in `properties.test.ts` |
+| SYS-16 | building | SIM-1…SIM-7 run headless in `game/src/engine/sims.test.ts` on a made-up library (`engine/test-fixtures/`); SIM-2's whack-a-mole line and SIM-5's grades wait for SYS-11 |

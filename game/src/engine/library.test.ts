@@ -50,6 +50,6 @@ describe('the recording library', () => {
     expect(kinds('ATK-08')).toContain('exfil');
     expect(kinds('ATK-06')).toContain('db');
     expect(kinds('ATK-13')).toContain('file');
-    expect(kinds('ATK-01').filter((k) => k === 'access').length).toBeGreaterThanOrEqual(30);
+    expect(kinds('ATK-01').filter((k) => k === 'access').length).toBeGreaterThanOrEqual(60);
   });
 });

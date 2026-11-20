@@ -49,7 +49,7 @@ describe('minion waves (PRD §4)', () => {
     expect(activeWaves(w)).toHaveLength(1);
     runWaves(w, 60_000);
     expect(activeWaves(w).filter((x) => x.minion === 'MIN-01')).toHaveLength(0); // MIN-02/03 have started meanwhile
-    expect(eventsOfKind(w, 'wave-ended')).toMatchObject([{ minion: 'MIN-01', wave: 1 }]);
+    expect(eventsOfKind(w, 'wave-ended')[0]).toMatchObject({ minion: 'MIN-01', wave: 1 });
     expect(eventsOfKind(w, 'wave-ended')[0]!.closedBy).toBeUndefined();
     expect(w.alerts[0]!.closedAt).toBeDefined();
   });
@@ -59,7 +59,7 @@ describe('minion waves (PRD §4)', () => {
     runWaves(w, 61_000);
     expect(started(w, 'MIN-02')).toHaveLength(1);
     expect(soulsStolen(w)).toBe(0);
-    runWaves(w, 30_000);
+    runWaves(w, medium.minions.waveDurationGameMs / 30 / 2 + 100); // halfway through the wave
     expect(soulsStolen(w)).toBe(1);
     expect(eventsOfKind(w, 'souls-stolen')).toMatchObject([{ by: 'MIN-02', count: 1 }]);
     expect(w.sessions).toMatchObject([{ kind: 'user', issuedBy: 'MIN-02' }]);

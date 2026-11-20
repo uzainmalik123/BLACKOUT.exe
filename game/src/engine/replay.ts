@@ -19,9 +19,11 @@ function nextId(world: World): number {
   return world.death.nextId++;
 }
 
-function openAlert(world: World, about: MoveId | MinionId): void {
+/** One alert per Death move and per minion wave (D-24). Opening or closing one restarts the Director's "quiet" clock. */
+export function openAlert(world: World, about: MoveId | MinionId): void {
   const id = nextId(world);
   world.alerts.push({ id, about, openedAt: world.clock.gameMs });
+  world.quietAlertsSince = world.clock.gameMs;
   emit(world, { kind: 'alert-opened', alert: id, about });
 }
 
@@ -29,12 +31,19 @@ export function closeAlert(world: World, about: MoveId | MinionId): void {
   const alert = world.alerts.find((a) => a.about === about && a.closedAt === undefined);
   if (!alert) return;
   alert.closedAt = world.clock.gameMs;
+  world.quietAlertsSince = world.clock.gameMs;
   emit(world, { kind: 'alert-closed', alert: alert.id, about });
 }
 
 /** Starts playing a variant. Death's moves open an alert and log move-started; waves log their own events. */
 export function startReplay(world: World, v: Variant, owner: 'death' | MinionId): Replay {
-  const replay: Replay = { id: nextId(world), owner, move: v.move, variant: v.variant, ip: v.info.ip, startedAt: world.clock.gameMs, cursor: 0 };
+  const ratio = CONFIG[world.difficulty].gameMsPerRealMs;
+  const saved = owner === 'death' && isMove(v.move) ? world.death.resume[v.move] : undefined;
+  const cursor = saved && saved.variant === v.variant ? saved.cursor : 0;
+  // An IP-cut move carries on from a fresh address: its next event is due now, as if the tool had never stopped.
+  const startedAt = world.clock.gameMs - (cursor > 0 ? v.recording.events[cursor]!.t * ratio : 0);
+  const replay: Replay = { id: nextId(world), owner, move: v.move, variant: v.variant, ip: v.info.ip, recordedIp: v.recording.attackerIp, startedAt, cursor };
+  if (saved && isMove(v.move)) delete world.death.resume[v.move];
   world.replays.push(replay);
   if (owner === 'death' && isMove(v.move)) {
     openAlert(world, v.move);
@@ -56,6 +65,7 @@ export function cutReplay(world: World, replay: Replay, by: ActionId): void {
   world.replays = world.replays.filter((r) => r !== replay);
   if (replay.owner !== 'death' || !isMove(replay.move)) return;
   world.death.played.push({ move: replay.move, variant: replay.variant, outcome: 'cut' });
+  if (by === 'DEF-06') world.death.resume[replay.move] = { variant: replay.variant, cursor: replay.cursor };
   emit(world, { kind: 'move-cut', move: replay.move, variant: replay.variant, by });
   closeAlert(world, replay.move);
   world.death.nextMoveAt = world.clock.gameMs + CONFIG[world.difficulty].cutRetryGameMs;
@@ -68,8 +78,8 @@ function whatStops(world: World, replay: Replay, info: VariantInfo): ActionId | 
   return stoppers.find((s) => stopperHolds(world, s, info))?.action;
 }
 
-function applyDb(world: World, by: MoveId | MinionId, e: DbEvent): void {
-  world.logs.dbChanges.push({ t: world.clock.gameMs, op: e.op, table: e.table, key: e.key, ...(e.before && { before: e.before }), ...(e.after && { after: e.after }) });
+function applyDb(world: World, by: MoveId | MinionId, e: DbEvent, t: number): void {
+  world.logs.dbChanges.push({ t, op: e.op, table: e.table, key: e.key, ...(e.before && { before: e.before }), ...(e.after && { after: e.after }) });
   if (!isMove(by)) return;
   const id = Number(Object.values(e.key)[0]);
   if (e.table === 'Users') {
@@ -99,18 +109,17 @@ function applyFile(world: World, by: MoveId | MinionId, e: FileEvent): void {
   world.files.push({ path: e.path, size: e.size, sha256: e.sha256, ...(e.contentBase64 !== undefined && { contentBase64: e.contentBase64 }), ...(isMove(by) && { plantedBy: by }) });
 }
 
-function applyEvent(world: World, replay: Replay, e: RecEvent): void {
-  const t = world.clock.gameMs;
+function applyEvent(world: World, replay: Replay, e: RecEvent, t: number): void {
   const by = replay.move;
   switch (e.kind) {
     case 'access':
-      world.logs.access.push({ t, ip: e.ip, method: e.method, target: e.target, protocol: e.protocol, status: e.status, bytes: e.bytes, referer: e.referer, userAgent: e.userAgent, by });
+      world.logs.access.push({ t, ip: e.ip === replay.recordedIp ? replay.ip : e.ip, method: e.method, target: e.target, protocol: e.protocol, status: e.status, bytes: e.bytes, referer: e.referer, userAgent: e.userAgent, by });
       return;
     case 'app':
       world.logs.app.push({ t, text: e.text, by });
       return;
     case 'db':
-      applyDb(world, by, e);
+      applyDb(world, by, e, t);
       return;
     case 'file':
       applyFile(world, by, e);
@@ -151,7 +160,8 @@ export function stepReplays(world: World, library: RecordingLibrary): void {
       cutReplay(world, replay, 'DEF-11');
       continue;
     }
-    const by = whatStops(world, replay, v.info);
+    const info: VariantInfo = { ...v.info, ip: replay.ip };
+    const by = whatStops(world, replay, info);
     if (by) {
       cutReplay(world, replay, by);
       continue;
@@ -159,10 +169,10 @@ export function stepReplays(world: World, library: RecordingLibrary): void {
     const events = v.recording.events;
     const now = world.clock.gameMs;
     while (replay.cursor < events.length && replay.startedAt + events[replay.cursor]!.t * ratio <= now) {
-      applyEvent(world, replay, events[replay.cursor]!);
+      applyEvent(world, replay, events[replay.cursor]!, replay.startedAt + events[replay.cursor]!.t * ratio);
       replay.cursor++;
     }
-    if (replay.cursor >= events.length && replay.startedAt + v.recording.durationMs * ratio <= now) land(world, replay, v.info);
+    if (replay.cursor >= events.length && replay.startedAt + v.recording.durationMs * ratio <= now) land(world, replay, info);
   }
 }
 

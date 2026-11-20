@@ -7,7 +7,7 @@ import { CONFIG } from './config';
 import { stopperHolds } from './facts';
 import type { RecordingLibrary } from './library';
 import { emit } from './log';
-import { closeAlert, startReplay } from './replay';
+import { closeAlert, openAlert, startReplay } from './replay';
 import { nextRandom } from './rng';
 import { stealOneUnstolenCustomer } from './souls';
 import type { Wave, World } from './state';
@@ -44,8 +44,7 @@ function startWave(world: World, library: RecordingLibrary, id: MinionId): void 
   const ips = [freshIp(world), freshIp(world), freshIp(world)];
   const wave: Wave = { id: world.death.nextId++, minion: id, n, ips, startedAt: now, endsAt: now + waveDurationGameMs, successesDone: 0 };
   world.waves.push(wave);
-  world.alerts.push({ id: world.death.nextId++, about: id, openedAt: now });
-  emit(world, { kind: 'alert-opened', alert: world.alerts[world.alerts.length - 1]!.id, about: id });
+  openAlert(world, id);
   emit(world, { kind: 'wave-started', minion: id, wave: n, ips });
   const variants = library.variantsOf(id);
   if (variants.length > 0) {
