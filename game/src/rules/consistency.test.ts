@@ -25,7 +25,7 @@ const stopperAction = (s: Stopper): ActionId => s.action;
 const preEmptive = (s: Stopper) => !('undo' in s);
 
 describe('the PRD tables (SYS-17)', () => {
-  it('has the PRD counts: 17 moves (10 must, 7 should), 20 actions (17 must, 3 should: the rows, not the summary line; KI-16), 4 minions', () => {
+  it('has the PRD counts: 17 moves (10 must, 7 should), 20 actions (17 must, 3 should), 4 minions', () => {
     expect(MOVES).toHaveLength(17);
     expect(MOVES.filter((m) => m.pri === 'M')).toHaveLength(10);
     expect(ACTIONS).toHaveLength(20);

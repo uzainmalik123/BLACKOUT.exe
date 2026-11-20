@@ -70,6 +70,9 @@ export const RETURN_GRANTS: Readonly<Record<Foothold, Gain>> = {
 };
 
 export const STAGES: readonly Stage[] = [1, 2, 3, 4, 5, 6];
+export const GAINS: readonly Gain[] = [
+  'map', 'secrets-leaked', 'admin-session', 'admin-password', 'user-session', 'own-admin', 'souls', 'defaced', 'xss-live', 'ransom',
+];
 export const FOOTHOLDS: readonly Foothold[] = ['hidden-admin', 'hijacked-user', 'planted-file', 'forged-token'];
 export const PATCHES: readonly Patch[] = ['login', 'registration', 'search', 'basket-ownership', 'change-password', 'token-verify', 'product-update', 'users-access'];
 export const FEATURES: readonly Feature[] = ['search', 'registration', 'password-reset', 'uploads', 'ftp', 'feedback-captcha'];
