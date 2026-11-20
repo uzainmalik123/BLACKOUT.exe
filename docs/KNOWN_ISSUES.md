@@ -17,6 +17,7 @@
 | KI-13 | `--trust-tools=` didn't stop Kiro using its built-in Grep tool: run from the repo, it read the PRD and told the "player" game mechanics ("the report marks you down", "per PRD DEF-06"). The in-game agent (SYS-12) must be a custom agent with **no built-in tools** (only KIRO-07's game tools), run from a folder **outside the repo**, with a prompt that forbids talking about the game's rules or files | Major | Open |
 | KI-14 | Kiro's drafts use `systemctl restart` and write to `/tmp/…` with `>`. SYS-09 only names `stop`/`start` and doesn't say which folders exist. Ruled: support both (D-22) | Minor | Closed (D-22) |
 | KI-15 | SYS-05 counts only `Users` rows as souls (D-24); ATK-10's "orders, addresses" souls have no table mapping until it is recorded | Minor | Open |
+| KI-16 | PRD §5's summary says "Must = 18, should = 2", but the table marks DEF-04, DEF-19 and DEF-20 as S (17 must, 3 should). `game/src/rules/actions.ts` follows the rows; the team fixes the line | Minor | Open |
 
 ### KI-03: Juice Shop facts (v20.4.0, checked 2026-11-17)
 
