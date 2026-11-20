@@ -14,6 +14,10 @@ networks:
 services:
   juice:
     image: bkimminich/juice-shop:v20.4.0
+    environment:
+      # Juice Shop's safety mode switches its "Danger Zone" holes off inside Docker (zip uploads write
+      # nothing, product descriptions get sanitized). This shop is isolated, so they stay on (D-28).
+      NODE_CONFIG: '{"challenges":{"safetyMode":"disabled"}}'
     networks:
       rec:
         ipv4_address: 10.66.0.20
@@ -38,7 +42,7 @@ services:
 
   tools:
     build: ./tools
-    image: rec-tools:sqlmap-1.10.11
+    image: rec-tools:2
     profiles: [attack]
     networks:
       rec:

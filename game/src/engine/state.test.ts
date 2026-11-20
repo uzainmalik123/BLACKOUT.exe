@@ -1,3 +1,4 @@
+import { SEED_ACCOUNTS } from './seed';
 import { describe, expect, it } from 'vitest';
 import { initialWorld } from './state';
 
@@ -5,8 +6,8 @@ describe('initialWorld (SYS-04)', () => {
   it('starts with 100 heartbeat, no souls stolen and one Users row per soul', () => {
     const w = initialWorld(1, 'medium');
     expect(w.heartbeat).toBe(100);
-    expect(w.souls).toEqual({ total: 25, stolen: [] });
-    expect(w.accounts).toHaveLength(25);
+    expect(w.souls).toEqual({ total: SEED_ACCOUNTS.length, stolen: [] });
+    expect(w.accounts).toHaveLength(SEED_ACCOUNTS.length);
   });
 
   it('has the PRD defaults: every feature on except the feedback CAPTCHA, nginx running, nothing blocked', () => {

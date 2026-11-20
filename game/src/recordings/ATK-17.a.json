@@ -1,0 +1,17 @@
+{
+  "format": 1,
+  "move": "ATK-17",
+  "variant": "a",
+  "label": "loud: ransom note upload and home-page product renamed, curl user agent",
+  "recordedAt": "2026-11-20T05:38:29.522Z",
+  "durationMs": 894,
+  "attackerIp": "203.0.113.171",
+  "juiceShop": "bkimminich/juice-shop:v20.4.0",
+  "tool": "curl 8.x",
+  "events": [
+    {"t":554,"kind":"access","ip":"203.0.113.171","method":"POST","target":"/file-upload","protocol":"HTTP/1.1","status":204,"bytes":0,"referer":"","userAgent":"curl/8.23.0","requestTimeMs":6},
+    {"t":598,"kind":"access","ip":"203.0.113.171","method":"PUT","target":"/api/Products/1","protocol":"HTTP/1.1","status":200,"bytes":532,"referer":"","userAgent":"curl/8.23.0","requestTimeMs":40},
+    {"t":598,"kind":"db","op":"update","table":"Products","key":{"id":1},"before":{"name":"Apple Juice (1000ml)","description":"The all-time classic.","updatedAt":"2026-11-20 05:37:59.827 +00:00"},"after":{"name":"READ_ME_MORTAL","description":"Your customers are mine. Pay before midnight, or I sell them one by one. -- D.","updatedAt":"2026-11-20 05:38:30.087 +00:00"}},
+    {"t":598,"kind":"file","op":"add","path":"complaints/READ_ME_MORTAL.txt","size":188,"sha256":"9f8c10f9df2577ac906e1769a582d9a8a647410b254ec19144fd55a7ed83cf75","contentBase64":"WW91ciBzaG9wIGlzIG1pbmUuIFlvdXIgY3VzdG9tZXJzIGFyZSBtaW5lLgpFdmVyeSBzb3VsIHlvdSB3ZXJlIHRydXN0ZWQgd2l0aCBpcyBpbiBteSBsZWRnZXIuClBheSBiZWZvcmUgbWlkbmlnaHQsIG9yIEkgc2VsbCB0aGVtIG9uZSBieSBvbmUuCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAtLSBELgo="}
+  ]
+}

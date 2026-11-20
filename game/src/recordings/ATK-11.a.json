@@ -1,0 +1,16 @@
+{
+  "format": 1,
+  "move": "ATK-11",
+  "variant": "a",
+  "label": "quiet: one staff-looking admin sign-up, browser user agent",
+  "recordedAt": "2026-11-20T05:36:20.667Z",
+  "durationMs": 989,
+  "attackerIp": "203.0.113.111",
+  "juiceShop": "bkimminich/juice-shop:v20.4.0",
+  "tool": "curl 8.x",
+  "events": [
+    {"t":670,"kind":"access","ip":"203.0.113.111","method":"POST","target":"/api/Users","protocol":"HTTP/1.1","status":201,"bytes":317,"referer":"","userAgent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36","requestTimeMs":80},
+    {"t":670,"kind":"db","op":"insert","table":"Users","key":{"id":326},"after":{"id":326,"username":"","email":"support-ops@juice-sh.op","password":"23ca6107054bbcf978699c155834741c","role":"admin","deluxeToken":"","lastLoginIp":"0.0.0.0","profileImage":"/assets/public/images/uploads/defaultAdmin.png","totpSecret":"","isActive":1,"createdAt":"2026-11-20 05:36:21.262 +00:00","updatedAt":"2026-11-20 05:36:21.262 +00:00","deletedAt":null}},
+    {"t":670,"kind":"db","op":"insert","table":"Wallets","key":{"id":326},"after":{"UserId":326,"id":326,"balance":0,"createdAt":"2026-11-20 05:36:21.336 +00:00","updatedAt":"2026-11-20 05:36:21.336 +00:00"}}
+  ]
+}

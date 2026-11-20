@@ -21,12 +21,23 @@ echo "== fresh rig"
 compose --profile attack build -q tools >/dev/null   # the tools image is local-only; cleanup below needs it
 compose --profile attack down -v --remove-orphans >/dev/null 2>&1 || true
 # nginx writes its logs as root, so a throwaway container clears them; we recreate the dirs as us.
-docker run --rm --network none -v "$PWD/runs:/r" rec-tools:sqlmap-1.10.11 rm -rf /r/.nginx /r/.out "/r/$move.$variant"
+docker run --rm --network none -v "$PWD/runs:/r" rec-tools:2 rm -rf /r/.nginx /r/.out "/r/$move.$variant"
 mkdir -p runs/.nginx runs/.out "$out"
 compose up -d --wait juice nginx >/dev/null 2>&1
 
 echo "== isolation"
 ./check-isolation.sh
+
+# Seed and setup talk to the shop directly (not through nginx) and before the window opens, so
+# neither is in the recording. Setup is what the move assumes Death already has (e.g. a token).
+tools() { compose --profile attack run --rm --no-deps -T --user "$(id -u):$(id -g)" -e HOME=/tmp tools "$@"; }
+echo "== seed (REC-04)"
+tools python3 /attacks/lib/customers.py seed http://10.66.0.20:3000
+setup="attacks/$move.$variant.setup.sh"
+if [ -f "$setup" ]; then
+  echo "== setup: $setup"
+  tools bash "/$setup"
+fi
 sleep 1
 # nginx owns its log files (root), so instead of truncating we remember where the attack starts.
 skip_log=$(wc -c < runs/.nginx/access.log) skip_jsonl=$(wc -c < runs/.nginx/access.jsonl)
@@ -37,7 +48,7 @@ docker cp -q rec-juice-1:/juice-shop/uploads "$out/uploads-before"
 
 echo "== attack: $script"
 started=$(ms)
-compose --profile attack run --rm --no-deps -T --user "$(id -u):$(id -g)" -e HOME=/tmp tools bash "/attacks/$move.$variant.sh" > "$out/attack.out" 2> "$out/attack.err"
+tools bash "/attacks/$move.$variant.sh" > "$out/attack.out" 2> "$out/attack.err"
 ended=$(ms)
 sleep 2   # let nginx and the shop flush their logs
 

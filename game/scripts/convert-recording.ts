@@ -9,13 +9,16 @@ import {
   buildRecording,
   diffDatabases,
   diffUploads,
-  exfilFromTraffic,
+  exfilFromResponses,
   parseAccessJsonl,
   parseAppLog,
+  parseCurlCapture,
+  parseSqlmapTraffic,
+  type CapturedResponse,
   type FileInfo,
   type RunMeta,
 } from '../src/recordings/convert.ts';
-import type { RecEvent, Recording } from '../src/recordings/format.ts';
+import { isTestNet3, type RecEvent, type Recording } from '../src/recordings/format.ts';
 
 const OUT_DIR = resolve(import.meta.dirname, '../src/recordings');
 
@@ -54,7 +57,8 @@ async function main(): Promise<void> {
   const after = new SQL.Database(readFileSync(join(runDir, 'after.sqlite')));
 
   const access = parseAccessJsonl(read('access.jsonl'), meta.startedAtMs);
-  const attackerAccess = access.filter((e) => e.ip === meta.attackerIp);
+  // The tools box itself, or an address it named in X-Forwarded-For (always TEST-NET-3, D-27).
+  const attackerAccess = access.filter((e) => e.ip === meta.attackerIp || isTestNet3(e.ip));
   const stampT = access.at(-1)?.t ?? 0;
   const events: RecEvent[] = [
     ...access,
@@ -62,10 +66,16 @@ async function main(): Promise<void> {
     ...diffDatabases(before, after, stampT),
     ...diffUploads(walk(join(runDir, 'uploads-before')), walk(join(runDir, 'uploads-after')), stampT),
   ];
-  if (existsSync(join(runDir, 'traffic.txt'))) {
+  // The tool's own responses, when it kept them: sqlmap's -t log, or capture.sh's (D-25).
+  let responses: CapturedResponse[] | undefined;
+  if (existsSync(join(runDir, 'traffic.txt'))) responses = parseSqlmapTraffic(read('traffic.txt'));
+  else if (existsSync(join(runDir, 'responses/index.tsv'))) {
+    responses = parseCurlCapture(read('responses/index.tsv'), (n) => read(`responses/${n}.body`));
+  }
+  if (responses) {
     const res = before.exec('SELECT id, email, password FROM Users')[0];
     const users = (res?.values ?? []).map(([id, email, password]) => ({ id: Number(id), email: String(email), password: String(password) }));
-    events.push(...exfilFromTraffic(read('traffic.txt'), attackerAccess, users));
+    events.push(...exfilFromResponses(responses, attackerAccess, users));
   }
 
   const rec = buildRecording(meta, events);

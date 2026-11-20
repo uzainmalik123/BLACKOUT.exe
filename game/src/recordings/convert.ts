@@ -156,13 +156,15 @@ export function diffUploads(before: Map<string, FileInfo>, after: Map<string, Fi
   return events.sort((x, y) => x.path.localeCompare(y.path));
 }
 
-interface TrafficEntry {
+/** One request the attack tool made and the body it got back, in the order it made them. */
+export interface CapturedResponse {
   n: number;
   target: string;
   body: string;
 }
 
-function parseTraffic(traffic: string): TrafficEntry[] {
+/** sqlmap's `-t` traffic log → captured responses. */
+export function parseSqlmapTraffic(traffic: string): CapturedResponse[] {
   return traffic
     .split(/^#{20,}$/m)
     .map((block) => block.trim())
@@ -178,31 +180,56 @@ function parseTraffic(traffic: string): TrafficEntry[] {
 }
 
 /**
- * sqlmap's `-t` traffic log, matched request by request to the attacker's access lines, says which
- * Users rows left in which response. Each (row, column) is reported once, at the first response
- * that carried it. Throws if the two logs disagree, rather than guess the timing.
+ * recording/attacks/lib/capture.sh's `responses/index.tsv` (`NNNN METHOD URL STATUS`, tab-separated)
+ * → captured responses; `body(n)` reads `responses/NNNN.body` (D-25).
  */
-export function exfilFromTraffic(
-  traffic: string,
+export function parseCurlCapture(index: string, body: (n: string) => string): CapturedResponse[] {
+  return index
+    .split('\n')
+    .filter((line) => line.trim() !== '')
+    .map((line) => {
+      const [n = '', , url = ''] = line.split('\t');
+      return { n: Number(n), target: url.replace(/^[a-z]+:\/\/[^/]+/, '') || '/', body: body(n) };
+    });
+}
+
+function count(haystack: string, needle: string): number {
+  return haystack.split(needle).length - 1;
+}
+
+/** True if `email` is in `body` other than as the tail of a longer address that also is. */
+function carriesEmail(body: string, email: string, all: string[]): boolean {
+  const inside = all.filter((other) => other !== email && other.endsWith(email)).reduce((n, other) => n + count(body, other), 0);
+  return count(body, email) > inside;
+}
+
+/**
+ * The attack tool's captured responses, matched request by request to the attacker's access lines,
+ * say which Users rows left in which response. Each (row, column) is reported once, at the first
+ * response that carried it. Throws if the two disagree, rather than guess the timing.
+ */
+export function exfilFromResponses(
+  responses: CapturedResponse[],
   access: AccessEvent[],
   users: { id: number; email: string; password: string }[],
 ): ExfilEvent[] {
-  const entries = parseTraffic(traffic);
-  if (entries.length !== access.length) {
-    throw new Error(`traffic has ${entries.length} requests, access log has ${access.length}`);
+  if (responses.length !== access.length) {
+    throw new Error(`the tool captured ${responses.length} responses, access log has ${access.length} requests`);
   }
+  const emails = users.map((u) => u.email).filter((e) => e !== '');
   const leaked = new Set<string>();
   const events: ExfilEvent[] = [];
-  entries.forEach((entry, i) => {
+  responses.forEach((entry, i) => {
     const line = access[i]!;
     if (entry.target !== line.target) {
       throw new Error(`request #${entry.n} is ${entry.target} but access line ${i + 1} is ${line.target}`);
     }
     const byColumns = new Map<string, number[]>();
     for (const u of users) {
-      const columns = (['email', 'password'] as const).filter(
-        (c) => u[c] !== '' && entry.body.includes(u[c]) && !leaked.has(`${u.id}.${c}`),
-      );
+      const columns = (['email', 'password'] as const).filter((c) => {
+        if (u[c] === '' || leaked.has(`${u.id}.${c}`)) return false;
+        return c === 'email' ? carriesEmail(entry.body, u.email, emails) : entry.body.includes(u[c]);
+      });
       if (columns.length === 0) continue;
       columns.forEach((c) => leaked.add(`${u.id}.${c}`));
       const k = columns.join(',');
@@ -223,11 +250,15 @@ export function rewriteIp<T>(value: T, from: string, to: string): T {
   return value;
 }
 
+/** nginx's rig address, which is every client as the shop sees it, and what it becomes in a recording (D-29). */
+export const RIG_PROXY_IP = '10.66.0.10';
+export const PROXY_IP = '10.0.0.10';
+
 /** Assembles, sorts, rewrites and validates a recording; throws with the validator's errors. */
 export function buildRecording(meta: RunMeta, events: RecEvent[]): Recording {
   const sorted = [...events].sort((a, b) => a.t - b.t);
   const lastT = sorted.at(-1)?.t ?? 0;
-  const recording: Recording = rewriteIp(
+  const recording: Recording = rewriteIp(rewriteIp(
     {
       format: 1,
       move: meta.move,
@@ -242,7 +273,7 @@ export function buildRecording(meta: RunMeta, events: RecEvent[]): Recording {
     },
     meta.attackerIp,
     meta.publicIp,
-  );
+  ), RIG_PROXY_IP, PROXY_IP);
   const errors = validateRecording(recording);
   if (errors.length > 0) throw new Error(`invalid recording ${meta.move}.${meta.variant}:\n${errors.join('\n')}`);
   return recording;

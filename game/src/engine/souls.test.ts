@@ -1,3 +1,4 @@
+import { SEED_ACCOUNTS } from './seed';
 import { describe, expect, it } from 'vitest';
 import { eventsOfKind } from './log';
 import { soulsLeft, soulsStolen, steal, stealOneUnstolenCustomer } from './souls';
@@ -8,7 +9,7 @@ describe('souls (SYS-05)', () => {
     const w = initialWorld(1, 'medium');
     expect(steal(w, 'ATK-08', 'Users', [1, 2, 3])).toBe(3);
     expect(soulsStolen(w)).toBe(3);
-    expect(soulsLeft(w)).toBe(22);
+    expect(soulsLeft(w)).toBe(SEED_ACCOUNTS.length - 3);
   });
 
   it('counts a row stolen twice once and ignores tables that are not souls', () => {
@@ -25,21 +26,21 @@ describe('souls (SYS-05)', () => {
     steal(w, 'ATK-08', 'Users', [2]);
     steal(w, 'MIN-02', 'Users', [7]);
     expect(eventsOfKind(w, 'souls-stolen')).toMatchObject([
-      { by: 'ATK-08', count: 2, stolen: 2, total: 25 },
-      { by: 'MIN-02', count: 1, stolen: 3, total: 25 },
+      { by: 'ATK-08', count: 2, stolen: 2, total: SEED_ACCOUNTS.length },
+      { by: 'MIN-02', count: 1, stolen: 3, total: SEED_ACCOUNTS.length },
     ]);
   });
 
   it('MIN-02 steals one customer not stolen before and returns undefined when none is left', () => {
     const w = initialWorld(3, 'medium');
     const seen = new Set<number>();
-    for (let i = 0; i < 25; i++) {
+    for (let i = 0; i < SEED_ACCOUNTS.length; i++) {
       const a = stealOneUnstolenCustomer(w, 'MIN-02');
       expect(a).toBeDefined();
       expect(seen.has(a!.id)).toBe(false);
       seen.add(a!.id);
     }
-    expect(soulsStolen(w)).toBe(25);
+    expect(soulsStolen(w)).toBe(SEED_ACCOUNTS.length);
     expect(stealOneUnstolenCustomer(w, 'MIN-02')).toBeUndefined();
   });
 });
