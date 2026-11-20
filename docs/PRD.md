@@ -299,3 +299,4 @@ Rows not listed here are `planned`. A PR that moves a row adds or updates its li
 | ATK-03 | building | Recorded (ATK-03.a); not playable until SYS-03 |
 | ATK-08 | building | Recorded (ATK-08.a); not playable until SYS-03 |
 | SYS-04 | building | Types and `initialWorld()` in `game/src/engine/state.ts`; the shell and dashboard build against them; `done` once every DEF and ATK effect goes through it |
+| SYS-17 | building | Tables in `game/src/rules/` with consistency tests; the fast-check suite and the stage-order test follow with SYS-02 |
