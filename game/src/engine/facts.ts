@@ -10,6 +10,8 @@ export interface VariantInfo {
   ip: string;
   quiet: boolean; // D-24: the label starts with "quiet"
   targets: string[]; // emails of the Users rows the recording touches (ATK-05's victim, ATK-12's victim)
+  move?: string; // the recording's move and variant, for per-variant dials (D-34)
+  variant?: string;
 }
 
 const live = (a: Account) => a.lockedAt === undefined;
@@ -98,7 +100,11 @@ export function stopperHolds(world: World, stopper: Stopper, variant?: VariantIn
       return world.features[stopper.feature] !== FEATURE_DEFAULTS[stopper.feature];
     case 'DEF-12': {
       const present = world.waf.some((r) => sameRule(r, stopper.rule));
-      const leaks = CONFIG[world.difficulty].leakyWaf && variant?.quiet === true && LEAKY_KINDS.has(stopper.rule.kind);
+      const config = CONFIG[world.difficulty];
+      const evasion = variant?.move !== undefined ? config.wafEvasion[variant.move as keyof typeof config.wafEvasion] : undefined;
+      const leaks = evasion !== undefined
+        ? (evasion[variant?.variant ?? ''] ?? []).includes(stopper.rule.kind) // a dialled move (D-34)
+        : config.leakyWaf && variant?.quiet === true && LEAKY_KINDS.has(stopper.rule.kind); // D-24's generic quiet leak
       return present && !leaks;
     }
     case 'DEF-13':

@@ -177,8 +177,8 @@ describe('the harvest variant (D-31)', () => {
     }
   });
 
-  it('a stopper on the pinned variant closes ATK-08: on Medium a SQLi rule stops loud .b and he does not fall back to .a or .c', () => {
-    const w = readyToHarvest('medium');
+  it('a stopper on the pinned variant closes ATK-08: on Easy a SQLi rule stops .b and he does not fall back to .a or .c', () => {
+    const w = readyToHarvest('easy');
     applyAction(w, { type: 'DEF-12', rule: { kind: 'sqli' } });
     directorTick(w, harvestLib);
     expect(harvest(w)).toBeUndefined();

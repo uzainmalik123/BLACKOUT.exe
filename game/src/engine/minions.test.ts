@@ -11,7 +11,6 @@ import { initialWorld, type World } from './state';
 import { FIXTURE_LIBRARY } from './test-fixtures/recordings';
 
 const medium = CONFIG.medium;
-const REAL_S = 30_000; // game ms
 const lib = FIXTURE_LIBRARY;
 
 /** Runs the minion side alone (no Director), in the engine's 100 real ms sub-steps. */
@@ -98,12 +97,12 @@ describe('minion waves (PRD §4)', () => {
     expect(eventsOfKind(p, 'wave-started')).toEqual([]);
   });
 
-  it('minions drain 0.5 heartbeat per game minute each while active', () => {
+  it('minions drain 1.5 heartbeat per real minute each while active (D-33)', () => {
     const w = initialWorld(1, 'medium');
     runWaves(w, 31_000);
-    const before = w.heartbeat;
-    runWaves(w, 2_000); // 60 game s with one wave: −0.5
-    expect(before - w.heartbeat).toBeCloseTo(0.5, 5);
-    expect(REAL_S).toBe(30_000);
+    expect(activeWaves(w)).toHaveLength(1);
+    w.heartbeat = 50; // below the cap, so the drain shows
+    runWaves(w, 10_000); // 10 real s with one wave: −1.5 × 10/60
+    expect(50 - w.heartbeat).toBeCloseTo(medium.heartbeat.drainPerRealMin.minion / 6, 5);
   });
 });

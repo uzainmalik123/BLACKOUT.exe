@@ -35,7 +35,7 @@ export const MOVES: readonly Move[] = [
   { id: 'ATK-07', stage: 3, name: 'Reuse a stolen admin token', attack: 'T1550.001', needs: [{ gain: 'admin-session' }], gains: [],
     stoppedBy: [{ action: 'DEF-09' }], pri: 'S' },
   { id: 'ATK-08', stage: 4, name: 'Dump customers through search', attack: 'T1190, T1041', needs: [MAP], gains: ['souls'],
-    stoppedBy: [{ action: 'DEF-10', feature: 'search' }, SQLI, { action: 'DEF-13', patch: 'search' }], pri: 'M' },
+    stoppedBy: [{ action: 'DEF-10', feature: 'search' }, SQLI, { action: 'DEF-12', rule: { kind: 'block-user-agent', pattern: 'sqlmap' } }, { action: 'DEF-13', patch: 'search' }], pri: 'M' }, // which WAF rule stops which variant: D-34
   { id: 'ATK-09', stage: 4, name: 'Scrape users through the admin API', attack: 'T1213', needs: [ADMIN_OR_OWN], gains: ['souls'],
     stoppedBy: [{ action: 'DEF-08', account: 'used' }, { action: 'DEF-14', account: 'used' }, { action: 'DEF-09' }], pri: 'M' },
   { id: 'ATK-10', stage: 4, name: "Walk other customers' baskets", attack: 'T1190', needs: [{ anyOf: [{ gain: 'user-session' }, { anySession: true }] }], gains: ['souls'],

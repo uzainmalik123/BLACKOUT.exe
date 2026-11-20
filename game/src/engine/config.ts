@@ -1,5 +1,5 @@
 // Every number the engine uses, per difficulty. PRD values cite their row; the rest are D-24 (all "tune").
-import type { ActionId, Difficulty, Feature, MinionId, MoveId } from '../rules/vocabulary';
+import type { ActionId, Difficulty, Feature, MinionId, MoveId, WafRule } from '../rules/vocabulary';
 
 const REAL_S = 30_000; // one real second in game ms (SYS-01: 1 real s = 30 game s)
 const GAME_MIN = 60_000;
@@ -16,8 +16,8 @@ export interface EngineConfig {
   patchDurationGameMs: number; // DEF-13: ≈ 20 game min
   leakyWaf: boolean; // DEF-12: quiet variants get through on Medium/Hard
   heartbeat: {
-    drainPerGameMin: { openDoor: number; minion: number; plug: number; defaced: number; recover: number }; // SYS-06
-    featureWeight: Record<Feature, number>; // D-24
+    drainPerRealMin: { openDoor: number; minion: number; plug: number; defaced: number; recover: number }; // SYS-06, per REAL minute (D-33)
+    featureWeight: Record<Feature, number>; // D-24's weights, per real minute (D-33)
     dip: Partial<Record<ActionId, number>>; // D-24: one-off costs
   };
   minions: {
@@ -30,6 +30,8 @@ export interface EngineConfig {
   scenarioStartIso: string; // D-24
   /** SYS-08, D-31: the only variant Death may play of these moves, normally and once tipped off. Other variants stay for reference. */
   pinnedVariants: Partial<Record<MoveId, { normal: string; tippedOff: string }>>;
+  /** SYS-08, D-34: the WAF rule kinds each variant of these moves slips past. A move listed here ignores D-24's generic quiet-variant leak. */
+  wafEvasion: Partial<Record<MoveId, Record<string, Array<WafRule['kind']>>>>;
 }
 
 const MEDIUM: EngineConfig = {
@@ -44,7 +46,7 @@ const MEDIUM: EngineConfig = {
   patchDurationGameMs: 20 * GAME_MIN,
   leakyWaf: true,
   heartbeat: {
-    drainPerGameMin: { openDoor: 1, minion: 0.5, plug: 4, defaced: 3, recover: 1 },
+    drainPerRealMin: { openDoor: 3, minion: 1.5, plug: 33, defaced: 20, recover: 2 },
     featureWeight: { search: 0.3, registration: 0.1, 'password-reset': 0.05, uploads: 0.05, ftp: 0.02, 'feedback-captcha': 0.02 },
     dip: { 'DEF-07': 2, 'DEF-09': 10, 'DEF-13': 3, 'DEF-14': 10, 'DEF-16': 1 },
   },
@@ -57,10 +59,11 @@ const MEDIUM: EngineConfig = {
   backupEveryGameMs: 60 * GAME_MIN,
   scenarioStartIso: '2026-10-31T22:00:00Z',
   pinnedVariants: { 'ATK-08': { normal: 'b', tippedOff: 'c' } },
+  wafEvasion: { 'ATK-08': { b: ['sqli', 'block-user-agent'], c: [] } }, // .b's tamper scripts leak through the SQLi rules; only .c is loud
 };
 
 export const CONFIG: Readonly<Record<Difficulty, EngineConfig>> = {
-  easy: { ...MEDIUM, pausable: true, moveGapGameMs: 60 * REAL_S, leakyWaf: false },
+  easy: { ...MEDIUM, pausable: true, moveGapGameMs: 60 * REAL_S, leakyWaf: false, wafEvasion: { 'ATK-08': { b: ['block-user-agent'], c: [] } } },
   medium: MEDIUM,
   hard: { ...MEDIUM, moveGapGameMs: 25 * REAL_S, pinnedVariants: { 'ATK-08': { normal: 'c', tippedOff: 'c' } } },
 };

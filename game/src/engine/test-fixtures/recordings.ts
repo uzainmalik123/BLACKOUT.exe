@@ -36,28 +36,29 @@ const many = (n: number, f: (i: number) => RecEvent): RecEvent[] => Array.from({
 
 /** The events each row describes in "What the defender sees", shrunk to a handful. */
 /**
- * ATK-08.b/.c in the shape D-31 asks the recordings for: about a minute of probing (sqlmap's detection with a delay:
- * 500s and SQLITE_ERRORs), then the dump without one, a row every 200 ms. A player who turns search off within 60 s of
- * the first SQLITE_ERROR keeps 90% of the souls; an idle one loses all of them before an open door flatlines the
- * shop (SYS-06 drains 30 heartbeat per real minute while he works, KI-21). .b is loud (sqlmap's agent), .c quiet.
+ * ATK-08.b/.c shaped like the real recordings (D-32), both with sqlmap's agent: .b low and slow (62 probing 500s in the
+ * first 30 s, then one row per request until about 149 s); .c loud (about 90 s of probing, nothing stolen, then
+ * every row in under 3 s). The committed ATK-08.b/.c replace these in the sims as soon as they are on main.
  */
-const PROBE_MS = 58_000;
-const ROW_EVERY_MS = 200;
-function slowHarvest(ip: string, quiet: boolean): RecEvent[] {
-  const ua = quiet ? 'Mozilla/5.0 (X11; Linux x86_64)' : 'sqlmap/1.10';
-  const errors = Array.from({ length: 20 }, (_, i): RecEvent[] => [
-    { ...access(ip, 'GET', `/rest/products/search?q=e${i}`, 500, ua), t: 1 + i * (PROBE_MS / 20) },
-    { t: 2 + i * (PROBE_MS / 20), kind: 'app', text: 'Error: SQLITE_ERROR: near "(": syntax error' },
+function harvest(ip: string, variant: 'b' | 'c'): RecEvent[] {
+  const [probeMs, dumpMs] = variant === 'b' ? [29_500, 119_000] : [91_400, 2_800];
+  const ua = 'sqlmap/1.10.11#pip (https://sqlmap.org)';
+  const errors = Array.from({ length: 62 }, (_, i): RecEvent[] => [
+    { ...access(ip, 'GET', `/rest/products/search?q=e${i}`, 500, ua), t: 1 + Math.floor((i * probeMs) / 62) },
+    { t: 2 + Math.floor((i * probeMs) / 62), kind: 'app', text: 'Error: SQLITE_ERROR: near "(": syntax error' },
   ]).flat();
-  const rows = Array.from({ length: 325 }, (_, k): RecEvent[] => [
-    { ...access(ip, 'GET', `/rest/products/search?q=r${k}`, 200, ua), t: PROBE_MS + k * ROW_EVERY_MS },
-    { t: PROBE_MS + 1 + k * ROW_EVERY_MS, kind: 'exfil', table: 'Users', keys: [k + 1], columns: ['email', 'password'] },
-  ]).flat();
+  const rows = Array.from({ length: 325 }, (_, k): RecEvent[] => {
+    const t = probeMs + Math.floor((k * dumpMs) / 325);
+    return [
+      { ...access(ip, 'GET', `/rest/products/search?q=r${k}`, 200, ua), t },
+      { t: t + 1, kind: 'exfil', table: 'Users', keys: [k + 1], columns: ['email', 'password'] },
+    ];
+  }).flat();
   return [...errors, ...rows];
 }
 
 function eventsFor(id: MoveId | MinionId, ip: string, quiet: boolean, variant = 'a'): RecEvent[] {
-  if (id === 'ATK-08' && variant !== 'a') return slowHarvest(ip, quiet);
+  if (id === 'ATK-08' && (variant === 'b' || variant === 'c')) return harvest(ip, variant);
   const ua = quiet ? 'Mozilla/5.0' : undefined;
   switch (id) {
     case 'ATK-01': return many(60, (i) => access(ip, 'GET', `/w${i}`, 404, ua ?? 'Fuzz Faster U Fool v2.1')); // 6 s: long enough to be cut
@@ -74,7 +75,7 @@ function eventsFor(id: MoveId | MinionId, ip: string, quiet: boolean, variant = 
       { t: 0, kind: 'db', op: 'insert', table: 'Users', key: { id: 326 }, after: { id: 326, email: 'death@juice-sh.op', role: 'admin' } },
     ];
     case 'ATK-07': return many(5, (i) => ({ ...access(ip, 'GET', `/api/Users/${i + 1}`, 200, ua ?? 'curl/8.0'), t: i * 1000 + 1 })); // one a second
-    case 'ATK-08': return [ // .a: fast, like the real ATK-08.a (never picked in play, D-31); .b/.c are slowHarvest()
+    case 'ATK-08': return [ // .a: fast, like the real ATK-08.a (never picked in play, D-31); .b/.c are harvest()
       ...many(30, (i) => access(ip, 'GET', `/rest/products/search?q=${i}`, i < 20 ? 500 : 200, ua ?? 'sqlmap/1.10')),
       ...many(5, (i) => ({ t: 0, kind: 'exfil', table: 'Users', keys: Array.from({ length: 65 }, (_, k) => k + 1 + 65 * i), columns: ['email', 'password'] }) as RecEvent), // all 325 seed rows
     ];

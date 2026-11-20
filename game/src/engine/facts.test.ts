@@ -164,3 +164,35 @@ describe('stopperHolds', () => {
     expect(anyStopperHolds(w, MOVE_BY_ID['ATK-08'], loud)).toBe(true);
   });
 });
+
+describe('WAF rules against ATK-08 (D-34)', () => {
+  const sqli = { action: 'DEF-12', rule: { kind: 'sqli' } } as const;
+  const ua = { action: 'DEF-12', rule: { kind: 'block-user-agent', pattern: 'sqlmap' } } as const;
+  const b: VariantInfo = { ip: '203.0.113.82', quiet: false, targets: [], move: 'ATK-08', variant: 'b' };
+  const c: VariantInfo = { ip: '203.0.113.83', quiet: false, targets: [], move: 'ATK-08', variant: 'c' };
+  const withRules = (difficulty: 'easy' | 'medium' | 'hard') => {
+    const w = initialWorld(1, difficulty);
+    w.waf.push({ kind: 'sqli' }, { kind: 'block-user-agent', pattern: 'sqlmap' });
+    return w;
+  };
+
+  it('the SQLi rule set stops ATK-08.b on Easy only; on Medium and Hard its tamper scripts leak through', () => {
+    expect(stopperHolds(withRules('easy'), sqli, b)).toBe(true);
+    expect(stopperHolds(withRules('medium'), sqli, b)).toBe(false);
+    expect(stopperHolds(withRules('hard'), sqli, b)).toBe(false);
+  });
+
+  it('a sqlmap user-agent rule matches only the loud ATK-08.c, on every level', () => {
+    for (const d of ['easy', 'medium', 'hard'] as const) {
+      expect(stopperHolds(withRules(d), ua, b), d).toBe(false);
+      expect(stopperHolds(withRules(d), ua, c), d).toBe(true);
+      expect(stopperHolds(withRules(d), sqli, c), d).toBe(true);
+    }
+  });
+
+  it("ATK-08's stoppers are search off, the SQLi rules, the sqlmap user-agent rule and the search patch", () => {
+    expect(MOVE_BY_ID['ATK-08'].stoppedBy).toEqual([
+      { action: 'DEF-10', feature: 'search' }, sqli, ua, { action: 'DEF-13', patch: 'search' },
+    ]);
+  });
+});
