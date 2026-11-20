@@ -143,6 +143,7 @@ export interface World {
     stageSkips: number; // tip-offs not yet spent (D-19)
     pacingDelayed: boolean; // SYS-02: the one-off delay for > 3 open alerts has been applied
     skipWait: boolean; // a tip-off during an active move: the next wait is skipped when it ends
+    tippedOff: boolean; // he has been tipped off at least once this run (D-31: the quiet harvest)
     quietSince?: number; // SYS-07: routes closed with a foothold left
     returnedThrough?: Foothold;
     resume: Partial<Record<MoveId, { variant: string; cursor: number }>>; // where an IP-cut move continues from a fresh address (D-24)
@@ -181,7 +182,7 @@ export function initialWorld(seed: number, difficulty: Difficulty): World {
     backups: [{ id: 0, takenAt: 0, accounts: accounts.map((a) => ({ ...a })), files: [], defacements: [] }],
     evidence: [],
     comms: { notifiedAt: {} },
-    death: { knowledge: [], forgedToken: false, played: [], nextMoveAt: 0, stageSkips: 0, pacingDelayed: false, skipWait: false, resume: {}, nextId: 1 },
+    death: { knowledge: [], forgedToken: false, played: [], nextMoveAt: 0, stageSkips: 0, pacingDelayed: false, skipWait: false, tippedOff: false, resume: {}, nextId: 1 },
     replays: [],
     waves: [],
     nextWaveAt: { ...config.minions.firstWaveGameMs },

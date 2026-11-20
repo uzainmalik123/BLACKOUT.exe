@@ -6,7 +6,10 @@ import { MOVE_BY_ID } from '../rules/moves';
 import { FOOTHOLDS, type MinionId, type MoveId, type Patch, type PlayerAction, type Stopper } from '../rules/vocabulary';
 import type { GameEvent } from './log';
 import { eventsOfKind } from './log';
+import { libraryFrom, type RecordingLibrary } from './library';
 import { runSim, type ScriptedPlayer, type SimResult } from './sim';
+import { soulsStolen } from './souls';
+import { committedLibrary } from './test-fixtures/committed';
 import type { World } from './state';
 import { FIXTURE_LIBRARY } from './test-fixtures/recordings';
 
@@ -173,4 +176,48 @@ describe('the playthrough sims (PRD §10, SYS-16)', () => {
     expect(eventsOfKind(r.world, 'return')).toMatchObject([{ through: 'forged-token' }]);
     expect(ending(r)).toBe('return');
   });
+});
+
+describe('SIM-8: the harvest at its recorded speed (D-31)', () => {
+  /** On Hard, ATK-08.c: does the player turn search off within 60 real s of the first SQLITE_ERROR in the app log? */
+  function hardHarvest(library: RecordingLibrary, reactAfterRealMs: number | undefined): SimResult {
+    let acted = false;
+    return runSim({
+      seed: 1, difficulty: 'hard', library, maxRealMs: 20 * REAL_MIN,
+      player: (w, realElapsed) => {
+        if (acted || reactAfterRealMs === undefined) return [];
+        const first = w.logs.app.find((l) => l.text.includes('SQLITE_ERROR'));
+        if (!first || realElapsed < first.t / 30 + reactAfterRealMs) return [];
+        acted = true;
+        return [{ type: 'DEF-10', feature: 'search', enabled: false }];
+      },
+    });
+  }
+  const kept = (r: SimResult) => 1 - soulsStolen(r.world) / r.world.souls.total;
+  const harvestOnly = (library: RecordingLibrary) =>
+    libraryFrom(['ATK-01', 'ATK-08'].flatMap((m) => library.variantsOf(m as 'ATK-01').map((v) => v.recording)));
+
+  it('a Hard player who turns search off within 60 s of the first SQLITE_ERROR keeps at least 90% of souls (made-up ATK-08.c)', () => {
+    const r = hardHarvest(harvestOnly(FIXTURE_LIBRARY), 60_000);
+    expect(eventsOfKind(r.world, 'move-started').find((e) => e.move === 'ATK-08')?.variant).toBe('c');
+    expect(eventsOfKind(r.world, 'move-cut')).toMatchObject([{ move: 'ATK-08', by: 'DEF-10' }]);
+    expect(kept(r)).toBeGreaterThanOrEqual(0.9);
+  });
+
+  it('a Hard player who does not loses every soul (made-up ATK-08.c)', () => {
+    const r = hardHarvest(harvestOnly(FIXTURE_LIBRARY), undefined);
+    expect(ending(r)).toBe('souls-lost');
+    expect(soulsStolen(r.world)).toBe(r.world.souls.total);
+  });
+
+  const real = committedLibrary();
+  it.runIf(real.variantsOf('ATK-08').some((v) => v.variant === 'c') && real.variantsOf('ATK-01').length > 0)(
+    'the same two outcomes on the committed ATK-01 and ATK-08.c recordings',
+    () => {
+      const lib = harvestOnly(real);
+      expect(kept(hardHarvest(lib, 60_000))).toBeGreaterThanOrEqual(0.9);
+      const idle = hardHarvest(lib, undefined);
+      expect(soulsStolen(idle.world)).toBe(idle.world.souls.total);
+    },
+  );
 });
