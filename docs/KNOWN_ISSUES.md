@@ -3,7 +3,7 @@
 | ID | Issue | Severity | Status |
 |---|---|---|---|
 | KI-01 | The game has no name yet; the title screen still says "RE:Animator" | Minor | Open |
-| KI-02 | Kiro's credit cost per call is unknown, so the per-run cap (KIRO-10) can't be set yet. **Latency measured** 2026-11-20 (kiro-cli 2.37.1, one-shot `chat --no-interactive`, process start included): 5.9–18.0 s per answer, median ≈ 10.7 s; within KIRO-09's 25 s timeout. Credits weren't printed in non-interactive mode: read them from the Kiro usage page | Major | Open |
+| KI-02 | Kiro's credit cost per call is unknown, so the per-run cap (KIRO-10) can't be set yet. **Latency measured** 2026-11-20 (kiro-cli 2.37.1, one-shot `chat --no-interactive`, process start included): 5.9–18.0 s per answer, median ≈ 10.7 s; within KIRO-09's 25 s timeout. Credits (Kiro usage page): about 1 credit for all 5 answers, so ≈ 0.2 per call. Caps set in PRD §6 (D-23) | Major | Closed (D-23) |
 | KI-03 | Some Juice Shop behaviours in PRD §3/§5 are unconfirmed; per-fact status below (checked 2026-11-17 against v20.4.0) | Major | Open |
 | KI-04 | No host picked for the page and the Kiro server (SYS-18); the rules require a working URL. Ruled: Fly.io (D-20) | Major | Closed (D-20) |
 | KI-05 | Recording timing assumes the host and the containers share one clock: `record.sh` stamps start/end with the host's `date`, while nginx and `docker logs` stamp with the containers' clocks. True on Linux Docker; Docker Desktop's VM can drift. `date +%s%3N` is GNU-only too, so re-recording is Linux-only | Minor | Open |
@@ -15,7 +15,7 @@
 | KI-11 | Juice Shop seeds its DB on start with the current time, so a re-recorded run's `before.sqlite` differs from the committed baseline in timestamp columns; a `db` event's `before` may not match the baseline exactly | Minor | Open |
 | KI-12 | D-18 holds ATK-15/16 to stage 6, but SYS-02 has no stage gate: it picks any move whose Needs hold, preferring later stages, so with Needs `map` it would deface the shop right after the first scan. Ruled: SYS-02 keeps stage order (D-19) | Major | Closed (D-19) |
 | KI-13 | `--trust-tools=` didn't stop Kiro using its built-in Grep tool: run from the repo, it read the PRD and told the "player" game mechanics ("the report marks you down", "per PRD DEF-06"). The in-game agent (SYS-12) must be a custom agent with **no built-in tools** (only KIRO-07's game tools), run from a folder **outside the repo**, with a prompt that forbids talking about the game's rules or files | Major | Open |
-| KI-14 | Kiro's drafts use `systemctl restart` and write to `/tmp/…` with `>`. SYS-09 only names `stop`/`start` and doesn't say which folders exist. Team to rule: support `restart` and a writable `/tmp`, or have the command guard (KIRO-08) rewrite/strip them | Minor | Open |
+| KI-14 | Kiro's drafts use `systemctl restart` and write to `/tmp/…` with `>`. SYS-09 only names `stop`/`start` and doesn't say which folders exist. Ruled: support both (D-22) | Minor | Closed (D-22) |
 
 ### KI-03: Juice Shop facts (v20.4.0, checked 2026-11-17)
 

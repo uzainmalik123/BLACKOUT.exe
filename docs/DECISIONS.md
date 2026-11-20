@@ -23,6 +23,8 @@
 | D-19 | Stage order: Death plays a stage-N move only after a stage-(N-1) move (stage 1 always open); the return ignores it and a tip-off skips one stage; Needs stay technical | Accepted |
 | D-20 | Hosting on Fly.io: one small container serves the game page and the Kiro server (SYS-18); the team handles any cold-start | Accepted |
 | D-21 | Track split: Uzain (with Claude) takes Track A, the rules engine, plus the recordings and Kiro; the teammate takes the shell, the look and the writing (`docs/TEAMMATE_TASKS.md`) | Accepted |
+| D-22 | The shell supports `systemctl restart` and a writable `/tmp`: Kiro's correct real-world drafts use them (KI-14) | Accepted |
+| D-23 | Kiro costs about 0.2 credits per call; caps: 60 calls per run, 400 per day (KI-02) | Accepted |
 
 ### D-01: Pivot to an incident-response game
 - **Context:** (2026-11-08) Reanimator raised dead repos so Death could attack them. Any agent can revive a repo on its own, so the product added nothing, and the UI had drifted into a pile of screens with no vision.
@@ -93,4 +95,14 @@
 - **Context:** (2026-11-20) `docs/TEAMMATE_TASKS.md` gave the teammate Track A (the rules engine), but no engine work had started and it's the critical path to the first playable version.
 - **Decision:** Uzain, with Claude, takes Track A plus the recordings and Kiro. The teammate takes the shell (SYS-09), the look (renderer, art, then the screens) and the writing (CON).
 - **Consequences:** the teammate builds screens against the engine's state types once A1 (SYS-04) lands, and wires them to the live engine when A5 (SYS-03) runs.
+
+### D-22: `systemctl restart` and `/tmp` in the shell
+- **Context:** (2026-11-20) In the Kiro test, Kiro's drafts used `systemctl restart nginx` and saved intermediate results to `/tmp/…` (KI-14). Both are what a real admin types.
+- **Decision:** SYS-09 supports `systemctl restart` (a stop then a start, with the same heartbeat effects) and a writable `/tmp` in the virtual file system. The steering file says so too.
+- **Consequences:** the command guard (KIRO-08) doesn't need to rewrite these.
+
+### D-23: Kiro's cost and the caps
+- **Context:** (2026-11-20) Five in-game-style answers cost about 1 credit in total (KI-02).
+- **Decision:** budget at 0.2 credits per call. KIRO-10's caps start at 60 calls per run (≈ 12 credits, ≈ 200 runs from the 2500 in-game credits) and 400 calls per day on the server _(tune)_.
+- **Consequences:** Kiro chat can be used freely in a run; the cap only stops abuse. Re-measure once the ACP server (SYS-12) exists, since longer conversations cost more.
 
