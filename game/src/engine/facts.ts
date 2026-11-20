@@ -1,7 +1,7 @@
 // Derived facts (SYS-04, D-24): Death's gains and footholds are read off the data they rest on, never bookkept.
 // The Director (SYS-02), the replay engine (SYS-03) and banishment (SYS-07) all ask these questions.
 import { MOVES, type Move } from '../rules/moves';
-import { FEATURE_DEFAULTS, type Foothold, type Gain, type Need, type Stopper, type WafRule } from '../rules/vocabulary';
+import { FEATURE_DEFAULTS, RETURN_GRANTS, type Foothold, type Gain, type Need, type Stopper, type WafRule } from '../rules/vocabulary';
 import { CONFIG } from './config';
 import type { Account, World } from './state';
 
@@ -25,6 +25,7 @@ export function gains(world: World): Set<Gain> {
   if (world.defacements.some((d) => d.kind === 'deface') || world.bannerDefacedBy !== undefined) g.add('defaced');
   if (world.defacements.some((d) => d.kind === 'xss')) g.add('xss-live');
   if (world.files.some((f) => f.plantedBy === 'ATK-17' && f.path.endsWith(RANSOM_NOTE))) g.add('ransom');
+  if (world.death.returnedThrough !== undefined) g.add(RETURN_GRANTS[world.death.returnedThrough]);
   return g;
 }
 

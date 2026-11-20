@@ -298,10 +298,12 @@ Rows not listed here are `planned`. A PR that moves a row adds or updates its li
 | REC-03 | building | One variant each so far: ATK-03.a, ATK-08.a |
 | ATK-03 | building | Recorded (ATK-03.a); plays headless in the engine (SYS-03); no UI yet |
 | ATK-08 | building | Recorded (ATK-08.a); plays headless in the engine (SYS-03): 25 souls; no UI yet |
-| SYS-04 | building | Types and `initialWorld()` in `game/src/engine/state.ts`; the shell and dashboard build against them; `done` once every DEF and ATK effect goes through it |
+| SYS-04 | done | `game/src/engine/state.ts`; every DEF effect goes through `engine/actions.ts`, every ATK effect through `engine/replay.ts` |
+| SYS-02 | done | `game/src/engine/director.ts`; seeded, stage order (D-19), pacing, tip-off; `director-pick.test.ts` |
+| SYS-07 | done | `game/src/engine/director.ts`; the return is an ending (D-24); leaving ATK-11's admin always triggers it |
 | SYS-03 | done | `game/src/engine/replay.ts` + `sqldb.ts`; blocking the IP mid-ATK-08 stops its lines within one tick; any stopper cuts the move |
 | SYS-01 | done | `game/src/engine/clock.ts`; 1 real s = 30 game s; pause only on Easy |
 | SYS-05 | done | `game/src/engine/souls.ts`; one `Users` row per soul (D-24, KI-15) |
 | SYS-06 | done | `game/src/engine/heartbeat.ts`; a plug-only run flatlines at game minute 25 |
 | SYS-10 | done | `game/src/engine/log.ts`; the sims and the report read only `world.events` |
-| SYS-17 | building | Tables in `game/src/rules/` with consistency tests; fast-check suite in `game/src/engine/properties.test.ts`; the stage-order test follows with SYS-02 |
+| SYS-17 | done | Consistency tests in `game/src/rules/`, stage-order test in `game/src/engine/stage-order.test.ts`, fast-check suite in `properties.test.ts` |

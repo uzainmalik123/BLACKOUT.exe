@@ -6,22 +6,17 @@ import { CONFIG } from './config';
 import { integrateHeartbeat } from './heartbeat';
 import type { RecordingLibrary } from './library';
 import { directorTick } from './director';
-import { emit } from './log';
+import { endRun } from './log';
 import { stepWaves } from './minions';
 import { stepReplays } from './replay';
-import { soulsLeft, soulsStolen } from './souls';
-import type { Ending, World } from './state';
-
-function end(world: World, ending: Ending): void {
-  world.ending = ending;
-  emit(world, { kind: 'ending', ending, souls: soulsStolen(world), heartbeat: world.heartbeat });
-}
+import { soulsLeft } from './souls';
+import type { World } from './state';
 
 /** Souls all taken or heartbeat at 0 end the run (SYS-05, SYS-06). Banishment and the return are the Director's. */
 export function checkEndings(world: World): void {
   if (world.ending) return;
-  if (soulsLeft(world) === 0) end(world, 'souls-lost');
-  else if (world.heartbeat <= 0) end(world, 'flatline');
+  if (soulsLeft(world) === 0) endRun(world, 'souls-lost');
+  else if (world.heartbeat <= 0) endRun(world, 'flatline');
 }
 
 function step(world: World, library: RecordingLibrary, dt: number): void {

@@ -139,6 +139,7 @@ export interface World {
     played: Array<{ move: MoveId; variant: string; outcome: 'landed' | 'cut' }>;
     nextMoveAt: number;
     stageSkips: number; // tip-offs not yet spent (D-19)
+    pacingDelayed: boolean; // SYS-02: the one-off delay for > 3 open alerts has been applied
     quietSince?: number; // SYS-07: routes closed with a foothold left
     returnedThrough?: Foothold;
     nextId: number; // ids for replays, waves, alerts, sessions, backups
@@ -176,7 +177,7 @@ export function initialWorld(seed: number, difficulty: Difficulty): World {
     backups: [{ id: 0, takenAt: 0, accounts: accounts.map((a) => ({ ...a })), files: [], defacements: [] }],
     evidence: [],
     comms: { notifiedAt: {} },
-    death: { knowledge: [], forgedToken: false, played: [], nextMoveAt: 0, stageSkips: 0, nextId: 1 },
+    death: { knowledge: [], forgedToken: false, played: [], nextMoveAt: 0, stageSkips: 0, pacingDelayed: false, nextId: 1 },
     replays: [],
     waves: [],
     nextWaveAt: { ...config.minions.firstWaveGameMs },

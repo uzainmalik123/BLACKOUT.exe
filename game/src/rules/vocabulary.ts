@@ -63,6 +63,11 @@ export const SOUL_TABLES = ['Users'] as const;
 
 export type Ending = 'banished' | 'souls-lost' | 'flatline' | 'return';
 
+/** What Death comes back with through each foothold (SYS-07, D-24). */
+export const RETURN_GRANTS: Readonly<Record<Foothold, Gain>> = {
+  'hidden-admin': 'own-admin', 'hijacked-user': 'user-session', 'forged-token': 'admin-session', 'planted-file': 'map',
+};
+
 export const STAGES: readonly Stage[] = [1, 2, 3, 4, 5, 6];
 export const FOOTHOLDS: readonly Foothold[] = ['hidden-admin', 'hijacked-user', 'planted-file', 'forged-token'];
 export const FEATURES: readonly Feature[] = ['search', 'registration', 'password-reset', 'uploads', 'ftp', 'feedback-captcha'];

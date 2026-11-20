@@ -32,3 +32,10 @@ export function emit(world: World, body: GameEventBody): GameEvent {
 export function eventsOfKind<K extends GameEvent['kind']>(world: World, kind: K): Extract<GameEvent, { kind: K }>[] {
   return world.events.filter((e): e is Extract<GameEvent, { kind: K }> => e.kind === kind);
 }
+
+/** Ends the run (SYS-05/06/07): sets world.ending and logs the final meters. Idempotent. */
+export function endRun(world: World, ending: Ending): void {
+  if (world.ending) return;
+  world.ending = ending;
+  emit(world, { kind: 'ending', ending, souls: world.souls.stolen.length, heartbeat: world.heartbeat });
+}
