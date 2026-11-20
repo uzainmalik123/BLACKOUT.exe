@@ -32,8 +32,9 @@ describe('briefing files (CON-01)', () => {
   });
 
   it('states the real customer and product counts', async () => {
-    const [[customers]] = await query("SELECT count(*) FROM Users WHERE role = 'customer'");
-    const [[products]] = await query('SELECT count(*) FROM Products');
+    const customers = (await query("SELECT count(*) FROM Users WHERE role = 'customer'"))[0]?.[0];
+    const products = (await query('SELECT count(*) FROM Products'))[0]?.[0];
+    expect(customers).toBe(312);
     expect(file('admins')).toContain(`${customers} accounts`);
     expect(file('system-map')).toContain(`${customers} customers, ${products} products`);
   });
