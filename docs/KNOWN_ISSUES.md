@@ -5,7 +5,7 @@
 | KI-01 | The game has no name yet; the title screen still says "RE:Animator" | Minor | Open |
 | KI-02 | Kiro's credit cost per call is unknown, so the per-run cap (KIRO-10) can't be set yet; measure it with the first SYS-12 prototype | Major | Open |
 | KI-03 | Some Juice Shop behaviours in PRD §3/§5 are unconfirmed; per-fact status below (checked 2026-11-17 against v20.4.0) | Major | Open |
-| KI-04 | No host picked for the page and the Kiro server (SYS-18); the rules require a working URL | Major | Open |
+| KI-04 | No host picked for the page and the Kiro server (SYS-18); the rules require a working URL. Ruled: Fly.io (D-20) | Major | Closed (D-20) |
 | KI-05 | Recording timing assumes the host and the containers share one clock: `record.sh` stamps start/end with the host's `date`, while nginx and `docker logs` stamp with the containers' clocks. True on Linux Docker; Docker Desktop's VM can drift. `date +%s%3N` is GNU-only too, so re-recording is Linux-only | Minor | Open |
 | KI-06 | nginx has no healthcheck (`up --wait` only waits on the shop's), and `record.sh` throws away the output of `compose down`/`up`, so a broken rig shows up only as an isolation-check failure | Minor | Open |
 | KI-07 | The "no rig address" test reads the recording as text, so an address inside an embedded file (`contentBase64`) would get past it | Minor | Open |

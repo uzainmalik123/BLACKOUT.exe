@@ -27,7 +27,7 @@ All rows start `planned`. §16 lists only the rows that have left `planned` (D-1
 
 ## 1. Platform (D-03)
 
-- **A hosted web page plus one small server.** The page is the game (React + Vite). The server runs `kiro-cli acp` with our `KIRO_API_KEY` and nothing else (D-04). The rules require a working URL for judges, so hosting is a must (SYS-18); the host is picked before the vertical slice (KI-04).
+- **A hosted web page plus one small server.** The page is the game (React + Vite). The server runs `kiro-cli acp` with our `KIRO_API_KEY` and nothing else (D-04). The rules require a working URL for judges, so hosting is a must (SYS-18); it runs on **Fly.io**: one small container serves the page and the Kiro server (D-20).
 - **Desktop only.** Below 1024 px wide, or on touch-only devices, a "play on a computer" screen shows instead.
 - **No accounts, no saves.** Each run is self-contained.
 - **The game works without the server.** If Kiro is unreachable, every Kiro feature falls back to rule-written text (KIRO-09). A judge never gets a broken game.
@@ -174,7 +174,7 @@ Real Kiro, through `kiro-cli acp` on our server, **on rails**: our rules decide 
 | SYS-15 | **Demo mode** | A fixed seed plus a fixed player script for the trailer | Two demo runs produce identical event logs | S |
 | SYS-16 | **Playthrough sims** | Headless runs of the whole rules engine (no UI) with scripted players. See §10 | All §10 sims pass in `npm test` | M |
 | SYS-17 | **Rules consistency** | Rules live as data (`game/src/rules/moves.ts`, `actions.ts`, `minions.ts`). Tests: every ATK has ≥ 1 DEF that stops it; every Need is produced by some move or the start state; every foothold has a DEF that removes it; every MIN has its closing DEF; no seeded run plays a stage-N move before a stage-(N-1) move, except during the return (SYS-07) or after a tip-off (D-19). Plus **property-based tests** (fast-check): random sequences of player actions never crash the engine, never make souls go back up, and never leave heartbeat outside 0–100 | These tests exist and pass | M |
-| SYS-18 | **Hosting** | The page and the Kiro server (SYS-12) live at one public URL from the vertical slice until judging ends | A full run plays from the public URL, both with the Kiro server up and with it stopped | M |
+| SYS-18 | **Hosting** | The page and the Kiro server (SYS-12) live at one public URL on Fly.io (one container, D-20) from the vertical slice until judging ends | A full run plays from the public URL, both with the Kiro server up and with it stopped | M |
 
 ---
 
@@ -286,7 +286,6 @@ From the Kiroween 2026 rules. Each one is a hard requirement unless marked bonus
 
 - **Name** (KI-01): the team decides.
 - **Who does what**: the team decides once both are online.
-- **Which host** for SYS-18 (KI-04).
 
 ## 16. Status
 
