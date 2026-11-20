@@ -37,6 +37,7 @@
 | D-33 | Heartbeat rates per real minute: plug −33, defaced/XSS −20, each open door −3, each minion −1.5, disabled features by D-24's weights, recovery +2 (KI-21) | Accepted |
 | D-34 | WAF vs ATK-08: the SQLi rule set stops ATK-08.b on Easy only (tamper scripts leak through on Medium/Hard); a sqlmap user-agent rule matches only ATK-08.c; SIM-9 | Accepted |
 | D-35 | ATK-08.b is quiet as well as slow: `--random-agent` and the `randomcase` tamper script, still with `--delay` (~2.5 min); ATK-08.c keeps sqlmap's own user agent (closes KI-22) | Accepted |
+| D-60 | Ordinary customer traffic: a recorded shopper loop (REC-06) plays under everything (SYS-19), from an address pool shared with Death and the minions, and shows the cost of the player's actions as customers' failed requests | Accepted |
 
 ### D-01: Pivot to an incident-response game
 - **Context:** (2026-11-08) Reanimator raised dead repos so Death could attack them. Any agent can revive a repo on its own, so the product added nothing, and the UI had drifted into a pile of screens with no vision.
@@ -189,3 +190,9 @@
 - **Context:** (2026-11-20) D-32 recorded ATK-08.b with sqlmap's own user agent, so the player saw "sqlmap" in the log while D-34's user-agent rule did nothing to it (KI-22). The team ruled ATK-08.b should be quiet too.
 - **Decision:** ATK-08.b runs sqlmap with `--random-agent` and a tamper script, still with `--delay=0.36` so the full dump takes 2 to 3 minutes. The ruling suggested `space2comment`, but whitespace tampers don't work on this route: `space2comment`'s `/**/` makes payloads longer than the 200 characters Juice Shop keeps of `q`, so sqlmap can't fingerprint SQLite, and with `space2randomblank` it finds no injection at all. So the tamper is `randomcase` (`UnIon AlL sELEcT`), which keeps the length. Recorded: 404 requests over 152 s, one browser user agent for the whole run, rows stolen from 33 s to 152 s. ATK-08.c stays loud (sqlmap's own agent, ~90 s of probing, then a fast dump from the saved session).
 - **Consequences:** a user-agent rule doesn't see ATK-08.b, and a case-sensitive `UNION SELECT` signature misses all but the odd request (`randomcase` lands on all capitals by chance: 1 of 404 here). How DEF-12's rules treat it is the engine session's (SYS-06 and the WAF rules are untouched here).
+
+### D-60: Customer traffic
+- **Context:** (2026-11-21) KI-60: the logs only ever held Death's and the minions' requests, so every line was suspicious, the briefing's "what normal looks like" had nothing to compare against, and spotting the attacker was far easier than in a real incident.
+- **Decision:** REC-06 records a loop of ordinary shoppers on the same rig; SYS-19 plays it underneath everything. Customers, Death and the minions draw addresses from one pool across all three documentation ranges (192.0.2.0/24, 198.51.100.0/24, 203.0.113.0/24), so the range never gives anyone away; recordings keep D-15's rewrite to 203.0.113.0/24 and the engine remaps at replay. Customer requests react to the player's actions (`503` for a disabled feature, `429` for a rate limit, blocked by matching WAF rules and blocked IPs, absent with the plug pulled).
+- **Consequences:** the heartbeat cost of an action becomes visible as real customers failing, which is the business side of containment (NIST 800-61). The engine's IP handling changes from "always 203.0.113.0/24" to the shared pool. Decision and issue numbers 60–79 are this work's block.
+
