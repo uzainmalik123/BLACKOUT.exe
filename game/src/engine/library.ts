@@ -1,6 +1,6 @@
 // The recordings the engine can play, grouped by move (SYS-03). The game injects the committed ones;
 // the sims inject made-up ones from src/engine/test-fixtures/.
-import type { Recording } from '../recordings/format';
+import { validateRecording, type Recording } from '../recordings/format';
 import type { MinionId, MoveId } from '../rules/vocabulary';
 import type { VariantInfo } from './facts';
 
@@ -16,3 +16,28 @@ export interface RecordingLibrary {
 }
 
 export const EMPTY_LIBRARY: RecordingLibrary = { variantsOf: () => [] };
+
+/** What the engine needs to know about a recording before playing it (D-24). */
+export function variantInfo(r: Recording): VariantInfo {
+  const targets = new Set<string>();
+  for (const e of r.events) {
+    if (e.kind !== 'db' || e.table !== 'Users') continue;
+    const email = e.after?.email ?? e.before?.email;
+    if (typeof email === 'string') targets.add(email);
+  }
+  return { ip: r.attackerIp, quiet: r.label.toLowerCase().startsWith('quiet'), targets: [...targets] };
+}
+
+/** Builds a library; throws when a recording fails D-15 validation. Variants come back sorted by name. */
+export function libraryFrom(recordings: Recording[]): RecordingLibrary {
+  const byMove = new Map<string, Variant[]>();
+  for (const r of recordings) {
+    const errors = validateRecording(r);
+    if (errors.length > 0) throw new Error(`${r.move}.${r.variant}: ${errors.join('; ')}`);
+    const list = byMove.get(r.move) ?? [];
+    list.push({ move: r.move as MoveId | MinionId, variant: r.variant, recording: r, info: variantInfo(r) });
+    byMove.set(r.move, list);
+  }
+  for (const list of byMove.values()) list.sort((a, b) => a.variant.localeCompare(b.variant));
+  return { variantsOf: (move) => byMove.get(move) ?? [] };
+}
