@@ -296,9 +296,10 @@ Rows not listed here are `planned`. A PR that moves a row adds or updates its li
 | REC-01 | done | `recording/`: isolated rig; `check-isolation.sh` checks the network is internal, no container asks for a published port, and nothing outside is reachable |
 | REC-02 | building | `recording/record.sh` + `npm run recording:convert`, format D-15. Exfil is read from sqlmap's traffic log only; curl-based souls moves (ATK-09, ATK-10) need a way to capture responses first |
 | REC-03 | building | One variant each so far: ATK-03.a, ATK-08.a |
-| ATK-03 | building | Recorded (ATK-03.a); not playable until SYS-03 |
-| ATK-08 | building | Recorded (ATK-08.a); not playable until SYS-03 |
+| ATK-03 | building | Recorded (ATK-03.a); plays headless in the engine (SYS-03); no UI yet |
+| ATK-08 | building | Recorded (ATK-08.a); plays headless in the engine (SYS-03): 25 souls; no UI yet |
 | SYS-04 | building | Types and `initialWorld()` in `game/src/engine/state.ts`; the shell and dashboard build against them; `done` once every DEF and ATK effect goes through it |
+| SYS-03 | done | `game/src/engine/replay.ts` + `sqldb.ts`; blocking the IP mid-ATK-08 stops its lines within one tick; any stopper cuts the move |
 | SYS-01 | done | `game/src/engine/clock.ts`; 1 real s = 30 game s; pause only on Easy |
 | SYS-05 | done | `game/src/engine/souls.ts`; one `Users` row per soul (D-24, KI-15) |
 | SYS-06 | done | `game/src/engine/heartbeat.ts`; a plug-only run flatlines at game minute 25 |
