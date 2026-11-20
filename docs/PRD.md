@@ -325,3 +325,5 @@ Rows not listed here are `planned`. A PR that moves a row adds or updates its li
 | SIM-9 | building | In `game/src/engine/sims.test.ts`: passes on made-up ATK-08.b and, checked locally, on PR #66's ATK-08.b; runs on the committed one once it is on main (D-34) |
 | SYS-08 | building | Two dials so far in `game/src/engine/config.ts`: the harvest variant per level (`pinnedVariants`, D-31) and which WAF rules each harvest slips past (`wafEvasion`, D-34) |
 | SYS-16 | building | SIM-1…SIM-9 run headless in `game/src/engine/sims.test.ts` on a made-up library (`engine/test-fixtures/`); SIM-2's whack-a-mole line and SIM-5's grades wait for SYS-11 |
+| CON-01 | done | `game/src/content/briefing/`: system map, admins, normal traffic, playbook; a test checks the admin list and counts against the baseline DB |
+| CON-04 | done | `game/src/content/taunts.ts`: 3 lines per move plus blocked, tipped off, banished, return; a test checks counts and that no line gives away a defence |
