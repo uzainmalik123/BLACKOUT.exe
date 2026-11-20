@@ -36,13 +36,13 @@ export function closeAlert(world: World, about: MoveId | MinionId): void {
 }
 
 /** Starts playing a variant. Death's moves open an alert and log move-started; waves log their own events. */
-export function startReplay(world: World, v: Variant, owner: 'death' | MinionId): Replay {
+export function startReplay(world: World, v: Variant, owner: 'death' | MinionId, ips?: string[]): Replay {
   const ratio = CONFIG[world.difficulty].gameMsPerRealMs;
   const saved = owner === 'death' && isMove(v.move) ? world.death.resume[v.move] : undefined;
-  const cursor = saved && saved.variant === v.variant ? saved.cursor : 0;
+  const cursor = saved && saved.variant === v.variant && saved.cursor < v.recording.events.length ? saved.cursor : 0;
   // An IP-cut move carries on from a fresh address: its next event is due now, as if the tool had never stopped.
   const startedAt = world.clock.gameMs - (cursor > 0 ? v.recording.events[cursor]!.t * ratio : 0);
-  const replay: Replay = { id: nextId(world), owner, move: v.move, variant: v.variant, ip: v.info.ip, recordedIp: v.recording.attackerIp, startedAt, cursor };
+  const replay: Replay = { id: nextId(world), owner, move: v.move, variant: v.variant, ip: v.info.ip, recordedIp: v.recording.attackerIp, startedAt, cursor, ...(ips && { ips }) };
   if (saved && isMove(v.move)) delete world.death.resume[v.move];
   world.replays.push(replay);
   if (owner === 'death' && isMove(v.move)) {
@@ -68,12 +68,13 @@ export function cutReplay(world: World, replay: Replay, by: ActionId): void {
   if (by === 'DEF-06') world.death.resume[replay.move] = { variant: replay.variant, cursor: replay.cursor };
   emit(world, { kind: 'move-cut', move: replay.move, variant: replay.variant, by });
   closeAlert(world, replay.move);
-  world.death.nextMoveAt = world.clock.gameMs + CONFIG[world.difficulty].cutRetryGameMs;
+  world.death.nextMoveAt = world.clock.gameMs + (world.death.skipWait ? 0 : CONFIG[world.difficulty].cutRetryGameMs);
+  world.death.skipWait = false;
 }
 
 function whatStops(world: World, replay: Replay, info: VariantInfo): ActionId | undefined {
   if (world.nginx === 'stopped') return 'DEF-11';
-  if (world.firewall.blocked.includes(replay.ip)) return 'DEF-06';
+  if ((replay.ips ?? [replay.ip]).every((ip) => world.firewall.blocked.includes(ip))) return 'DEF-06';
   const stoppers: Stopper[] = isMove(replay.move) ? MOVE_BY_ID[replay.move].stoppedBy : MINION_BY_ID[replay.move].closedBy;
   return stoppers.find((s) => stopperHolds(world, s, info))?.action;
 }
@@ -85,6 +86,7 @@ function applyDb(world: World, by: MoveId | MinionId, e: DbEvent, t: number): vo
   if (e.table === 'Users') {
     if (e.op === 'insert' && e.after) {
       const role = String(e.after.role ?? 'customer') as World['accounts'][number]['role'];
+      world.accounts = world.accounts.filter((x) => x.id !== id); // a retried move inserts the same row once
       world.accounts.push({ id, email: String(e.after.email ?? `user${id}@juice-sh.op`), role, createdBy: by });
     } else if (e.op === 'update' && e.after?.password !== undefined) {
       const a = world.accounts.find((x) => x.id === id);
@@ -112,9 +114,12 @@ function applyFile(world: World, by: MoveId | MinionId, e: FileEvent): void {
 function applyEvent(world: World, replay: Replay, e: RecEvent, t: number): void {
   const by = replay.move;
   switch (e.kind) {
-    case 'access':
-      world.logs.access.push({ t, ip: e.ip === replay.recordedIp ? replay.ip : e.ip, method: e.method, target: e.target, protocol: e.protocol, status: e.status, bytes: e.bytes, referer: e.referer, userAgent: e.userAgent, by });
+    case 'access': {
+      const ips = replay.ips ?? [replay.ip];
+      const ip = e.ip === replay.recordedIp ? ips[replay.cursor % ips.length]! : e.ip;
+      world.logs.access.push({ t, ip, method: e.method, target: e.target, protocol: e.protocol, status: e.status, bytes: e.bytes, referer: e.referer, userAgent: e.userAgent, by });
       return;
+    }
     case 'app':
       world.logs.app.push({ t, text: e.text, by });
       return;
@@ -148,7 +153,8 @@ function land(world: World, replay: Replay, info: VariantInfo): void {
   world.death.played.push({ move: move.id, variant: replay.variant, outcome: 'landed' });
   emit(world, { kind: 'move-landed', move: move.id, variant: replay.variant });
   closeAlert(world, move.id);
-  world.death.nextMoveAt = world.clock.gameMs + CONFIG[world.difficulty].moveGapGameMs;
+  world.death.nextMoveAt = world.clock.gameMs + (world.death.skipWait ? 0 : CONFIG[world.difficulty].moveGapGameMs);
+  world.death.skipWait = false;
 }
 
 /** One tick of every replay: cut what is now stopped, apply the events that are due, land what has finished. */
@@ -161,12 +167,16 @@ export function stepReplays(world: World, library: RecordingLibrary): void {
       continue;
     }
     const info: VariantInfo = { ...v.info, ip: replay.ip };
+    const events = v.recording.events;
     const by = whatStops(world, replay, info);
+    if (by === 'DEF-06' && replay.cursor >= events.length) {
+      land(world, replay, info); // the tool had already finished; blocking the address changes nothing
+      continue;
+    }
     if (by) {
       cutReplay(world, replay, by);
       continue;
     }
-    const events = v.recording.events;
     const now = world.clock.gameMs;
     while (replay.cursor < events.length && replay.startedAt + events[replay.cursor]!.t * ratio <= now) {
       applyEvent(world, replay, events[replay.cursor]!, replay.startedAt + events[replay.cursor]!.t * ratio);

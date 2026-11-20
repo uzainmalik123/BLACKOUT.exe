@@ -18,7 +18,7 @@
 | KI-14 | Kiro's drafts use `systemctl restart` and write to `/tmp/…` with `>`. SYS-09 only names `stop`/`start` and doesn't say which folders exist. Ruled: support both (D-22) | Minor | Closed (D-22) |
 | KI-15 | SYS-05 counts only `Users` rows as souls (D-24); ATK-10's "orders, addresses" souls have no table mapping until it is recorded | Minor | Open |
 | KI-16 | PRD §5's summary says "Must = 18, should = 2", but the table marks DEF-04, DEF-19 and DEF-20 as S (17 must, 3 should). `game/src/rules/actions.ts` follows the rows; the team fixes the line | Minor | Open |
-| KI-17 | Stage order (D-19) means Death can't start without a stage-1 recording: until REC-03 records ATK-01, the committed library plays only in tests, and a real run's first Director tick banishes him | Major | Open |
+| KI-17 | With a partial recording library the Director skips stages that have no recorded move and banishes Death once the recorded moves run out, so a real run on today's two recordings ends in a "win" after ATK-08 without the player acting (and can't start at all without a stage-1 recording). Closes when REC-03/REC-05 cover every must row | Major | Open |
 | KI-18 | At the D-24 pace (recorded ms × 30) ATK-08.a steals all 25 souls 1.8–2.0 real s after it starts: no player can read the alert and act in time, so the first harvest is an instant loss. The team should slow the replay pace (a stretch factor in `config.ts`), split the exfil over more requests when re-recording (REC-03), or seed more customers (REC-04). The sims use made-up recordings whose exfil comes 3 s in | Major | Open |
 
 ### KI-03: Juice Shop facts (v20.4.0, checked 2026-11-17)

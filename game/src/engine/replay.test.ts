@@ -146,4 +146,31 @@ describe('the replay engine (SYS-03)', () => {
     expect(w.death.played).toEqual([]);
     expect(eventsOfKind(w, 'move-cut')).toEqual([]);
   });
+  it('blocking the IP after the last event but before the move ends lands it instead of leaving a resume that crashes', () => {
+    const w = playing(COMMITTED, 'ATK-03'); // last event at 220 ms, duration 314 ms
+    advance(w, COMMITTED, 250);
+    expect(w.logs.access).toHaveLength(1);
+    applyAction(w, { type: 'DEF-06', ip: '203.0.113.23', op: 'add' });
+    advance(w, COMMITTED, 100);
+    expect(w.death.resume).toEqual({});
+    expect(eventsOfKind(w, 'move-landed')).toMatchObject([{ move: 'ATK-03' }]);
+    expect(() => startReplay(w, COMMITTED.variantsOf('ATK-03')[0]!, 'death')).not.toThrow();
+    expect(() => advance(w, COMMITTED, 30_000)).not.toThrow();
+  });
+
+  it('a move retried after a non-IP cut does not insert the same account twice', () => {
+    const w = initialWorld(1, 'medium');
+    w.sessions.push({ id: 1, email: 'admin@juice-sh.op', kind: 'admin', issuedBy: 'ATK-03', keyVersion: 1 });
+    startReplay(w, FIXTURE_LIBRARY.variantsOf('ATK-11')[0]!, 'death');
+    advance(w, FIXTURE_LIBRARY, 150); // the insert is in; the move has not ended
+    applyAction(w, { type: 'DEF-11' });
+    advance(w, FIXTURE_LIBRARY, 100);
+    expect(eventsOfKind(w, 'move-cut')).toMatchObject([{ move: 'ATK-11', by: 'DEF-11' }]);
+    applyAction(w, { type: 'DEF-18', what: 'nginx' });
+    startReplay(w, FIXTURE_LIBRARY.variantsOf('ATK-11')[0]!, 'death');
+    advance(w, FIXTURE_LIBRARY, 1000);
+    expect(w.accounts.filter((a) => a.id === 27)).toHaveLength(1);
+    expect(applyAction(w, { type: 'DEF-14', email: 'support-ops@juice-sh.op' }).ok).toBe(true);
+    expect(footholds(w).has('hidden-admin')).toBe(false);
+  });
 });

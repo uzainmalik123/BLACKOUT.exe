@@ -74,6 +74,7 @@ export interface Replay {
   variant: string;
   ip: string; // the address this replay plays from (a fresh one when the recorded IP is blocked, D-24)
   recordedIp: string; // the recording's attackerIp, rewritten to `ip` in every access line
+  ips?: string[]; // a minion wave's addresses: its access lines rotate through them
   startedAt: number;
   cursor: number; // next recording event to apply
 }
@@ -141,6 +142,7 @@ export interface World {
     nextMoveAt: number;
     stageSkips: number; // tip-offs not yet spent (D-19)
     pacingDelayed: boolean; // SYS-02: the one-off delay for > 3 open alerts has been applied
+    skipWait: boolean; // a tip-off during an active move: the next wait is skipped when it ends
     quietSince?: number; // SYS-07: routes closed with a foothold left
     returnedThrough?: Foothold;
     resume: Partial<Record<MoveId, { variant: string; cursor: number }>>; // where an IP-cut move continues from a fresh address (D-24)
@@ -179,7 +181,7 @@ export function initialWorld(seed: number, difficulty: Difficulty): World {
     backups: [{ id: 0, takenAt: 0, accounts: accounts.map((a) => ({ ...a })), files: [], defacements: [] }],
     evidence: [],
     comms: { notifiedAt: {} },
-    death: { knowledge: [], forgedToken: false, played: [], nextMoveAt: 0, stageSkips: 0, pacingDelayed: false, resume: {}, nextId: 1 },
+    death: { knowledge: [], forgedToken: false, played: [], nextMoveAt: 0, stageSkips: 0, pacingDelayed: false, skipWait: false, resume: {}, nextId: 1 },
     replays: [],
     waves: [],
     nextWaveAt: { ...config.minions.firstWaveGameMs },

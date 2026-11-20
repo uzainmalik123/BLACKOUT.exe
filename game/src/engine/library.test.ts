@@ -17,9 +17,9 @@ describe('the recording library', () => {
     expect(lib.variantsOf('ATK-01')).toEqual([]);
   });
 
-  it('reads quiet from the label and targets from db events, and sorts variants by name', () => {
+  it('reads quiet from the label and targets from db events (resolving ids through the seed), and sorts variants by name', () => {
     const b = fakeRecording('ATK-05', 'b', { ip: '203.0.113.2', quiet: true, events: [
-      { t: 0, kind: 'db', op: 'update', table: 'Users', key: { id: 2 }, before: { password: 'x' }, after: { password: 'y', email: 'jim@juice-sh.op' } },
+      { t: 0, kind: 'db', op: 'update', table: 'Users', key: { id: 2 }, before: { password: 'x' }, after: { password: 'y' } }, // a real update carries only the changed columns
     ] });
     const a = fakeRecording('ATK-05', 'a', { ip: '203.0.113.1' });
     const lib = libraryFrom([b, a]);
