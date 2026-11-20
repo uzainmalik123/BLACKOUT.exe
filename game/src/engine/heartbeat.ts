@@ -1,14 +1,14 @@
-// Heartbeat (SYS-06, D-08): the business staying alive. Drains per game minute while a cause is present,
-// recovers +1 per game minute once every cause is gone, never leaves 0..100.
+// Heartbeat (SYS-06, D-08): the business staying alive. Drains per REAL minute while a cause is present (D-33),
+// recovers once every cause is gone, never leaves 0..100.
 import { FEATURE_DEFAULTS, FEATURES } from '../rules/vocabulary';
 import { CONFIG } from './config';
 import type { World } from './state';
 
 const clamp = (x: number) => Math.min(100, Math.max(0, x));
 
-/** The SYS-06 drain for the world as it stands, per game minute. 0 means it is recovering. */
-export function drainPerGameMinute(world: World): number {
-  const { drainPerGameMin: d, featureWeight } = CONFIG[world.difficulty].heartbeat;
+/** The SYS-06 drain for the world as it stands, per real minute. 0 means it is recovering. */
+export function drainPerRealMinute(world: World): number {
+  const { drainPerRealMin: d, featureWeight } = CONFIG[world.difficulty].heartbeat;
   let drain = 0;
   if (world.replays.some((r) => r.owner === 'death')) drain += d.openDoor;
   drain += d.minion * world.waves.length;
@@ -19,9 +19,10 @@ export function drainPerGameMinute(world: World): number {
 }
 
 export function integrateHeartbeat(world: World, dtGameMs: number): void {
-  const minutes = dtGameMs / 60_000;
-  const drain = drainPerGameMinute(world);
-  const delta = drain > 0 ? -drain : CONFIG[world.difficulty].heartbeat.drainPerGameMin.recover;
+  const config = CONFIG[world.difficulty];
+  const minutes = dtGameMs / config.gameMsPerRealMs / 60_000;
+  const drain = drainPerRealMinute(world);
+  const delta = drain > 0 ? -drain : config.heartbeat.drainPerRealMin.recover;
   world.heartbeat = clamp(world.heartbeat + delta * minutes);
 }
 

@@ -18,8 +18,12 @@ export interface SimResult {
 
 const STEP_REAL_MS = 100;
 
-export function runSim(opts: { seed: number; difficulty?: Difficulty; library?: RecordingLibrary; player: ScriptedPlayer; maxRealMs?: number }): SimResult {
+export function runSim(opts: {
+  seed: number; difficulty?: Difficulty; library?: RecordingLibrary; player: ScriptedPlayer; maxRealMs?: number;
+  setup?: (world: World) => void; // start from a given state (a shop already defaced, ...)
+}): SimResult {
   const world = initialWorld(opts.seed, opts.difficulty ?? 'medium');
+  opts.setup?.(world);
   const library = opts.library ?? COMMITTED_LIBRARY;
   const max = opts.maxRealMs ?? 12 * 60_000;
   let realMs = 0;

@@ -6,12 +6,14 @@ import { MOVE_BY_ID } from '../rules/moves';
 import { FOOTHOLDS, type MinionId, type MoveId, type Patch, type PlayerAction, type Stopper } from '../rules/vocabulary';
 import type { GameEvent } from './log';
 import { eventsOfKind } from './log';
+import type { RecEvent } from '../recordings/format';
+import { CONFIG } from './config';
 import { libraryFrom, type RecordingLibrary } from './library';
 import { runSim, type ScriptedPlayer, type SimResult } from './sim';
 import { soulsStolen } from './souls';
 import { committedLibrary } from './test-fixtures/committed';
 import type { World } from './state';
-import { FIXTURE_LIBRARY } from './test-fixtures/recordings';
+import { FIXTURE_LIBRARY, fakeRecording } from './test-fixtures/recordings';
 
 const REAL_MIN = 60_000;
 const sim = (player: ScriptedPlayer, maxRealMs = 20 * REAL_MIN): SimResult => runSim({ seed: 1, player, library: FIXTURE_LIBRARY, maxRealMs });
@@ -220,4 +222,79 @@ describe('SIM-8: the harvest at its recorded speed (D-31)', () => {
       expect(soulsStolen(idle.world)).toBe(idle.world.souls.total);
     },
   );
+});
+
+describe('SYS-06 target times in a running game (D-33)', () => {
+  const closeAllMinions: PlayerAction[] = [
+    { type: 'DEF-07' }, { type: 'DEF-12', rule: { kind: 'block-user-agent', pattern: 'scanner' } },
+    { type: 'DEF-12', rule: { kind: 'rate-limit', path: '/api/*' } }, { type: 'DEF-10', feature: 'feedback-captcha', enabled: true },
+  ];
+  const cfg = CONFIG.medium.heartbeat;
+  const minutesToFlatline = (perMinute: number, start = 100) => (start / perMinute) * REAL_MIN;
+  /** One Death move that keeps a door open for 40 real minutes and does nothing else. */
+  const slowScan = libraryFrom([fakeRecording('ATK-01', 'a', { ip: '203.0.113.9', durationMs: 40 * REAL_MIN, events: Array.from({ length: 40 }, (_, i) => ({ t: 1 + i * REAL_MIN, kind: 'access', ip: '203.0.113.9', method: 'GET', target: `/s${i}`, protocol: 'HTTP/1.1', status: 404, bytes: 10, referer: '', userAgent: 'curl/8.0', requestTimeMs: 1 }) as RecEvent) })]);
+  const once = (actions: PlayerAction[]): ScriptedPlayer => { let done = false; return () => (done ? [] : ((done = true), actions)); };
+
+  it('a player who pulls the plug and leaves it flatlines the shop about 3 real minutes later', () => {
+    const r = runSim({ seed: 1, player: once([{ type: 'DEF-11' }]), library: FIXTURE_LIBRARY, maxRealMs: 10 * REAL_MIN });
+    expect(ending(r)).toBe('flatline');
+    expect(r.realMs).toBeGreaterThanOrEqual(minutesToFlatline(cfg.drainPerRealMin.plug) - 1000);
+    expect(r.realMs).toBeLessThanOrEqual(minutesToFlatline(cfg.drainPerRealMin.plug) + 1000);
+  });
+
+  it('one open door alone takes about half an hour to flatline the shop', () => {
+    const r = runSim({ seed: 1, player: once(closeAllMinions), library: slowScan, maxRealMs: 45 * REAL_MIN });
+    expect(ending(r)).toBe('flatline');
+    const perMinute = cfg.drainPerRealMin.openDoor + cfg.featureWeight['feedback-captcha'];
+    expect(r.realMs).toBeGreaterThan(30 * REAL_MIN);
+    expect(Math.abs(r.realMs - (3000 + minutesToFlatline(perMinute, 100 - cfg.dip['DEF-07']!)))).toBeLessThan(5000);
+  });
+
+  it('a defacement left live (with his door open) flatlines the shop in under 5 real minutes', () => {
+    const r = runSim({
+      seed: 1, player: once(closeAllMinions), library: slowScan, maxRealMs: 10 * REAL_MIN,
+      setup: (w) => { w.defacements.push({ productId: 1, kind: 'deface', by: 'ATK-15' }); },
+    });
+    expect(ending(r)).toBe('flatline');
+    const both = cfg.drainPerRealMin.defaced + cfg.drainPerRealMin.openDoor + cfg.featureWeight['feedback-captcha'];
+    expect(r.realMs).toBeLessThan(5 * REAL_MIN);
+    expect(Math.abs(r.realMs - minutesToFlatline(both, 100 - cfg.dip['DEF-07']!))).toBeLessThan(5000);
+  });
+});
+
+describe('SIM-9: WAF rules against the low-and-slow harvest (D-34)', () => {
+  const harvestOnly = (library: RecordingLibrary) =>
+    libraryFrom(['ATK-01', 'ATK-08'].flatMap((m) => library.variantsOf(m as 'ATK-01').map((v) => v.recording)));
+  /** On Medium (ATK-08.b), 20 s after the first SQLITE_ERROR the player does `actions` once. */
+  function mediumHarvest(library: RecordingLibrary, actions: PlayerAction[]): SimResult {
+    let acted = false;
+    return runSim({
+      seed: 1, difficulty: 'medium', library, maxRealMs: 20 * REAL_MIN,
+      player: (w, realElapsed) => {
+        if (acted) return [];
+        const first = w.logs.app.find((l) => l.text.includes('SQLITE_ERROR'));
+        if (!first || realElapsed < first.t / 30 + 20_000) return [];
+        acted = true;
+        return actions;
+      },
+    });
+  }
+  const wafOnly: PlayerAction[] = [{ type: 'DEF-12', rule: { kind: 'sqli' } }, { type: 'DEF-12', rule: { kind: 'block-user-agent', pattern: 'sqlmap' } }];
+  const searchOff: PlayerAction[] = [{ type: 'DEF-10', feature: 'search', enabled: false }];
+  const kept = (r: SimResult) => 1 - soulsStolen(r.world) / r.world.souls.total;
+
+  for (const [name, lib] of [['made-up', harvestOnly(FIXTURE_LIBRARY)], ['committed', harvestOnly(committedLibrary())]] as const) {
+    const ready = lib.variantsOf('ATK-08').some((v) => v.variant === 'b') && lib.variantsOf('ATK-01').length > 0;
+    it.runIf(ready)(`a Medium player who only adds WAF rules still loses souls to ATK-08.b (${name})`, () => {
+      const r = mediumHarvest(lib, wafOnly);
+      expect(eventsOfKind(r.world, 'move-started').find((e) => e.move === 'ATK-08')?.variant).toBe('b');
+      expect(eventsOfKind(r.world, 'move-cut')).toEqual([]);
+      expect(soulsStolen(r.world)).toBe(r.world.souls.total);
+    });
+    it.runIf(ready)(`one who turns search off instead keeps most of them (${name})`, () => {
+      const r = mediumHarvest(lib, searchOff);
+      expect(eventsOfKind(r.world, 'move-cut')).toMatchObject([{ move: 'ATK-08', by: 'DEF-10' }]);
+      expect(kept(r)).toBeGreaterThanOrEqual(0.9);
+    });
+  }
 });
