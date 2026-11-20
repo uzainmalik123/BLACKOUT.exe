@@ -4,9 +4,11 @@ import {
   buildRecording,
   diffDatabases,
   diffUploads,
-  exfilFromTraffic,
+  exfilFromResponses,
   parseAccessJsonl,
   parseAppLog,
+  parseCurlCapture,
+  parseSqlmapTraffic,
   rewriteIp,
   type FileInfo,
   type RunMeta,
@@ -112,7 +114,7 @@ function trafficEntry(n: number, target: string, body: string): string {
   ].join('\n');
 }
 
-describe('exfilFromTraffic', () => {
+describe('exfilFromResponses', () => {
   const users = [
     { id: 1, email: 'admin@juice-sh.op', password: '0192023a7bbd73250516f069df18b500' },
     { id: 2, email: 'jim@juice-sh.op', password: 'e541ca7ecf72b8d1286474fc613e5e45' },
@@ -124,12 +126,12 @@ describe('exfilFromTraffic', () => {
 
   it('throws when the traffic log and the access log disagree in count', () => {
     const traffic = trafficEntry(1, '/s?q=1', '{}') + trafficEntry(2, '/s?q=2', '{}');
-    expect(() => exfilFromTraffic(traffic, access, users)).toThrow('traffic has 2 requests, access log has 3');
+    expect(() => exfilFromResponses(parseSqlmapTraffic(traffic), access, users)).toThrow('the tool captured 2 responses, access log has 3 requests');
   });
 
   it('throws when a request does not match its access line', () => {
     const traffic = trafficEntry(1, '/s?q=1', '{}') + trafficEntry(2, '/s?q=X', '{}') + trafficEntry(3, '/s?q=3', '{}');
-    expect(() => exfilFromTraffic(traffic, access, users)).toThrow('request #2');
+    expect(() => exfilFromResponses(parseSqlmapTraffic(traffic), access, users)).toThrow('request #2');
   });
 
   it('reads bodies after CRLF headers, as sqlmap writes real responses', () => {
@@ -137,7 +139,7 @@ describe('exfilFromTraffic', () => {
     const crlf = (n: number, target: string, body: string) =>
       `HTTP request [#${n}]:\r\nGET ${target} HTTP/1.1\r\nHost: x\r\n\r\nHTTP response [#${n}] (200 OK):\r\nVary: Accept-Encoding\r\nURI: http://x${target}\n\r\n${body}\n\n${'#'.repeat(76)}\n\n`;
     const traffic = crlf(1, '/s?q=1', '{}') + crlf(2, '/s?q=2', '{}') + crlf(3, '/s?q=3', leak);
-    expect(exfilFromTraffic(traffic, access, users)).toEqual([
+    expect(exfilFromResponses(parseSqlmapTraffic(traffic), access, users)).toEqual([
       { t: 300, kind: 'exfil', table: 'Users', keys: [2], columns: ['email', 'password'] },
     ]);
   });
@@ -145,8 +147,41 @@ describe('exfilFromTraffic', () => {
   it('stamps leaked rows at the response that carried them, once per row and column', () => {
     const leak = '{"data":[{"name":"qkvjqadmin@juice-sh.op0192023a7bbd73250516f069df18b500qbxxq"}]}';
     const traffic = trafficEntry(1, '/s?q=1', '{"data":[]}') + trafficEntry(2, '/s?q=2', leak) + trafficEntry(3, '/s?q=3', leak);
-    expect(exfilFromTraffic(traffic, access, users)).toEqual([
+    expect(exfilFromResponses(parseSqlmapTraffic(traffic), access, users)).toEqual([
       { t: 200, kind: 'exfil', table: 'Users', keys: [1], columns: ['email', 'password'] },
+    ]);
+  });
+});
+
+describe('parseCurlCapture', () => {
+  it('reads index.tsv lines into targets and bodies', () => {
+    const index = '0001\tGET\thttp://10.66.0.10/api/Users\t200\n0002\tPOST\thttp://10.66.0.10/rest/user/login?x=1\t401\n';
+    const bodies: Record<string, string> = { '0001': '{"data":[]}', '0002': 'Invalid email or password.' };
+    expect(parseCurlCapture(index, (n) => bodies[n]!)).toEqual([
+      { n: 1, target: '/api/Users', body: '{"data":[]}' },
+      { n: 2, target: '/rest/user/login?x=1', body: 'Invalid email or password.' },
+    ]);
+  });
+});
+
+describe('exfilFromResponses with curl captures', () => {
+  const users = [
+    { id: 7, email: 'ava.adams@example.com', password: 'a'.repeat(32) },
+    { id: 8, email: 'java.adams@example.com', password: 'b'.repeat(32) },
+  ];
+  const access = parseAccessJsonl(accessLine(START + 50, '/api/Users'), START);
+
+  it('does not count an address that only appears inside a longer one', () => {
+    const body = '{"data":[{"id":8,"email":"java.adams@example.com"}]}';
+    expect(exfilFromResponses([{ n: 1, target: '/api/Users', body }], access, users)).toEqual([
+      { t: 50, kind: 'exfil', table: 'Users', keys: [8], columns: ['email'] },
+    ]);
+  });
+
+  it('counts both when both appear', () => {
+    const body = '[{"email":"java.adams@example.com"},{"email":"ava.adams@example.com"}]';
+    expect(exfilFromResponses([{ n: 1, target: '/api/Users', body }], access, users)).toEqual([
+      { t: 50, kind: 'exfil', table: 'Users', keys: [7, 8], columns: ['email'] },
     ]);
   });
 });
@@ -174,6 +209,11 @@ describe('buildRecording', () => {
     expect(rec).toMatchObject({ format: 1, move: 'ATK-03', attackerIp: '203.0.113.23', recordedAt: new Date(START).toISOString(), durationMs: 300 });
     expect(rec.events.map((e) => e.t)).toEqual([100, 200]);
     expect(JSON.stringify(rec)).not.toContain('10.66.');
+  });
+
+  it("rewrites nginx's rig address, the shop's view of every client, to the proxy address", () => {
+    const rec = buildRecording(meta, [{ t: 10, kind: 'app', text: 'Error: Blocked illegal activity by ::ffff:10.66.0.10' }]);
+    expect(rec.events[0]).toMatchObject({ text: 'Error: Blocked illegal activity by ::ffff:10.0.0.10' });
   });
 
   it('stretches durationMs to cover events logged just after the tool exited', () => {

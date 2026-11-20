@@ -1,0 +1,19 @@
+{
+  "format": 1,
+  "move": "ATK-15",
+  "variant": "a",
+  "label": "loud: three product descriptions rewritten, no login, curl user agent",
+  "recordedAt": "2026-11-20T05:37:47.698Z",
+  "durationMs": 816,
+  "attackerIp": "203.0.113.151",
+  "juiceShop": "bkimminich/juice-shop:v20.4.0",
+  "tool": "curl 8.x",
+  "events": [
+    {"t":499,"kind":"access","ip":"203.0.113.151","method":"PUT","target":"/api/Products/1","protocol":"HTTP/1.1","status":200,"bytes":525,"referer":"","userAgent":"curl/8.23.0","requestTimeMs":33},
+    {"t":534,"kind":"access","ip":"203.0.113.151","method":"PUT","target":"/api/Products/2","protocol":"HTTP/1.1","status":200,"bytes":530,"referer":"","userAgent":"curl/8.23.0","requestTimeMs":31},
+    {"t":569,"kind":"access","ip":"203.0.113.151","method":"PUT","target":"/api/Products/3","protocol":"HTTP/1.1","status":200,"bytes":539,"referer":"","userAgent":"curl/8.23.0","requestTimeMs":31},
+    {"t":569,"kind":"db","op":"update","table":"Products","key":{"id":1},"before":{"description":"The all-time classic.","updatedAt":"2026-11-20 05:37:17.079 +00:00"},"after":{"description":"This juice has gone sour. Every bottle here now belongs to Death.","updatedAt":"2026-11-20 05:37:48.171 +00:00"}},
+    {"t":569,"kind":"db","op":"update","table":"Products","key":{"id":2},"before":{"description":"Made from oranges hand-picked by Uncle Dittmeyer.","updatedAt":"2026-11-20 05:37:17.079 +00:00"},"after":{"description":"This juice has gone sour. Every bottle here now belongs to Death.","updatedAt":"2026-11-20 05:37:48.207 +00:00"}},
+    {"t":569,"kind":"db","op":"update","table":"Products","key":{"id":3},"before":{"description":"Now with even more exotic flavour.","updatedAt":"2026-11-20 05:37:17.079 +00:00"},"after":{"description":"This juice has gone sour. Every bottle here now belongs to Death.","updatedAt":"2026-11-20 05:37:48.242 +00:00"}}
+  ]
+}

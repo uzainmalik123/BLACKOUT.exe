@@ -1,0 +1,19 @@
+{
+  "format": 1,
+  "move": "ATK-06",
+  "variant": "a",
+  "label": "loud: mass-assignment admin sign-up, then login, curl user agent",
+  "recordedAt": "2026-11-20T05:33:57.091Z",
+  "durationMs": 986,
+  "attackerIp": "203.0.113.61",
+  "juiceShop": "bkimminich/juice-shop:v20.4.0",
+  "tool": "curl 8.x",
+  "events": [
+    {"t":611,"kind":"access","ip":"203.0.113.61","method":"POST","target":"/api/Users","protocol":"HTTP/1.1","status":201,"bytes":312,"referer":"","userAgent":"curl/8.23.0","requestTimeMs":72},
+    {"t":671,"kind":"access","ip":"203.0.113.61","method":"POST","target":"/rest/user/login","protocol":"HTTP/1.1","status":200,"bytes":800,"referer":"","userAgent":"curl/8.23.0","requestTimeMs":56},
+    {"t":688,"kind":"access","ip":"203.0.113.61","method":"GET","target":"/rest/user/authentication-details/","protocol":"HTTP/1.1","status":200,"bytes":106105,"referer":"","userAgent":"curl/8.23.0","requestTimeMs":13},
+    {"t":688,"kind":"db","op":"insert","table":"Baskets","key":{"id":6},"after":{"id":6,"coupon":null,"UserId":326,"createdAt":"2026-11-20 05:33:57.730 +00:00","updatedAt":"2026-11-20 05:33:57.730 +00:00"}},
+    {"t":688,"kind":"db","op":"insert","table":"Users","key":{"id":326},"after":{"id":326,"username":"","email":"reaper@example.org","password":"34445e334047a55504c9236351e184f7","role":"admin","deluxeToken":"","lastLoginIp":"0.0.0.0","profileImage":"/assets/public/images/uploads/defaultAdmin.png","totpSecret":"","isActive":1,"createdAt":"2026-11-20 05:33:57.633 +00:00","updatedAt":"2026-11-20 05:33:57.633 +00:00","deletedAt":null}},
+    {"t":688,"kind":"db","op":"insert","table":"Wallets","key":{"id":326},"after":{"UserId":326,"id":326,"balance":0,"createdAt":"2026-11-20 05:33:57.701 +00:00","updatedAt":"2026-11-20 05:33:57.701 +00:00"}}
+  ]
+}

