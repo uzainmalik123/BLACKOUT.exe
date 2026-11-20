@@ -111,7 +111,7 @@ describe('the replay engine (SYS-03)', () => {
   it('db and file events shape the world: ATK-06 adds own-admin, ATK-11 the hidden admin, ATK-16 xss-live, ATK-13 a planted file, ATK-05 a user session, ATK-12 a hijack', () => {
     const run = (move: Parameters<RecordingLibrary['variantsOf']>[0]) => {
       const w = playing(FIXTURE_LIBRARY, move);
-      advance(w, FIXTURE_LIBRARY, 4000); // the longest fixture (ATK-01) lasts 3 real s
+      advance(w, FIXTURE_LIBRARY, 7000); // the longest fixture (ATK-01) lasts 6 real s
       expect(eventsOfKind(w, 'move-landed'), move).toHaveLength(1);
       return w;
     };

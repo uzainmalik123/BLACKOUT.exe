@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { dip, drainPerGameMinute, integrateHeartbeat } from './heartbeat';
+import { CONFIG } from './config';
 import { initialWorld, type Replay, type Wave } from './state';
 
-const deathReplay: Replay = { id: 1, owner: 'death', move: 'ATK-08', variant: 'a', ip: '203.0.113.81', startedAt: 0, cursor: 0 };
+const weight = CONFIG.medium.heartbeat.featureWeight;
+
+const deathReplay: Replay = { id: 1, owner: 'death', move: 'ATK-08', variant: 'a', ip: '203.0.113.81', recordedIp: '203.0.113.81', startedAt: 0, cursor: 0 };
 const wave: Wave = { id: 2, minion: 'MIN-01', n: 1, ips: ['203.0.113.100'], startedAt: 0, endsAt: 1, successesDone: 0 };
 
 describe('heartbeat (SYS-06)', () => {
@@ -24,12 +27,12 @@ describe('heartbeat (SYS-06)', () => {
     expect(drainPerGameMinute(w)).toBe(2);
     w.features.search = false;
     w.features['feedback-captcha'] = true;
-    expect(drainPerGameMinute(w)).toBeCloseTo(3.1);
+    expect(drainPerGameMinute(w)).toBeCloseTo(2 + weight.search + weight['feedback-captcha']);
     w.defacements.push({ productId: 1, kind: 'xss', by: 'ATK-16' });
-    expect(drainPerGameMinute(w)).toBeCloseTo(6.1);
+    expect(drainPerGameMinute(w)).toBeCloseTo(5 + weight.search + weight['feedback-captcha']);
     w.defacements = [];
     w.bannerDefacedBy = 'ATK-17';
-    expect(drainPerGameMinute(w)).toBeCloseTo(6.1);
+    expect(drainPerGameMinute(w)).toBeCloseTo(5 + weight.search + weight['feedback-captcha']);
   });
 
   it('recovers +1 per game minute while nothing drains and never above 100', () => {

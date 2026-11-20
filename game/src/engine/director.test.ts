@@ -23,12 +23,14 @@ function landNow(w: World, lib: RecordingLibrary, move: Parameters<RecordingLibr
 }
 
 describe('playable moves (SYS-07)', () => {
-  it('a move is playable when its Needs hold and a variant has an open IP and no stopper', () => {
+  it('a move is playable when its Needs hold and a variant has no stopper (a blocked IP is not one)', () => {
     const w = initialWorld(1, 'medium');
     expect(playableMoves(w, FIXTURE_LIBRARY).map((m) => m.id)).toEqual(['ATK-01']);
     w.death.knowledge.push('map');
     expect(playableMoves(w, FIXTURE_LIBRARY).map((m) => m.id)).toEqual(['ATK-01', 'ATK-02', 'ATK-03', 'ATK-04', 'ATK-05', 'ATK-06', 'ATK-08', 'ATK-15', 'ATK-16']);
     for (const v of FIXTURE_LIBRARY.variantsOf('ATK-08')) w.firewall.blocked.push(v.info.ip);
+    expect(playableVariants(w, FIXTURE_LIBRARY, MOVE_BY_ID['ATK-08'])).toHaveLength(3); // blocked IPs alone never stop him (D-24)
+    w.features.search = false;
     expect(playableVariants(w, FIXTURE_LIBRARY, MOVE_BY_ID['ATK-08'])).toEqual([]);
     w.waf.push({ kind: 'sqli' });
     expect(playableVariants(w, FIXTURE_LIBRARY, MOVE_BY_ID['ATK-03']).map((v) => v.variant)).toEqual(['c']); // the quiet one leaks through

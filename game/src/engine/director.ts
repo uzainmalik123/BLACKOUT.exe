@@ -7,15 +7,26 @@ import { anyStopperHolds, footholds, needsHold } from './facts';
 import type { RecordingLibrary, Variant } from './library';
 import { emit, endRun } from './log';
 import { activeDeathReplay, startReplay } from './replay';
-import { pick } from './rng';
+import { nextRandom, pick } from './rng';
 import type { World } from './state';
 
 const landed = (world: World, move: Move) => world.death.played.some((p) => p.move === move.id && p.outcome === 'landed');
 
-/** The variants of a move Death could start now: Needs hold, the IP is open, no stopper holds for that variant. */
+/**
+ * The variants of a move Death could start now: Needs hold and no stopper holds for that variant. A variant whose
+ * recorded IP is blocked is still playable from a fresh address (D-24): blocking IPs alone is whack-a-mole.
+ */
 export function playableVariants(world: World, library: RecordingLibrary, move: Move): Variant[] {
   if (landed(world, move) || !needsHold(world, move)) return [];
-  return library.variantsOf(move.id).filter((v) => !world.firewall.blocked.includes(v.info.ip) && !anyStopperHolds(world, move, v.info));
+  return library.variantsOf(move.id).filter((v) => !anyStopperHolds(world, move, { ...v.info, ip: 'fresh' }));
+}
+
+/** A new address in TEST-NET-3 for a variant whose recorded IP is blocked. */
+function freshIp(world: World): string {
+  let ip: string;
+  do ip = `203.0.113.${1 + Math.floor(nextRandom(world) * 254)}`;
+  while (world.firewall.blocked.includes(ip));
+  return ip;
 }
 
 export function playableMoves(world: World, library: RecordingLibrary): Move[] {
@@ -101,7 +112,10 @@ export function directorTick(world: World, library: RecordingLibrary): void {
   const move = pick(world, candidates.filter((m) => m.stage === top));
   const variants = playableVariants(world, library, move);
   const untried = variants.filter((v) => !world.death.played.some((p) => p.move === move.id && p.variant === v.variant));
-  const variant = (untried[0] ?? variants[0])!;
+  const open = untried.filter((v) => !world.firewall.blocked.includes(v.info.ip));
+  const resumable = variants.find((v) => world.death.resume[move.id]?.variant === v.variant);
+  const chosen = (resumable ?? open[0] ?? untried[0] ?? variants[0])!;
+  const variant = world.firewall.blocked.includes(chosen.info.ip) ? { ...chosen, info: { ...chosen.info, ip: freshIp(world) } } : chosen;
   if (move.stage > highestStagePlayed(world) + 1) world.death.stageSkips -= 1;
   startReplay(world, variant, 'death');
 }

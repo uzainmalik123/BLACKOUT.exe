@@ -43,13 +43,13 @@ const MEDIUM: EngineConfig = {
   leakyWaf: true,
   heartbeat: {
     drainPerGameMin: { openDoor: 1, minion: 0.5, plug: 4, defaced: 3, recover: 1 },
-    featureWeight: { search: 1, registration: 0.5, 'password-reset': 0.25, uploads: 0.25, ftp: 0.1, 'feedback-captcha': 0.1 },
+    featureWeight: { search: 0.3, registration: 0.1, 'password-reset': 0.05, uploads: 0.05, ftp: 0.02, 'feedback-captcha': 0.02 },
     dip: { 'DEF-07': 2, 'DEF-09': 10, 'DEF-13': 3, 'DEF-14': 10, 'DEF-16': 1 },
   },
   minions: {
     periodGameMs: { 'MIN-01': 120 * REAL_S, 'MIN-02': 180 * REAL_S, 'MIN-03': 240 * REAL_S, 'MIN-04': 300 * REAL_S },
     firstWaveGameMs: { 'MIN-01': 30 * REAL_S, 'MIN-02': 60 * REAL_S, 'MIN-03': 90 * REAL_S, 'MIN-04': 120 * REAL_S },
-    waveDurationGameMs: 60 * REAL_S,
+    waveDurationGameMs: 20 * REAL_S,
     min02SuccessesPerWave: 1,
   },
   backupEveryGameMs: 60 * GAME_MIN,
