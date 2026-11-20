@@ -23,7 +23,6 @@
 |---|---|
 | New recordings (REC-03, the other ATK moves, MIN recordings, REC-04 fake customers) | The rig runs on Uzain's machine; recording also needs a way to capture curl responses first (REC-02 is still `building`) |
 | Everything Kiro: SYS-12, KIRO-01 to KIRO-11, KDEV-03/05/06 | Needs Uzain's Kiro account and credits; the cost per call isn't measured yet (KI-02) |
-| **SYS-02 Director** | Waits for the stage-order ruling (KI-12 → D-19). Uzain is settling it now; start it once D-19 is on main |
 | SYS-18 hosting | No host picked (KI-04) |
 | The name, the category, the trailer | Team decisions |
 
@@ -36,12 +35,12 @@ The game's brain, with **no UI**. Pure TypeScript in `game/src/rules/` and `game
 | # | Rows | What to build | Notes |
 |---|---|---|---|
 | A1 | **SYS-04** | The world state: one typed model for accounts, sessions, signing key, files, feature flags, firewall rules, WAF rules, backups, Death's gains, footholds, evidence | Everything else reads and writes through it |
-| A2 | **SYS-17** | The rules as data: `game/src/rules/moves.ts` (PRD §3: every ATK row's stage, Needs, Gains, Stopped by), `actions.ts` (§5: every DEF row), `minions.ts` (§4). Plus the consistency tests from the row, and the **property-based tests with fast-check** (add it as a dev dependency) | Copy the PRD tables faithfully, including the D-18 changes (ATK-15/16 need `map`; ATK-12 needs `user-session`, which MIN-02 can supply) |
+| A2 | **SYS-17** | The rules as data: `game/src/rules/moves.ts` (PRD §3: every ATK row's stage, Needs, Gains, Stopped by), `actions.ts` (§5: every DEF row), `minions.ts` (§4). Plus the consistency tests from the row, and the **property-based tests with fast-check** (add it as a dev dependency) | Copy the PRD tables faithfully, including the D-18 and D-19 changes (ATK-15/16 need `map` and are stopped by DEF-12 too; ATK-12 needs `user-session`, which MIN-02 can supply) |
 | A3 | **SYS-01, SYS-05, SYS-06** | Game clock (1 real s = 30 game s), souls, heartbeat with the exact drain/recover numbers in SYS-06 | Write the SYS-06 Done-when test first: "plug pulled only" flatlines at the expected minute |
 | A4 | **SYS-10** | The event log: every Death move, minion wave, player action and Kiro call, timestamped in game time | The report and the sims read only from this |
 | A5 | **SYS-03** | The replay engine: plays a recording's events into a virtual access log, app log, DB and files at game speed; stops a recording mid-way when an action cuts it (e.g. blocking its IP) | Test it on ATK-03.a and ATK-08.a. Each `exfil` event = souls stolen (SYS-05). Render `access` events into nginx `combined` lines yourself (D-15) |
 | A6 | **SYS-07** | Banishment and the return | Needs A2's footholds |
-| A7 | **SYS-02** | The Director | **Only after D-19 lands** (see above). Deterministic for a seed |
+| A7 | **SYS-02** | The Director | Deterministic for a seed, and keeps stage order (D-19): a stage-N move only after a stage-(N-1) move, except during the return or after a tip-off. SYS-17's stage-order test needs it |
 | A8 | **SYS-16** | Playthrough sims: SIM-1 to SIM-7 | With only two real recordings, sims may use **made-up recordings inside test files** (clearly test-only, never in `game/src/recordings/`). They become real as recordings arrive |
 
 Then, still headless and independent:
@@ -92,7 +91,7 @@ Everything you write must be **true to real incident response** (GAME_PLAN §9):
 
 1. A1 → A2 → A3 (the core numbers, all tested)
 2. A4 → A5 (now the real recordings play)
-3. A6, then A7 once D-19 lands, then A8
+3. A6, then A7, then A8
 4. Track D and the renderer whenever you need a break from the engine
 5. Tell Uzain when A5 runs: that's when the first playable screen can start
 
