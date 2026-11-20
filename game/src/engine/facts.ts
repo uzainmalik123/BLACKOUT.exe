@@ -24,7 +24,7 @@ export function gains(world: World): Set<Gain> {
   if (world.sessions.some((s) => s.kind === 'user' && s.keyVersion === v) || world.accounts.some(isHijacked)) g.add('user-session');
   if (world.accounts.some((a) => a.createdBy === 'ATK-06' && live(a))) g.add('own-admin');
   if (world.souls.stolen.length > 0) g.add('souls');
-  if (world.defacements.some((d) => d.kind === 'deface') || world.bannerDefacedBy !== undefined) g.add('defaced');
+  if (world.defacements.some((d) => d.kind === 'deface')) g.add('defaced');
   if (world.defacements.some((d) => d.kind === 'xss')) g.add('xss-live');
   if (world.files.some((f) => f.plantedBy === 'ATK-17' && f.path.endsWith(RANSOM_NOTE))) g.add('ransom');
   if (world.death.returnedThrough !== undefined) g.add(RETURN_GRANTS[world.death.returnedThrough]);

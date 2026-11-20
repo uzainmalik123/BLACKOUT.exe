@@ -102,7 +102,6 @@ export interface Backup {
   accounts: Account[];
   files: VFile[];
   defacements: Defacement[];
-  bannerDefacedBy?: MoveId;
 }
 
 export interface Evidence {
@@ -125,8 +124,7 @@ export interface World {
   sessions: Session[];
   signingKey: { version: number; rotatedAt?: number };
   files: VFile[];
-  defacements: Defacement[];
-  bannerDefacedBy?: MoveId;
+  defacements: Defacement[]; // ATK-15/16, and ATK-17's renamed first product (no route writes the banner: KI-03)
   features: Record<Feature, boolean>;
   firewall: { blocked: string[] };
   waf: WafRule[];

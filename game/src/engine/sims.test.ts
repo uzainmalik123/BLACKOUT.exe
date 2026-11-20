@@ -57,7 +57,7 @@ function contain(move: MoveId, ip: string, w: World, act: Act, options: { noLogi
 
 /** Recover from a defacement (DEF-17): restore the latest backup taken before the move started. */
 function recover(move: MoveId, w: World, act: Act): void {
-  if (w.defacements.some((d) => d.by === move) || w.bannerDefacedBy === move) {
+  if (w.defacements.some((d) => d.by === move)) {
     const started = eventsOfKind(w, 'move-started').find((e) => e.move === move)!;
     const backup = [...w.backups].reverse().find((b) => b.takenAt <= started.t)!;
     act({ type: 'DEF-17', backupId: backup.id });

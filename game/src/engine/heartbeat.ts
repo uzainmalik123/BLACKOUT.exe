@@ -14,7 +14,7 @@ export function drainPerRealMinute(world: World): number {
   drain += d.minion * world.waves.length;
   for (const f of FEATURES) if (world.features[f] !== FEATURE_DEFAULTS[f]) drain += featureWeight[f];
   if (world.nginx === 'stopped') drain += d.plug;
-  if (world.defacements.length > 0 || world.bannerDefacedBy !== undefined) drain += d.defaced;
+  if (world.defacements.length > 0) drain += d.defaced;
   return drain;
 }
 

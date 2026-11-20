@@ -97,11 +97,8 @@ function applyDb(world: World, by: MoveId | MinionId, e: DbEvent, t: number): vo
       world.accounts = world.accounts.filter((x) => x.id !== id);
     }
   } else if (e.table === 'Products' && e.op === 'update' && e.after?.description !== undefined) {
-    if (by === 'ATK-17') world.bannerDefacedBy = by;
-    else {
-      const text = String(e.after.description);
-      world.defacements.push({ productId: id, kind: /<script|<iframe/i.test(text) ? 'xss' : 'deface', by });
-    }
+    const text = String(e.after.description);
+    world.defacements.push({ productId: id, kind: /<script|<iframe/i.test(text) ? 'xss' : 'deface', by }); // ATK-17 renames product 1 (ATK-17.a)
   }
 }
 
