@@ -11,10 +11,10 @@ describe('derived gains and footholds', () => {
   it('derives own-admin from an ATK-06 account and loses it when the account is locked or gone', () => {
     const w = initialWorld(1, 'medium');
     expect(gains(w).has('own-admin')).toBe(false);
-    w.accounts.push({ id: 26, email: 'death@juice-sh.op', role: 'admin', createdBy: 'ATK-06' });
+    w.accounts.push({ id: 326, email: 'death@juice-sh.op', role: 'admin', createdBy: 'ATK-06' });
     expect(gains(w).has('own-admin')).toBe(true);
     expect(usedAccountEmails(w)).toEqual(['death@juice-sh.op']);
-    w.accounts[25]!.lockedAt = 5;
+    w.accounts.at(-1)!.lockedAt = 5;
     expect(gains(w).has('own-admin')).toBe(false);
     w.accounts.pop();
     expect(gains(w).has('own-admin')).toBe(false);
@@ -23,7 +23,7 @@ describe('derived gains and footholds', () => {
   it('derives hidden-admin, planted-file and forged-token from accounts, files and the token flag; the token-verify patch removes forged-token', () => {
     const w = initialWorld(1, 'medium');
     expect(footholds(w).size).toBe(0);
-    w.accounts.push({ id: 27, email: 'support-ops@juice-sh.op', role: 'admin', createdBy: 'ATK-11' });
+    w.accounts.push({ id: 327, email: 'support-ops@juice-sh.op', role: 'admin', createdBy: 'ATK-11' });
     w.files.push({ path: 'complaints/invoice.zip', size: 10, sha256: 'a'.repeat(64), plantedBy: 'ATK-13' });
     w.death.forgedToken = true;
     expect([...footholds(w)].sort()).toEqual(['forged-token', 'hidden-admin', 'planted-file']);
@@ -75,7 +75,7 @@ describe('needHolds', () => {
     w.sessions.push({ id: 1, email: 'jim@juice-sh.op', kind: 'user', issuedBy: 'MIN-02', keyVersion: 1 });
     expect(needHolds(w, { anySession: true })).toBe(true);
     expect(needHolds(w, { anyAdmin: true })).toBe(false);
-    w.accounts.push({ id: 26, email: 'death@juice-sh.op', role: 'admin', createdBy: 'ATK-06' });
+    w.accounts.push({ id: 326, email: 'death@juice-sh.op', role: 'admin', createdBy: 'ATK-06' });
     expect(needHolds(w, { anyAdmin: true })).toBe(true);
     expect(needHolds(w, { stageGain: 3 })).toBe(true);
     w.files.push({ path: 'x', size: 1, sha256: 'c'.repeat(64), plantedBy: 'ATK-13' });
@@ -123,7 +123,7 @@ describe('stopperHolds', () => {
     expect(stopperHolds(w, { action: 'DEF-14', account: 'used' })).toBe(false); // he never had an account of his own
     w.death.played.push({ move: 'ATK-06', variant: 'a', outcome: 'landed' });
     expect(stopperHolds(w, { action: 'DEF-14', account: 'used' })).toBe(true); // he did, and it is gone
-    w.accounts.push({ id: 26, email: 'death@juice-sh.op', role: 'admin', createdBy: 'ATK-06' });
+    w.accounts.push({ id: 326, email: 'death@juice-sh.op', role: 'admin', createdBy: 'ATK-06' });
     expect(stopperHolds(w, { action: 'DEF-14', account: 'used' })).toBe(false);
     w.accounts.pop();
     const jim: VariantInfo = { ...loud, targets: ['jim@juice-sh.op'] };

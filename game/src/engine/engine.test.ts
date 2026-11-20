@@ -16,8 +16,8 @@ describe('Engine', () => {
   it('runs the committed library with the real baseline: db() reflects a replayed change and a DEF-08 lock', async () => {
     const e = new Engine({ seed: 1, difficulty: 'medium', baseline: baseline() });
     startReplay(e.world, COMMITTED_LIBRARY.variantsOf('ATK-03')[0]!, 'death');
-    e.advance(400);
-    expect(e.accessLog()).toBe('203.0.113.23 - - [31/Oct/2026:22:00:06 +0000] "POST /rest/user/login HTTP/1.1" 200 784 "-" "curl/8.23.0"\n');
+    e.advance(600);
+    expect(e.accessLog()).toBe('203.0.113.23 - - [31/Oct/2026:22:00:15 +0000] "POST /rest/user/login HTTP/1.1" 200 784 "-" "curl/8.23.0"\n');
     expect(e.act({ type: 'DEF-08', email: 'jim@juice-sh.op' }).ok).toBe(true);
     const g = await e.db();
     expect(g.db.exec("SELECT deletedAt IS NOT NULL FROM Users WHERE email='jim@juice-sh.op'")[0]!.values).toEqual([[1]]);

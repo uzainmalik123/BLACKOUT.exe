@@ -29,13 +29,13 @@ describe('the replay engine (SYS-03)', () => {
     const w = playing(COMMITTED, 'ATK-03');
     expect(eventsOfKind(w, 'move-started')).toMatchObject([{ move: 'ATK-03', variant: 'a', stage: 2, ip: '203.0.113.23' }]);
     expect(w.alerts).toMatchObject([{ about: 'ATK-03', openedAt: 0 }]);
-    advance(w, COMMITTED, 219); // 220 recorded ms → 6600 game ms; 219 real ms = 6570 game ms
+    advance(w, COMMITTED, 507); // 508 recorded ms → 15240 game ms; 507 real ms = 15210 game ms
     expect(w.logs.access).toHaveLength(0);
     advance(w, COMMITTED, 1);
     expect(w.logs.access).toHaveLength(1);
-    expect(w.logs.access[0]!.t).toBe(6600);
-    expect(renderAccessLog(w)).toBe('203.0.113.23 - - [31/Oct/2026:22:00:06 +0000] "POST /rest/user/login HTTP/1.1" 200 784 "-" "curl/8.23.0"\n');
-    advance(w, COMMITTED, 100);
+    expect(w.logs.access[0]!.t).toBe(15240);
+    expect(renderAccessLog(w)).toBe('203.0.113.23 - - [31/Oct/2026:22:00:15 +0000] "POST /rest/user/login HTTP/1.1" 200 784 "-" "curl/8.23.0"\n');
+    advance(w, COMMITTED, 300);
     expect(activeDeathReplay(w)).toBeUndefined();
     expect(gains(w).has('admin-session')).toBe(true);
     expect(w.sessions).toMatchObject([{ email: 'admin@juice-sh.op', kind: 'admin', issuedBy: 'ATK-03', keyVersion: 1 }]);
@@ -45,14 +45,14 @@ describe('the replay engine (SYS-03)', () => {
     expect(w.death.nextMoveAt).toBe(w.clock.gameMs + medium.moveGapGameMs);
   });
 
-  it('plays ATK-08.a to the end: 102 access lines, 242 app lines, 25 souls stolen, souls-stolen events summing to 25', () => {
+  it('plays ATK-08.a to the end: 402 access lines, 242 app lines, 325 souls stolen, souls-stolen events summing to 325', () => {
     const w = playing(COMMITTED, 'ATK-08');
-    advance(w, COMMITTED, 2400);
-    expect(w.logs.access).toHaveLength(102);
+    advance(w, COMMITTED, 6000);
+    expect(w.logs.access).toHaveLength(402);
     expect(w.logs.app).toHaveLength(242);
-    expect(soulsStolen(w)).toBe(25);
-    expect(eventsOfKind(w, 'souls-stolen').reduce((n, e) => n + e.count, 0)).toBe(25);
-    expect(renderAppLog(w).split('\n')[0]).toBe('Error: SQLITE_ERROR: near "(": syntax error');
+    expect(soulsStolen(w)).toBe(325);
+    expect(eventsOfKind(w, 'souls-stolen').reduce((n, e) => n + e.count, 0)).toBe(325);
+    expect(renderAppLog(w).split('\n')[0]).toBe('Error: SQLITE_ERROR: near ",": syntax error');
     expect(w.ending).toBe('souls-lost');
   });
 
@@ -61,7 +61,7 @@ describe('the replay engine (SYS-03)', () => {
     advance(w, COMMITTED, 1000);
     const n = w.logs.access.length;
     expect(n).toBeGreaterThan(0);
-    expect(n).toBeLessThan(102);
+    expect(n).toBeLessThan(402);
     applyAction(w, { type: 'DEF-06', ip: '203.0.113.81', op: 'add' });
     advance(w, COMMITTED, 100);
     expect(w.logs.access).toHaveLength(n);
@@ -130,7 +130,7 @@ describe('the replay engine (SYS-03)', () => {
     expect(gains(run('ATK-04')).has('admin-password')).toBe(true);
     const w06 = run('ATK-06');
     expect(w06.logs.dbChanges).toHaveLength(1);
-    expect(w06.accounts.at(-1)).toMatchObject({ id: 26, email: 'death@juice-sh.op', role: 'admin', createdBy: 'ATK-06' });
+    expect(w06.accounts.at(-1)).toMatchObject({ id: 326, email: 'death@juice-sh.op', role: 'admin', createdBy: 'ATK-06' });
   });
 
   it('a minion replay is cut by its closer and never enters death.played', () => {
@@ -147,8 +147,8 @@ describe('the replay engine (SYS-03)', () => {
     expect(eventsOfKind(w, 'move-cut')).toEqual([]);
   });
   it('blocking the IP after the last event but before the move ends lands it instead of leaving a resume that crashes', () => {
-    const w = playing(COMMITTED, 'ATK-03'); // last event at 220 ms, duration 314 ms
-    advance(w, COMMITTED, 250);
+    const w = playing(COMMITTED, 'ATK-03'); // last event at 508 ms, duration 778 ms
+    advance(w, COMMITTED, 600);
     expect(w.logs.access).toHaveLength(1);
     applyAction(w, { type: 'DEF-06', ip: '203.0.113.23', op: 'add' });
     advance(w, COMMITTED, 100);

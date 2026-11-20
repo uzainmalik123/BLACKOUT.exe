@@ -10,8 +10,8 @@ import { initialWorld, type World } from './state';
 const medium = CONFIG.medium;
 const fresh = () => initialWorld(1, 'medium');
 const withoutEvents = (w: World) => ({ ...w, events: [] });
-const deathAdmin = (w: World) => w.accounts.push({ id: 26, email: 'death@juice-sh.op', role: 'admin', createdBy: 'ATK-06' });
-const hiddenAdmin = (w: World) => w.accounts.push({ id: 27, email: 'support-ops@juice-sh.op', role: 'admin', createdBy: 'ATK-11' });
+const deathAdmin = (w: World) => w.accounts.push({ id: 326, email: 'death@juice-sh.op', role: 'admin', createdBy: 'ATK-06' });
+const hiddenAdmin = (w: World) => w.accounts.push({ id: 327, email: 'support-ops@juice-sh.op', role: 'admin', createdBy: 'ATK-11' });
 
 describe('applyAction: every DEF row', () => {
   it('rejects unknown targets without changing the world', () => {
