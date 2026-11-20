@@ -20,8 +20,8 @@ async function baseline() {
 
 describe('every committed recording', () => {
   it('exists', () => {
-    const moves = ['ATK-01', 'ATK-03', 'ATK-04', 'ATK-06', 'ATK-08', 'ATK-09', 'ATK-11', 'ATK-13', 'ATK-15', 'ATK-17', 'MIN-01', 'MIN-02'];
-    expect(jsonFiles).toEqual(expect.arrayContaining(moves.map((m) => `${m}.a.json`)));
+    const moves = ['ATK-01', 'ATK-03', 'ATK-04', 'ATK-06', 'ATK-08', 'ATK-08.b', 'ATK-08.c', 'ATK-09', 'ATK-11', 'ATK-13', 'ATK-15', 'ATK-17', 'MIN-01', 'MIN-02'];
+    expect(jsonFiles).toEqual(expect.arrayContaining(moves.map((m) => (m.includes('.') ? `${m}.json` : `${m}.a.json`))));
   });
 
   it.each(jsonFiles)('%s is valid D-15, named after its move and variant, with no rig address left', (file) => {
@@ -60,6 +60,36 @@ describe('ATK-08.a: sqlmap UNION dump through search', () => {
       new Set(r.events.flatMap((e) => (e.kind === 'exfil' && e.table === 'Users' && e.columns.includes(column) ? e.keys : [])));
     expect([...leaked('email')].sort()).toEqual([...ids].sort());
     expect([...leaked('password')].sort()).toEqual([...ids].sort());
+  });
+});
+
+describe('ATK-08.b and ATK-08.c: the paced dumps (D-32, D-35)', () => {
+  const leakedAll = async (r: Recording) => {
+    const db = await baseline();
+    const ids = db.exec('SELECT id FROM Users')[0]!.values.map((v) => Number(v[0])).sort();
+    return [...new Set(exfilOf(r).flatMap((e) => e.keys))].sort().join() === ids.join();
+  };
+
+  it('ATK-08.b (low and slow, quiet) dumps every customer over 2 to 3 minutes, with a browser agent and mixed-case SQL (D-35)', async () => {
+    const r = load('ATK-08.b.json');
+    const access = accessOf(r);
+    expect(access.some((e) => /sqlmap/i.test(e.userAgent))).toBe(false);
+    expect(access.every((e) => e.userAgent.startsWith('Mozilla/5.0'))).toBe(true);
+    // randomcase can land on all capitals by chance: a case-sensitive rule catches about one request in 400
+    expect(access.filter((e) => e.target.includes('UNION%20ALL%20SELECT')).length).toBeLessThanOrEqual(5);
+    const steals = exfilOf(r).map((e) => e.t);
+    expect(steals.at(-1)! - accessOf(r)[0]!.t).toBeGreaterThanOrEqual(120_000);
+    expect(r.durationMs).toBeLessThanOrEqual(180_000);
+    expect(await leakedAll(r)).toBe(true);
+  });
+
+  it('ATK-08.c (loud) probes for about 90 s with nothing stolen, then dumps every customer in seconds', async () => {
+    const r = load('ATK-08.c.json');
+    const steals = exfilOf(r).map((e) => e.t);
+    expect(steals[0]!).toBeGreaterThan(80_000);
+    expect(steals.at(-1)! - steals[0]!).toBeLessThan(10_000);
+    expect(accessOf(r).filter((e) => e.t < steals[0]! && e.status === 500).length).toBeGreaterThanOrEqual(60);
+    expect(await leakedAll(r)).toBe(true);
   });
 });
 
