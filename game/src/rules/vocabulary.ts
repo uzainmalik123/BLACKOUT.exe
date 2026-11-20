@@ -1,0 +1,67 @@
+// The ids and tokens every rules table and the engine share (PRD §3–§5, SYS-04, SYS-17).
+// Numbers and interpretations the PRD leaves open are in docs/DECISIONS.md D-24.
+
+export type Stage = 1 | 2 | 3 | 4 | 5 | 6;
+export type Difficulty = 'easy' | 'medium' | 'hard';
+
+export type MoveId =
+  | 'ATK-01' | 'ATK-02' | 'ATK-03' | 'ATK-04' | 'ATK-05' | 'ATK-06' | 'ATK-07' | 'ATK-08' | 'ATK-09'
+  | 'ATK-10' | 'ATK-11' | 'ATK-12' | 'ATK-13' | 'ATK-14' | 'ATK-15' | 'ATK-16' | 'ATK-17';
+export type ActionId =
+  | 'DEF-01' | 'DEF-02' | 'DEF-03' | 'DEF-04' | 'DEF-05' | 'DEF-06' | 'DEF-07' | 'DEF-08' | 'DEF-09' | 'DEF-10'
+  | 'DEF-11' | 'DEF-12' | 'DEF-13' | 'DEF-14' | 'DEF-15' | 'DEF-16' | 'DEF-17' | 'DEF-18' | 'DEF-19' | 'DEF-20';
+export type MinionId = 'MIN-01' | 'MIN-02' | 'MIN-03' | 'MIN-04';
+
+/** What a move gives Death (PRD §3 "Gains"). */
+export type Gain =
+  | 'map' | 'secrets-leaked' | 'admin-session' | 'admin-password' | 'user-session' | 'own-admin'
+  | 'souls' | 'defaced' | 'xss-live' | 'ransom';
+/** Something Death leaves behind that lets him return (SYS-07). */
+export type Foothold = 'hidden-admin' | 'hijacked-user' | 'planted-file' | 'forged-token';
+/** The feature-flags console (DEF-10). */
+export type Feature = 'search' | 'registration' | 'password-reset' | 'uploads' | 'ftp' | 'feedback-captcha';
+/** The holes the deploy console can patch (DEF-13). */
+export type Patch = 'login' | 'registration' | 'search' | 'basket-ownership' | 'change-password' | 'token-verify' | 'product-update';
+/** The WAF console (DEF-12). */
+export type WafRule =
+  | { kind: 'sqli' }
+  | { kind: 'block-user-agent'; pattern: string }
+  | { kind: 'block-path'; method: string; path: string }
+  | { kind: 'rate-limit'; path: string };
+
+/** What must hold for the Director to pick a move (PRD §3 "Needs"); all entries of a move must hold. */
+export type Need =
+  | { gain: Gain }
+  | { anyOf: Need[] }
+  | { anySession: true }
+  | { anyFoothold: true }
+  | { anyAdmin: true }
+  | { stageGain: Stage }
+  | { featureOn: Feature }
+  | { loginNotRateLimited: true };
+
+/** A DEF row that closes a move (PRD §3 "Stopped by"). `undo` stoppers only close a move after it lands. */
+export type Stopper =
+  | { action: 'DEF-06' }
+  | { action: 'DEF-07' }
+  | { action: 'DEF-08'; account: 'used' | 'target' }
+  | { action: 'DEF-09' }
+  | { action: 'DEF-10'; feature: Feature }
+  | { action: 'DEF-12'; rule: WafRule }
+  | { action: 'DEF-13'; patch: Patch }
+  | { action: 'DEF-14'; account: 'used' }
+  | { action: 'DEF-16'; account: 'admin' | 'target' }
+  | { action: 'DEF-15' | 'DEF-17' | 'DEF-20'; undo: true };
+
+/** The feature flags at the start of a run: everything on, the feedback CAPTCHA off. */
+export const FEATURE_DEFAULTS: Readonly<Record<Feature, boolean>> = {
+  search: true, registration: true, 'password-reset': true, uploads: true, ftp: true, 'feedback-captcha': false,
+};
+
+/** A soul is one row of these tables (D-24, KI-15). */
+export const SOUL_TABLES = ['Users'] as const;
+
+export const STAGES: readonly Stage[] = [1, 2, 3, 4, 5, 6];
+export const FOOTHOLDS: readonly Foothold[] = ['hidden-admin', 'hijacked-user', 'planted-file', 'forged-token'];
+export const FEATURES: readonly Feature[] = ['search', 'registration', 'password-reset', 'uploads', 'ftp', 'feedback-captcha'];
+export const MINION_IDS: readonly MinionId[] = ['MIN-01', 'MIN-02', 'MIN-03', 'MIN-04'];
