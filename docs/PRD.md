@@ -56,7 +56,7 @@ Juice Shop facts marked ⚠ get confirmed while recording; if one turns out fals
 
 | ID | Stage | Move | Real request / tool | What the defender sees | ATT&CK | Needs | Gains | Stopped by | Pri |
 |---|---|---|---|---|---|---|---|---|---|
-| ATK-01 | 1 Scout | Directory scan | ffuf with a wordlist | Thousands of requests from one IP in seconds, nearly all `200`s of the same size (the shop answers unknown paths with its home page) and a few `500`s with stack traces for `/api`/`/rest` words; user agent `Fuzz Faster U Fool` (Hard: hidden) (recorded: ATK-01.a) | T1595.003 | — | `map` (knows exactly what ATK-01.a found: `/ftp`, `/api`, `/rest`, `robots.txt`; D-30) | DEF-06, DEF-12 (scanner rule) | M |
+| ATK-01 | 1 Scout | Directory scan | ffuf with a wordlist | Thousands of requests from one IP in seconds, nearly all `200`s of the same size (the shop answers unknown paths with its home page) and a few `500`s with stack traces for `/api`/`/rest` words; user agent `Fuzz Faster U Fool` (Hard: hidden) (recorded: ATK-01.a) | T1595.003 | — | `map` (knows exactly what ATK-01.a found: `/ftp`, `/api`, `/rest`, `robots.txt`; D-30) | DEF-12 (scanner rule). DEF-06 only interrupts it: he resumes from a fresh IP where he stopped (D-24, D-40) | M |
 | ATK-02 | 1 Scout | Loot the exposed `/ftp` folder | `curl /ftp/acquisitions.md`; null-byte trick for `package.json.bak` | `200`s on `/ftp/*` files; `%2500` in a URL | T1213 | `map`; `/ftp` on | `secrets-leaked` (company docs); reveals tech stack | DEF-10 (`/ftp` off) | S |
 | ATK-03 | 2 Break in | SQL injection on login | `POST /rest/user/login` with `' OR 1=1--` as the email | **One** successful admin login from a new IP, no failed attempts first. The injection is in the request body, so it isn't in the access log, and Juice Shop doesn't log it either (recorded: ATK-03.a); the only trace is the login itself | T1190 | `map` | `admin-session` | DEF-12 (SQLi rules), DEF-13 (login patch) | M |
 | ATK-04 | 2 Break in | Guess the admin password | Hydra against the login with a short list (Juice Shop's admin password is `admin123`) | A burst of `401`s on `/rest/user/login` (Hydra also sends a `GET` of it with nearly every try: `500`, stack trace in the app log), then one `200`; user agent `Mozilla/5.0 (Hydra)` (recorded: ATK-04.a) | T1110.001 | `map`; login not rate-limited | `admin-session`, `admin-password` | DEF-07 (login rate limit), DEF-16 (reset admin password) | M |
@@ -127,7 +127,7 @@ Actions happen in two places, as in a real job:
 | DEF-19 | Communicate | Escalate to the incident lead | Comms console | The lead acknowledges; required before pulling the plug without a report penalty | Game time | S |
 | DEF-20 | Communicate | Notify (legal / customers) | Comms console | Meets the notification clock (SYS-14) | Game time; notifying before confirming a breach is marked down | S |
 
-**Must = 18, should = 2.** Difficulty only changes how the actions are reached (SYS-08), never what they do.
+**Must = 17, should = 3.** Difficulty only changes how the actions are reached (SYS-08), never what they do.
 
 ---
 
@@ -159,11 +159,11 @@ Real Kiro, through `kiro-cli acp` on our server, **on rails**: our rules decide 
 |---|---|---|---|---|
 | SYS-01 | **Game clock** | 1 real s = 30 game s _(tune)_; pausable only on Easy | Clock runs at the set ratio; pause key does nothing on Medium/Hard | M |
 | SYS-02 | **The Director** | Every 3 real s _(tune)_ it looks at the world state and picks the next ATK move whose Needs hold, preferring later stages. **Stage order (D-19):** Death may pick a stage-N move only after he has played at least one stage-(N-1) move; stage 1 is always open. Needs stay purely technical. Exceptions: the return (SYS-07) ignores stage order; a tip-off lets him skip one stage. Pacing: if the player has more than 3 open alerts, delay the next move; if fewer than 1 for 60 s, bring it forward. Tip-off (DEF-04 active, DEF-08) skips one wait. **Variants (D-31):** the Director picks ATK-08.b on Easy/Medium and ATK-08.c on Hard or once he has been tipped off; ATK-08.a is never picked in play. Recordings play at their recorded speed (no stretching). Deterministic for a given seed | A seeded run produces the same move sequence every time, in stage order (SYS-17) | M |
-| SYS-03 | **Replay engine** | Plays a recording's events into the virtual logs/DB/files at game speed. If an action cuts the move mid-way (e.g. DEF-06 on its IP), the rest of that recording stops and the Director picks the next variant | Blocking the IP mid-ATK-08 stops new lines from that IP within one tick | M |
+| SYS-03 | **Replay engine** | Plays a recording's events into the virtual logs/DB/files at game speed. If an action cuts the move mid-way, the rest of that recording stops. Blocking its IP (DEF-06) only interrupts it: after a short wait he resumes the same recording from where it stopped, from a fresh IP (D-24, D-40); any of the move's stoppers (a WAF rule, a flag, a patch, the plug) ends it | Blocking the IP mid-ATK-08 stops new lines from that IP within one tick | M |
 | SYS-04 | **World state** | One typed model: accounts, sessions, signing key, files, feature flags, firewall rules, WAF rules, backups, Death's gains, footholds, evidence | Every DEF and ATK reads/writes only through it | M |
 | SYS-05 | **Souls** 💀 | Total = the customer records in the recorded DB _(count set by REC-04)_. Stolen records never come back. All taken → loss | The number shown equals the stolen rows replayed so far | M |
 | SYS-06 | **Heartbeat** 🫀 | Starts at 100. Per **real** minute _(tune)_ (D-33): −3 per **open door Death is actively using** (≈ 30 min alone), −1.5 per active minion, −(D-24 feature weight) per disabled feature, −33 while the plug is pulled (flatline ≈ 3 min), −20 while defaced/XSS live (≈ 5 min). Recovers +2 per real minute while nothing drains. Never above 100. 0 → loss (flatline) | A test with only "plug pulled" flatlines at the expected minute (≈ 3 real min); sims check the target times | M |
-| SYS-07 | **Banishment and the return** | Win when Death has no move whose Needs hold **and** no foothold is left. If a foothold is left when his routes close, he goes quiet, then **returns** after 2 real minutes _(tune)_ through it | Leaving ATK-11's admin in place always triggers the return | M |
+| SYS-07 | **Banishment and the return** | Win when Death has no move the Director could actually pick (its Needs hold, a recorded variant isn't stopped, and stage order allows it; D-40) **and** no foothold is left. If a foothold is left when his routes close, he goes quiet, then **returns** after 2 real minutes _(tune)_ through it | Leaving ATK-11's admin in place always triggers the return | M |
 | SYS-08 | **Difficulty dials** | The table in GAME_PLAN §8, plus: Easy = consoles have buttons for terminal actions and KIRO-04; Medium = consoles + terminal; Hard = consoles + terminal, no suggestions, quiet ATK variants, more MIN waves. The harvest's variant is a dial (D-31): ATK-08.b on Easy/Medium, ATK-08.c on Hard (and on any level once Death is tipped off). Which WAF rules stop which harvest is a dial too (D-34): the SQLi rule set stops ATK-08.b on Easy only (its tamper scripts leak through on Medium/Hard), and a sqlmap user-agent rule matches only the loud ATK-08.c. Same recordings and same report verdict on all | Switching difficulty changes only dial values (a test diffs two configs) | M |
 | SYS-09 | **The shell** | Our own. Commands: `ls cd pwd cat head tail grep awk sort uniq wc cut file sha256sum tar cp rm mkdir sqlite3 iptables systemctl ss whois ping nmap curl date history clear help man`. Pipes and `>` supported. `systemctl` takes `status`, `stop`, `start` and `restart`; `/tmp` exists and is writable (D-22). `sqlite3` is real SQLite (sql.js) on the recorded DB. Virtual file system filled by SYS-03. Anything else: `command not found` | Each command has tests for its supported flags; a property-based test (fast-check) shows random input never throws, only prints an error; the command list is exported for KIRO-08 and KDEV-01 | M |
 | SYS-10 | **Event log** | Every Death move, minion wave, player action and Kiro call, timestamped in game time | The report and the sim tests read only from it | M |
@@ -300,28 +300,28 @@ Rows not listed here are `planned`. A PR that moves a row adds or updates its li
 | REC-03 | building | One variant each so far for ATK-01, 03, 04, 06, 09, 11, 13, 15, 17 (`.a`); ATK-08 has three: `.a` (test-only), `.b` low and slow and quiet (D-35), `.c` loud (D-32) |
 | REC-04 | done | 300 seeded customers (D-26); baseline `juiceshop.sqlite` has 325 users |
 | REC-05 | building | MIN-01.a, MIN-02.a (the must minions); MIN-03/04 still to record |
-| ATK-01 | building | Recorded (ATK-01.a); not in the engine's library yet (`engine/engine.ts` loads ATK-03.a and ATK-08.a) |
+| ATK-01 | building | Recorded (ATK-01.a); plays headless in the engine (every committed recording is loaded, D-40); no UI yet. Stopped by the scanner rule; DEF-06 only interrupts it (D-40) |
 | ATK-03 | building | Recorded (ATK-03.a); plays headless in the engine (SYS-03); no UI yet |
-| ATK-04 | building | Recorded (ATK-04.a); not in the engine's library yet (`engine/engine.ts` loads ATK-03.a and ATK-08.a) |
-| ATK-06 | building | Recorded (ATK-06.a); not in the engine's library yet (`engine/engine.ts` loads ATK-03.a and ATK-08.a) |
+| ATK-04 | building | Recorded (ATK-04.a); plays headless in the engine (every committed recording is loaded, D-40); no UI yet |
+| ATK-06 | building | Recorded (ATK-06.a); plays headless in the engine (every committed recording is loaded, D-40); no UI yet |
 | ATK-08 | building | Recorded: ATK-08.a (test-only, never picked in play, D-31), ATK-08.b (low and slow, quiet: D-32, D-35) and ATK-08.c (loud, D-32); which plays when is D-31; no UI yet |
-| ATK-09 | building | Recorded (ATK-09.a); not in the engine's library yet (`engine/engine.ts` loads ATK-03.a and ATK-08.a) |
-| ATK-11 | building | Recorded (ATK-11.a); not in the engine's library yet (`engine/engine.ts` loads ATK-03.a and ATK-08.a) |
-| ATK-13 | building | Recorded (ATK-13.a); not in the engine's library yet (`engine/engine.ts` loads ATK-03.a and ATK-08.a) |
-| ATK-15 | building | Recorded (ATK-15.a); not in the engine's library yet (`engine/engine.ts` loads ATK-03.a and ATK-08.a) |
-| ATK-17 | building | Recorded (ATK-17.a); not in the engine's library yet (`engine/engine.ts` loads ATK-03.a and ATK-08.a) |
-| MIN-01 | building | Recorded (MIN-01.a); not in the engine's library yet (`engine/engine.ts` loads ATK-03.a and ATK-08.a) |
-| MIN-02 | building | Recorded (MIN-02.a); not in the engine's library yet (`engine/engine.ts` loads ATK-03.a and ATK-08.a) |
+| ATK-09 | building | Recorded (ATK-09.a); plays headless in the engine (every committed recording is loaded, D-40); no UI yet. Needs and stoppers per D-30 (incl. the `/api/Users` access-control patch); takes every email in one request (KI-50) |
+| ATK-11 | building | Recorded (ATK-11.a); plays headless in the engine (every committed recording is loaded, D-40); no UI yet. Needs `map`, stopped by registration off or patched; DEF-14 removes it once planted (D-30, D-40) |
+| ATK-13 | building | Recorded (ATK-13.a); plays headless in the engine (every committed recording is loaded, D-40); no UI yet. Needs any session as the row says; the upload needs no login (KI-51) |
+| ATK-15 | building | Recorded (ATK-15.a); plays headless in the engine (every committed recording is loaded, D-40); no UI yet |
+| ATK-17 | building | Recorded (ATK-17.a); plays headless in the engine (every committed recording is loaded, D-40); no UI yet. Needs `map`, stoppers per D-30; the renamed product 1 is a defacement (D-40); ransom doesn't end his chain yet (KI-49) |
+| MIN-01 | building | Recorded (MIN-01.a); plays headless in the engine (every committed recording is loaded, D-40); no UI yet |
+| MIN-02 | building | Recorded (MIN-02.a); plays headless in the engine (every committed recording is loaded, D-40); no UI yet. Breaks into leaked-password reusers only (D-26, D-40); a wave's damage with the recording is KI-48 |
 | SYS-04 | done | `game/src/engine/state.ts`; every DEF effect goes through `engine/actions.ts`, every ATK effect through `engine/replay.ts` |
 | SYS-02 | done | `game/src/engine/director.ts`; seeded, stage order (D-19), pacing, tip-off; `director-pick.test.ts` |
-| SYS-07 | done | `game/src/engine/director.ts`; the return is an ending (D-24); leaving ATK-11's admin always triggers it |
-| SYS-03 | done | `game/src/engine/replay.ts` + `sqldb.ts`; blocking the IP mid-ATK-08 stops its lines within one tick; any stopper cuts the move |
+| SYS-07 | done | `game/src/engine/director.ts`; the return is an ending (D-24); leaving ATK-11's admin always triggers it; banishment counts only moves the Director could pick (`candidateMoves`, D-40) |
+| SYS-03 | done | `game/src/engine/replay.ts` + `sqldb.ts`; blocking the IP mid-ATK-08 stops its lines within one tick and the move resumes from a fresh IP (D-24, D-40); any other stopper ends the move |
 | SYS-01 | done | `game/src/engine/clock.ts`; 1 real s = 30 game s; pause only on Easy |
-| SYS-05 | done | `game/src/engine/souls.ts`; one `Users` row per soul (D-24, KI-15) |
+| SYS-05 | done | `game/src/engine/souls.ts`; one `Users` row of the seed per soul (D-24, KI-15); Death's own accounts are never souls (D-40) |
 | SYS-06 | done | `game/src/engine/heartbeat.ts`, rates per real minute (D-33); a plug-only run flatlines at 3:02 real; sims in `sims.test.ts` check the plug, one open door and a live defacement in a running game |
 | SYS-10 | done | `game/src/engine/log.ts`; the sims and the report read only `world.events` |
-| SYS-17 | done | Consistency tests in `game/src/rules/`, stage-order test in `game/src/engine/stage-order.test.ts`, fast-check suite in `properties.test.ts` |
-| SIM-8 | building | In `game/src/engine/sims.test.ts`: passes on made-up ATK-08.c and, checked locally, on PR #66's ATK-08.c; runs on the committed one once it is on main (D-31) |
-| SIM-9 | building | In `game/src/engine/sims.test.ts`: passes on made-up ATK-08.b and, checked locally, on PR #66's ATK-08.b; runs on the committed one once it is on main (D-34) |
+| SYS-17 | done | Consistency tests in `game/src/rules/`, `rules/prd-sync.test.ts` (moves.ts against PRD §3, D-40), stage-order test in `game/src/engine/stage-order.test.ts`, fast-check suite in `properties.test.ts` |
+| SIM-8 | building | In `game/src/engine/sims.test.ts`: passes on made-up ATK-08.c and on the committed ATK-01.a + ATK-08.c (D-31) |
+| SIM-9 | building | In `game/src/engine/sims.test.ts`: passes on made-up ATK-08.b and on the committed ATK-01.a + ATK-08.b (D-34) |
 | SYS-08 | building | Two dials so far in `game/src/engine/config.ts`: the harvest variant per level (`pinnedVariants`, D-31) and which WAF rules each harvest slips past (`wafEvasion`, D-34) |
-| SYS-16 | building | SIM-1…SIM-9 run headless in `game/src/engine/sims.test.ts` on a made-up library (`engine/test-fixtures/`); SIM-2's whack-a-mole line and SIM-5's grades wait for SYS-11 |
+| SYS-16 | building | SIM-1…SIM-9 run headless in `game/src/engine/sims.test.ts` on a made-up library (`engine/test-fixtures/`), and an idle seeded run on the committed recordings in `engine.test.ts` (KI-17 closed); SIM-2's whack-a-mole line and SIM-5's grades wait for SYS-11 |
