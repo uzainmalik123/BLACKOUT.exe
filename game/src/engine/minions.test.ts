@@ -72,8 +72,10 @@ describe('minion waves (PRD §4)', () => {
 
   it('MIN-01 is closed by the scanner user-agent rule or by blocking every IP of the wave', () => {
     const w = initialWorld(1, 'medium');
-    runWaves(w, 31_000);
-    for (const ip of activeWaves(w)[0]!.ips) applyAction(w, { type: 'DEF-06', ip, op: 'add' });
+    runWaves(w, 33_000);
+    const seen = new Set(w.logs.access.filter((l) => l.by === 'MIN-01').map((l) => l.ip));
+    expect(seen.size).toBe(3); // every address of the wave shows in the log, so the player can block them
+    for (const ip of seen) applyAction(w, { type: 'DEF-06', ip, op: 'add' });
     runWaves(w, 100);
     expect(eventsOfKind(w, 'wave-ended')).toMatchObject([{ minion: 'MIN-01', closedBy: 'DEF-06' }]);
     const v = initialWorld(1, 'medium');

@@ -49,7 +49,7 @@ function startWave(world: World, library: RecordingLibrary, id: MinionId): void 
   const variants = library.variantsOf(id);
   if (variants.length > 0) {
     const v = variants[(n - 1) % variants.length]!;
-    startReplay(world, { ...v, info: { ...v.info, ip: ips[0]! } }, id);
+    startReplay(world, { ...v, info: { ...v.info, ip: ips[0]! } }, id, ips);
   }
 }
 

@@ -3,6 +3,7 @@
 import { validateRecording, type Recording } from '../recordings/format';
 import type { MinionId, MoveId } from '../rules/vocabulary';
 import type { VariantInfo } from './facts';
+import { SEED_ACCOUNTS } from './seed';
 
 export interface Variant {
   move: MoveId | MinionId;
@@ -22,8 +23,8 @@ export function variantInfo(r: Recording): VariantInfo {
   const targets = new Set<string>();
   for (const e of r.events) {
     if (e.kind !== 'db' || e.table !== 'Users') continue;
-    const email = e.after?.email ?? e.before?.email;
-    if (typeof email === 'string') targets.add(email);
+    const email = e.after?.email ?? e.before?.email ?? SEED_ACCOUNTS.find((a) => a.id === Number(Object.values(e.key)[0]))?.email;
+    if (typeof email === 'string') targets.add(email); // a real update carries only the changed columns (D-15): the id names the user
   }
   return { ip: r.attackerIp, quiet: r.label.toLowerCase().startsWith('quiet'), targets: [...targets] };
 }

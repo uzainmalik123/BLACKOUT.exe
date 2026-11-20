@@ -44,7 +44,7 @@ function eventsFor(id: MoveId | MinionId, ip: string, quiet: boolean): RecEvent[
     case 'ATK-04': return [...many(5, () => access(ip, 'POST', '/rest/user/login', 401, ua ?? 'Mozilla/4.0 (Hydra)')), access(ip, 'POST', '/rest/user/login', 200, ua ?? 'Mozilla/4.0 (Hydra)')];
     case 'ATK-05': return [
       access(ip, 'POST', '/rest/user/reset-password', 200, ua ?? 'curl/8.0'),
-      { t: 0, kind: 'db', op: 'update', table: 'Users', key: { id: 2 }, before: { password: 'old' }, after: { password: 'new', email: 'jim@juice-sh.op' } },
+      { t: 0, kind: 'db', op: 'update', table: 'Users', key: { id: 2 }, before: { password: 'old' }, after: { password: 'new' } }, // only the changed columns, as convert.ts writes them
       access(ip, 'POST', '/rest/user/login', 200, ua ?? 'curl/8.0'),
     ];
     case 'ATK-06': return [
@@ -70,7 +70,7 @@ function eventsFor(id: MoveId | MinionId, ip: string, quiet: boolean): RecEvent[
     ];
     case 'ATK-12': return [
       access(ip, 'GET', '/rest/user/change-password?new=x&repeat=x', 200, ua ?? 'curl/8.0'),
-      { t: 0, kind: 'db', op: 'update', table: 'Users', key: { id: 7 }, before: { password: 'old' }, after: { password: 'x', email: 'morty@juice-sh.op' } },
+      { t: 0, kind: 'db', op: 'update', table: 'Users', key: { id: 7 }, before: { password: 'old' }, after: { password: 'x' } },
     ];
     case 'ATK-13': return [
       access(ip, 'POST', '/file-upload', 204, ua ?? 'curl/8.0'),
@@ -112,3 +112,6 @@ function build(): RecordingLibrary {
 }
 
 export const FIXTURE_LIBRARY: RecordingLibrary = build();
+
+/** Every attacker address the fixtures use, for tests that want blocks to land mid-move. */
+export const FIXTURE_IPS: readonly string[] = [...MOVES.map((m) => m.id), ...MINION_IDS].flatMap((id) => FIXTURE_LIBRARY.variantsOf(id).map((v) => v.info.ip));

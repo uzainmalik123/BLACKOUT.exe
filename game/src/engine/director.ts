@@ -1,7 +1,7 @@
 // The Director (SYS-02) and banishment / the return (SYS-07). Every 3 real s it looks at the world and picks
 // the next move whose Needs hold, preferring later stages and keeping stage order (D-19); deterministic for a seed.
 import { MOVES, type Move } from '../rules/moves';
-import { FOOTHOLDS, RETURN_GRANTS, type Foothold, type Gain, type Stage } from '../rules/vocabulary';
+import { FOOTHOLDS, RETURN_GRANTS, STAGES, type Foothold, type Gain, type Stage } from '../rules/vocabulary';
 import { CONFIG } from './config';
 import { anyStopperHolds, footholds, needsHold } from './facts';
 import type { RecordingLibrary, Variant } from './library';
@@ -37,14 +37,21 @@ export function highestStagePlayed(world: World): number {
   return Math.max(0, ...world.death.played.filter((p) => p.outcome === 'landed').map((p) => MOVES.find((m) => m.id === p.move)!.stage));
 }
 
+/** The next stage Death may enter: the lowest recorded stage above the highest he has landed (a stage with no recording is skipped). */
+export function nextStage(world: World, library: RecordingLibrary): number {
+  const highest = highestStagePlayed(world);
+  const recorded = STAGES.filter((st) => st > highest && MOVES.some((m) => m.stage === st && library.variantsOf(m.id).length > 0));
+  return recorded[0] ?? highest + 1;
+}
+
 /** D-19: a stage-N move only after a stage-(N-1) move; a tip-off skips one stage; the return ignores the order. */
-export function stageAllowed(world: World, stage: Stage): boolean {
-  return world.death.returnedThrough !== undefined || stage <= highestStagePlayed(world) + 1 + world.death.stageSkips;
+export function stageAllowed(world: World, library: RecordingLibrary, stage: Stage): boolean {
+  return world.death.returnedThrough !== undefined || stage <= nextStage(world, library) + world.death.stageSkips;
 }
 
 /** Playable and allowed by stage order: what the Director can actually pick. */
 export function candidateMoves(world: World, library: RecordingLibrary): Move[] {
-  return playableMoves(world, library).filter((m) => stageAllowed(world, m.stage));
+  return playableMoves(world, library).filter((m) => stageAllowed(world, library, m.stage));
 }
 
 export function openAlerts(world: World): number {
@@ -99,7 +106,7 @@ function pace(world: World): void {
 }
 
 export function directorTick(world: World, library: RecordingLibrary): void {
-  if (world.ending || activeDeathReplay(world)) return;
+  if (world.ending || world.nginx === 'stopped' || activeDeathReplay(world)) return; // nothing reaches a stopped server
   pace(world);
   const candidates = candidateMoves(world, library);
   if (candidates.length === 0) {
@@ -116,6 +123,6 @@ export function directorTick(world: World, library: RecordingLibrary): void {
   const resumable = variants.find((v) => world.death.resume[move.id]?.variant === v.variant);
   const chosen = (resumable ?? open[0] ?? untried[0] ?? variants[0])!;
   const variant = world.firewall.blocked.includes(chosen.info.ip) ? { ...chosen, info: { ...chosen.info, ip: freshIp(world) } } : chosen;
-  if (move.stage > highestStagePlayed(world) + 1) world.death.stageSkips -= 1;
+  if (move.stage > nextStage(world, library)) world.death.stageSkips -= 1;
   startReplay(world, variant, 'death');
 }

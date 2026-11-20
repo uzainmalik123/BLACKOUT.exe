@@ -77,5 +77,6 @@ export function syncDb(g: GameDb, world: World): void {
       g.db.run(`INSERT INTO Users (${cols.map(q).join(', ')}) VALUES (${cols.map(() => '?').join(', ')})`, cols.map((k) => seed[k]!));
     }
     if (a.lockedAt !== undefined) g.db.run("UPDATE Users SET deletedAt = datetime('now') WHERE id = ? AND deletedAt IS NULL", [id]);
+    else if (g.seedUsers.get(id)?.deletedAt === null) g.db.run('UPDATE Users SET deletedAt = NULL WHERE id = ?', [id]); // a restore undid the lock
   }
 }

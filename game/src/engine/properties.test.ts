@@ -9,8 +9,9 @@ import { EMPTY_LIBRARY, type RecordingLibrary } from './library';
 import { SEED_ACCOUNTS } from './seed';
 import { soulsStolen } from './souls';
 import { initialWorld } from './state';
+import { FIXTURE_IPS, FIXTURE_LIBRARY } from './test-fixtures/recordings';
 
-const ips = ['203.0.113.23', '203.0.113.81', '203.0.113.100', '203.0.113.200', '10.0.0.1', 'nope'];
+const ips = ['203.0.113.23', '203.0.113.81', '203.0.113.100', '203.0.113.200', '10.0.0.1', 'nope', ...FIXTURE_IPS];
 const emails = [...SEED_ACCOUNTS.map((a) => a.email), 'death@juice-sh.op', 'support-ops@juice-sh.op', 'nobody@juice-sh.op'];
 const paths = ['complaints/invoice.zip', 'READ_ME_MORTAL.txt', 'nope.txt'];
 const patches = ['login', 'registration', 'search', 'basket-ownership', 'change-password', 'token-verify', 'product-update'] as const;
@@ -67,6 +68,10 @@ export function checkEngineInvariants(library: RecordingLibrary, numRuns: number
 describe('engine invariants under random play (SYS-17)', () => {
   it('never throws, never gives souls back, never leaves heartbeat outside 0–100, stays JSON-plain (no recordings)', () => {
     checkEngineInvariants(EMPTY_LIBRARY, 300);
+  });
+
+  it('holds while Death and the minions actually play (fixture library), including IP blocks mid-move', () => {
+    checkEngineInvariants(FIXTURE_LIBRARY, 200);
   });
 
   it('two runs with the same seed and script produce identical event logs', () => {

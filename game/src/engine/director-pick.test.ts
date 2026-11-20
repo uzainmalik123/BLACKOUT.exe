@@ -4,6 +4,7 @@ import { advance } from './advance';
 import { CONFIG } from './config';
 import { directorTick, openAlerts } from './director';
 import { eventsOfKind } from './log';
+import { libraryFrom } from './library';
 import { initialWorld, type World } from './state';
 import { FIXTURE_LIBRARY } from './test-fixtures/recordings';
 
@@ -100,5 +101,36 @@ describe('the Director (SYS-02)', () => {
     expect(started!.stage).toBe(3);
     expect(started!.move).toBe('ATK-06');
     expect(w.death.stageSkips).toBe(0);
+  });
+  it('starts nothing while the plug is pulled, and resumes when nginx is back', () => {
+    const w = initialWorld(1, 'medium');
+    applyAction(w, { type: 'DEF-11' });
+    advance(w, lib, 30 * REAL_S); // (the plug flatlines at 50 real s: SYS-06)
+    expect(eventsOfKind(w, 'move-started')).toEqual([]);
+    expect(eventsOfKind(w, 'move-cut')).toEqual([]);
+    expect(w.ending).toBeUndefined();
+    applyAction(w, { type: 'DEF-18', what: 'nginx' });
+    advance(w, lib, 4 * REAL_S);
+    expect(eventsOfKind(w, 'move-started')).toHaveLength(1);
+  });
+
+  it('a tip-off during an active move skips the wait after it lands', () => {
+    const w = run(1, 4 * REAL_S);
+    expect(w.replays).toHaveLength(1);
+    applyAction(w, { type: 'DEF-04', ip: eventsOfKind(w, 'move-started')[0]!.ip, mode: 'active' });
+    advance(w, lib, 10 * REAL_S); // ATK-01's fixture lasts 6 s
+    const landed = eventsOfKind(w, 'move-landed')[0]!;
+    expect(landed.move).toBe('ATK-01');
+    const next = eventsOfKind(w, 'move-started')[1]!;
+    expect(next.t - landed.t).toBeLessThanOrEqual(medium.directorPeriodGameMs); // no 40 s wait after a tip-off
+    expect(w.death.skipWait).toBe(false);
+  });
+
+  it('a library that only covers some stages skips the missing ones instead of ending the run', () => {
+    const partial = libraryFrom(['ATK-01', 'ATK-03', 'ATK-08'].flatMap((m) => lib.variantsOf(m as 'ATK-01').map((v) => v.recording)));
+    const w = initialWorld(1, 'medium');
+    for (let t = 0; t < 10 * 60 * REAL_S && !w.ending; t += REAL_S) advance(w, partial, REAL_S);
+    expect(eventsOfKind(w, 'move-started').map((e) => e.move)).toEqual(['ATK-01', 'ATK-03', 'ATK-08']);
+    expect(w.ending).toBe('souls-lost');
   });
 });
