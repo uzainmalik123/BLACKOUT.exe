@@ -20,6 +20,7 @@
 | D-16 | Row status lives in a new PRD §16 that lists only rows past `planned`, instead of a Status column in every table | Accepted |
 | D-17 | PRD rows corrected to what Juice Shop v20.4.0 really does (ATK-03, ATK-08, ATK-13, DEF-08); findings that would change a move's Needs go to KI-03 for the team | Accepted |
 | D-18 | ATK-15/16 need only `map`, held to stage 6 by the Director; ATK-12 needs `user-session`, which MIN-02 can supply | Accepted |
+| D-19 | Stage order: Death plays a stage-N move only after a stage-(N-1) move (stage 1 always open); the return ignores it and a tip-off skips one stage; Needs stay technical | Accepted |
 
 ### D-01: Pivot to an incident-response game
 - **Context:** (2026-11-08) Reanimator raised dead repos so Death could attack them. Any agent can revive a repo on its own, so the product added nothing, and the UI had drifted into a pile of screens with no vision.
@@ -75,3 +76,8 @@
 - **Context:** (2026-11-17) Juice Shop's source (KI-03) showed ATK-15/16's route needs no login and ATK-12 only changes the password of the token's own user, so their Needs in the PRD were wrong. The team ruled.
 - **Decision:** ATK-15/16 need only `map` (Juice Shop leaves product updates unauthenticated: broken access control, held back to stage 6 by the Director); ATK-12 needs `user-session`, which MIN-02 can supply, tying minions to Death's chain. ATK-15 is also stopped by DEF-12 (a WAF rule blocking `PUT /api/Products`). `user-session` comes from ATK-05 or a successful MIN-02 wave, so MIN-02's damage is 1 soul per success **and** a `user-session` for Death.
 - **Consequences:** ignoring MIN-02 now opens a stage-5 foothold (ATK-12), not just a soul drain. SYS-02 has no rule yet that holds a move to its stage (KI-12); until it does, "prefer later stages" would pick ATK-15/16 right after ATK-01.
+
+### D-19: Stage order in the Director
+- **Context:** (2026-11-20) D-18 made ATK-15/16 need only `map`, and SYS-02 picked any move whose Needs hold, preferring later stages, so it would deface the shop right after the first scan (KI-12).
+- **Decision:** SYS-02 gets a stage-order rule: Death may pick a stage-N move only after he has played at least one stage-(N-1) move; stage 1 is always open. Needs stay purely technical. Exceptions: the return (SYS-07) ignores stage order; a tip-off lets him skip one stage. SYS-17 tests it: no seeded run plays a stage-N move before a stage-(N-1) move, except during the return or after a tip-off. ATK-16 is also stopped by DEF-12, like ATK-15.
+- **Consequences:** the chain always unfolds scout → break in → admin → harvest → dig in → strike unless the player tips him off, so a tip-off now costs more than a shorter wait. KI-12 is closed.

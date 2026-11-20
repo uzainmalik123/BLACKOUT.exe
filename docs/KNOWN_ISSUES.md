@@ -13,7 +13,7 @@
 | KI-09 | `record.sh` writes `run.json` with a heredoc, unescaped: a `# tool:` or `# label:` line containing `"` or `\` breaks the JSON. The converter then refuses the run rather than saving bad data | Minor | Open |
 | KI-10 | Each recording has a few hundred ms of idle time at the start and end (container start-up before the first request, the exit after the last) | Minor | Open |
 | KI-11 | Juice Shop seeds its DB on start with the current time, so a re-recorded run's `before.sqlite` differs from the committed baseline in timestamp columns; a `db` event's `before` may not match the baseline exactly | Minor | Open |
-| KI-12 | D-18 holds ATK-15/16 to stage 6, but SYS-02 has no stage gate: it picks any move whose Needs hold, preferring later stages, so with Needs `map` it would deface the shop right after the first scan. **Team to define the gate** (e.g. a stage-5 foothold first) before SYS-02 is built | Major | Open |
+| KI-12 | D-18 holds ATK-15/16 to stage 6, but SYS-02 has no stage gate: it picks any move whose Needs hold, preferring later stages, so with Needs `map` it would deface the shop right after the first scan. Ruled: SYS-02 keeps stage order (D-19) | Major | Closed (D-19) |
 
 ### KI-03: Juice Shop facts (v20.4.0, checked 2026-11-17)
 
