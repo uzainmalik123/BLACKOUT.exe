@@ -53,7 +53,7 @@ describe('the Director (SYS-02)', () => {
     advance(w, lib, REAL_S);
     expect(eventsOfKind(w, 'move-cut')).toMatchObject([{ move: 'ATK-01', variant: 'a', by: 'DEF-06' }]);
     const linesBefore = w.logs.access.length;
-    advance(w, lib, medium.cutRetryGameMs / 30 + 3 * REAL_S);
+    advance(w, lib, medium.ipResumeGameMs / 30 + 3 * REAL_S);
     expect(moves(w)).toEqual(['ATK-01.a', 'ATK-01.a']); // the same scan carries on from a fresh IP (D-24)
     expect(eventsOfKind(w, 'move-started')[1]!.ip).not.toBe(ip);
     expect(w.logs.access.slice(linesBefore).every((l) => l.ip === eventsOfKind(w, 'move-started')[1]!.ip)).toBe(true);
@@ -76,11 +76,11 @@ describe('the Director (SYS-02)', () => {
     expect(openAlerts(w)).toBe(4);
     directorTick(w, lib);
     expect(eventsOfKind(w, 'move-started')).toEqual([]);
-    expect(w.death.nextMoveAt).toBe(medium.moveGapGameMs);
+    expect(w.death.nextMoveAt).toBe(medium.breatherGameMs.max);
     directorTick(w, lib);
-    expect(w.death.nextMoveAt).toBe(medium.moveGapGameMs); // once, not every tick
+    expect(w.death.nextMoveAt).toBe(medium.breatherGameMs.max); // once, not every tick
     const q = initialWorld(1, 'medium');
-    q.death.nextMoveAt = 10 * medium.moveGapGameMs;
+    q.death.nextMoveAt = 10 * medium.breatherGameMs.max;
     q.clock.gameMs = medium.pacing.bringForwardAfterQuietGameMs - 3000;
     directorTick(q, lib);
     expect(eventsOfKind(q, 'move-started')).toEqual([]);
@@ -94,7 +94,7 @@ describe('the Director (SYS-02)', () => {
     w.death.knowledge.push('map');
     w.death.played.push({ move: 'ATK-01', variant: 'a', outcome: 'landed' });
     w.clock.gameMs = 1000;
-    w.death.nextMoveAt = 10 * medium.moveGapGameMs;
+    w.death.nextMoveAt = 10 * medium.breatherGameMs.max;
     applyAction(w, { type: 'DEF-04', ip: '203.0.113.10', mode: 'active' });
     directorTick(w, lib);
     const [started] = eventsOfKind(w, 'move-started');
