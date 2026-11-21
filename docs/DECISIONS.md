@@ -37,6 +37,7 @@
 | D-33 | Heartbeat rates per real minute: plug −33, defaced/XSS −20, each open door −3, each minion −1.5, disabled features by D-24's weights, recovery +2 (KI-21) | Accepted |
 | D-34 | WAF vs ATK-08: the SQLi rule set stops ATK-08.b on Easy only (tamper scripts leak through on Medium/Hard); a sqlmap user-agent rule matches only ATK-08.c; SIM-9 | Accepted |
 | D-35 | ATK-08.b is quiet as well as slow: `--random-agent` and the `randomcase` tamper script, still with `--delay` (~2.5 min); ATK-08.c keeps sqlmap's own user agent (closes KI-22) | Accepted |
+| D-36 | New split: Uzain builds the brain (engine, shell logic, Kiro server, report grading, recordings, content text, hosting); the teammate builds every scene, the renderer, art, sound and the terminal window, from `docs/SCENES.md` and `docs/ENGINE_API.md` | Accepted |
 | D-60 | Ordinary customer traffic: a recorded shopper loop (REC-06) plays under everything (SYS-19), from an address pool shared with Death and the minions, and shows the cost of the player's actions as customers' failed requests | Accepted |
 
 ### D-01: Pivot to an incident-response game
@@ -190,6 +191,11 @@
 - **Context:** (2026-11-20) D-32 recorded ATK-08.b with sqlmap's own user agent, so the player saw "sqlmap" in the log while D-34's user-agent rule did nothing to it (KI-22). The team ruled ATK-08.b should be quiet too.
 - **Decision:** ATK-08.b runs sqlmap with `--random-agent` and a tamper script, still with `--delay=0.36` so the full dump takes 2 to 3 minutes. The ruling suggested `space2comment`, but whitespace tampers don't work on this route: `space2comment`'s `/**/` makes payloads longer than the 200 characters Juice Shop keeps of `q`, so sqlmap can't fingerprint SQLite, and with `space2randomblank` it finds no injection at all. So the tamper is `randomcase` (`UnIon AlL sELEcT`), which keeps the length. Recorded: 404 requests over 152 s, one browser user agent for the whole run, rows stolen from 33 s to 152 s. ATK-08.c stays loud (sqlmap's own agent, ~90 s of probing, then a fast dump from the saved session).
 - **Consequences:** a user-agent rule doesn't see ATK-08.b, and a case-sensitive `UNION SELECT` signature misses all but the odd request (`randomcase` lands on all capitals by chance: 1 of 404 here). How DEF-12's rules treat it is the engine session's (SYS-06 and the WAF rules are untouched here).
+
+### D-36: The brain and the screens
+- **Context:** (2026-11-21) Nothing visible exists yet with 13 days left, and the teammate's strength is UI. D-21 had given her the shell and the writing too.
+- **Decision:** Uzain (with Claude) owns the brain: engine, the shell's logic (SYS-09, still built from a Kiro spec, KDEV-02), Kiro's server (SYS-12), report grading (SYS-11), recordings, the content text (CON-01/03/04/05) and hosting. The teammate owns every scene (UI-01 to UI-08), the renderer, art (CON-06), sound and the terminal window. `docs/SCENES.md` fixes what each scene must contain and leaves layout and style to her; `docs/ENGINE_API.md` is the contract, including the agreed shapes of the shell, Kiro and the report so she builds against stubs now.
+- **Consequences:** separate folders, so the two never edit the same files. Supersedes D-21's split.
 
 ### D-60: Customer traffic
 - **Context:** (2026-11-21) KI-60: the logs only ever held Death's and the minions' requests, so every line was suspicious, the briefing's "what normal looks like" had nothing to compare against, and spotting the attacker was far easier than in a real incident.
