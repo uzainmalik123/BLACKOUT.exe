@@ -8,6 +8,7 @@ import { gameTimeIso } from './clock';
 import { CONFIG } from './config';
 import { stopperHolds } from './facts';
 import { emit } from './log';
+import { bump, customerAddresses } from './pool';
 import { closeAlert, openAlert } from './replay';
 import { SEED_ACCOUNTS } from './seed';
 import { steal } from './souls';
@@ -27,7 +28,7 @@ export function tapClosed(world: World, id: TapId): boolean {
 }
 
 function line(world: World, id: TapId, target: string, bytes: number): void {
-  const ip = `203.0.113.${100 + Math.floor(nextTapRandom(world) * 150)}`;
+  const ip = bump(`203.0.113.${100 + Math.floor(nextTapRandom(world) * 150)}`, customerAddresses(world), 100, 249); // D-65: never a customer's address
   world.logs.access.push({ t: world.clock.gameMs, ip, method: 'GET', target, protocol: 'HTTP/1.1', status: 200, bytes, referer: '', userAgent: SCRAPER_AGENT, by: id });
 }
 

@@ -3,6 +3,7 @@
 import { applyPendingPatches, takeBackupIfDue } from './actions';
 import { realToGameMs } from './clock';
 import { CONFIG } from './config';
+import { stepCustomers } from './customers';
 import { refreshDoors } from './doors';
 import { integrateHeartbeat } from './heartbeat';
 import type { RecordingLibrary } from './library';
@@ -28,6 +29,7 @@ function step(world: World, library: RecordingLibrary, dt: number): void {
   stepReplays(world, library);
   stepWaves(world, library);
   stepTaps(world);
+  stepCustomers(world, library); // SYS-19: after Death and the minions, so their addresses are known (D-65)
   refreshDoors(world, library); // D-44: a door is shut only while its fix holds
   integrateHeartbeat(world, dt);
   const config = CONFIG[world.difficulty];

@@ -273,7 +273,7 @@ describe('SYS-06 target times in a running game (D-33)', { timeout: WHOLE_RUN_TI
   it('one open door alone takes about half an hour to flatline the shop', () => {
     const r = runSim({ seed: 1, player: once(closeAllMinions), library: slowScan, maxRealMs: 45 * REAL_MIN });
     expect(ending(r)).toBe('flatline');
-    const perMinute = cfg.drainPerRealMin.openDoor + cfg.featureWeight['feedback-captcha'];
+    const perMinute = cfg.drainPerRealMin.openDoor; // D-65: the CAPTCHA on costs nothing (no shopper fails it)
     expect(r.realMs).toBeGreaterThan(30 * REAL_MIN);
     expect(Math.abs(r.realMs - (3000 + minutesToFlatline(perMinute, 100 - cfg.dip['DEF-07']!)))).toBeLessThan(5000);
   });
@@ -284,7 +284,7 @@ describe('SYS-06 target times in a running game (D-33)', { timeout: WHOLE_RUN_TI
       setup: (w) => { w.defacements.push({ productId: 1, kind: 'deface', by: 'ATK-15' }); },
     });
     expect(ending(r)).toBe('flatline');
-    const both = cfg.drainPerRealMin.defaced + cfg.drainPerRealMin.openDoor + cfg.featureWeight['feedback-captcha'];
+    const both = cfg.drainPerRealMin.defaced + cfg.drainPerRealMin.openDoor;
     expect(r.realMs).toBeLessThan(5 * REAL_MIN);
     expect(Math.abs(r.realMs - minutesToFlatline(both, 100 - cfg.dip['DEF-07']!))).toBeLessThan(5000);
   });

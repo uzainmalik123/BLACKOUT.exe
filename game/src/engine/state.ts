@@ -2,7 +2,7 @@
 // Times are game milliseconds since the scenario start (SYS-01). Derived facts (gains, footholds) live in facts.ts.
 import type { Row } from '../recordings/format';
 import type { GameEvent } from './log';
-import type { Actor, Difficulty, Ending, Feature, Foothold, MinionId, MoveId, Patch, TapId, WafRule } from '../rules/vocabulary';
+import type { Actor, Difficulty, Ending, Feature, Foothold, MinionId, MoveId, Patch, RequestClass, TapId, WafRule } from '../rules/vocabulary';
 import { FEATURE_DEFAULTS } from '../rules/vocabulary';
 import { CONFIG } from './config';
 import { SEED_ACCOUNTS } from './seed';
@@ -125,6 +125,33 @@ export interface Evidence {
   appLines: number;
 }
 
+/** A customer's complaint to support (D-65): one per shopper per loop, at their first failure. For the comms console. */
+export interface Ticket {
+  id: number;
+  t: number;
+  ip: string; // the shopper's pool address, as the log shows it
+  userAgent: string;
+  about: RequestClass;
+  status: 403 | 429 | 503 | 'blocked'; // what the shop answered; 'blocked' = the firewall dropped them
+  text: string;
+}
+
+/** The customers (SYS-19, D-65): where the traffic loop stands, this loop's shoppers and what the player did to them. */
+export interface CustomerState {
+  loop: number; // 0 until the first loop starts
+  loopStartedAt: number; // game ms
+  cursor: number; // next recording event
+  addresses: Record<string, string>; // this loop's shoppers: recorded address → pool address
+  failures: Record<string, number>; // failed requests per shopper (recorded address) this loop
+  gone: string[]; // shoppers who gave up this loop (recorded addresses): the rest of their visit never comes
+  hits: Record<string, number[]>; // rate limits: `<recorded address> <rule path>` → recorded times of recent hits
+  rng: number; // the customers' own seeded stream, so Death's draws don't move
+  lastFailureAt?: number; // SYS-06 recovery waits a real minute after this
+  served: number; // requests that reached the shop and were answered as recorded
+  failed: number; // requests the player's actions failed
+  lost: number; // shoppers who gave up (churn), over the run
+}
+
 export type { Ending } from '../rules/vocabulary';
 
 export interface World {
@@ -134,6 +161,7 @@ export interface World {
   clock: { gameMs: number; paused: boolean; lastDirectorTick: number; lastBackupAt: number };
   souls: { total: number; stolen: Array<{ table: string; key: number }>; byMinions: number }; // byMinions: D-41's 5 % cap
   heartbeat: number;
+  heartbeatMax: number; // D-65: churn lowers it for good; the heartbeat never rises above it
   accounts: Account[];
   sessions: Session[];
   signingKey: { version: number; rotatedAt?: number };
@@ -172,6 +200,8 @@ export interface World {
   nextWaveAt: Record<MinionId, number>;
   minionCursor: Partial<Record<MinionId, number>>; // D-41: where the next wave's slice of its recording starts
   taps: { open: OpenTap[]; opened: TapId[]; nextAt: number; rng: number }; // D-42: leaky taps; their own seeded stream, so Death's draws don't move
+  customers: CustomerState; // SYS-19, D-65
+  tickets: Ticket[]; // D-65: support tickets, for the comms console
   alerts: Alert[];
   quietAlertsSince: number;
   logs: { access: AccessLine[]; app: AppLine[]; dbChanges: DbChange[] };
@@ -182,6 +212,11 @@ export interface World {
 /** D-42: the taps' own PRNG state, derived from the run's seed. */
 export function tapSeed(seed: number): number {
   return (seed ^ 0x7a9c3e15) >>> 0;
+}
+
+/** D-65: the customers' own PRNG state, derived from the run's seed. */
+export function customerSeed(seed: number): number {
+  return (seed ^ 0x3c6ef372) >>> 0;
 }
 
 /** mulberry32, the same generator as rng.ts, on an explicit state: returns the value and the next state. */
@@ -204,6 +239,7 @@ export function initialWorld(seed: number, difficulty: Difficulty): World {
     clock: { gameMs: 0, paused: false, lastDirectorTick: 0, lastBackupAt: 0 },
     souls: { total: SEED_ACCOUNTS.length, stolen: [], byMinions: 0 },
     heartbeat: 100,
+    heartbeatMax: 100,
     accounts,
     sessions: [],
     signingKey: { version: 1 },
@@ -223,6 +259,8 @@ export function initialWorld(seed: number, difficulty: Difficulty): World {
     nextWaveAt: { ...config.minions.firstWaveGameMs },
     minionCursor: {},
     taps: { open: [], opened: [], nextAt: config.taps.everyGameMs.min + Math.round(firstTap.value * (config.taps.everyGameMs.max - config.taps.everyGameMs.min)), rng: firstTap.state },
+    customers: { loop: 0, loopStartedAt: 0, cursor: 0, addresses: {}, failures: {}, gone: [], hits: {}, rng: customerSeed(seed), served: 0, failed: 0, lost: 0 },
+    tickets: [],
     alerts: [],
     quietAlertsSince: 0,
     logs: { access: [], app: [], dbChanges: [] },

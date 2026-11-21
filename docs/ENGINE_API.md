@@ -36,12 +36,12 @@ const unsubscribe = engine.subscribe((world) => render(world));
 | What | Field | Notes |
 |---|---|---|
 | 💀 Souls | `souls.total`, `souls.stolen.length` | Stolen never goes back down |
-| 🫀 Heartbeat | `heartbeat` | 0–100. 0 = flatline (an ending) |
+| 🫀 Heartbeat | `heartbeat`, `heartbeatMax` | 0–`heartbeatMax`. 0 = flatline (an ending). The maximum starts at 100 and drops for good as customers give up (churn, D-65): draw the lost part of the meter as dead |
 | Game clock | `clock.gameMs`, `clock.paused` | |
 | Difficulty | `difficulty` | Decides which helpers the screens show (SCENES.md §0) |
 | Alerts | `alerts` (`about`, `openedAt`, `closedAt?`) | Open = no `closedAt`. `about` is the move, minion or leaky tap (`TAP-01`…) it's about; **don't show that id to the player**, it's a spoiler. Show what the logs show |
 | Leaky taps | `taps.open` (`id`, `openedAt`) | Small exposures dripping customer data (PRD §4.1, D-42). Each is closed by one WAF path block: `TAP_BY_ID[id].closedBy.rule` in `src/rules/taps.ts` gives the exact `DEF-12` rule a console button should send |
-| Logs | `engine.accessLog()`, `engine.appLog()` | Ready-made text, one line per entry (real nginx `combined` lines and real Juice Shop log lines). Also `world.logs.access` / `.app` as structured lines if you want to colour or filter them |
+| Logs | `engine.accessLog()`, `engine.appLog()` | Ready-made text, one line per entry (real nginx `combined` lines and real Juice Shop log lines). Also `world.logs.access` / `.app` as structured lines if you want to colour or filter them. Most access lines are ordinary customers (`by: 'CUST'`, SYS-19): **never colour by `by`**, it's a spoiler; what the player did to customers shows as their `503`/`429`/`403` lines |
 | Accounts | `accounts` (`email`, `role`, `lockedAt?`, `createdBy`) | For the Accounts console. `createdBy` is a spoiler too: show `role` and `email` only |
 | Sessions | `sessions` | For the Sessions console (count, kinds) |
 | Feature flags | `features` | `search`, `registration`, `password-reset`, `uploads`, `ftp`, `feedback-captcha` |
@@ -51,7 +51,8 @@ const unsubscribe = engine.subscribe((world) => render(world));
 | Backups | `backups` (`id`, `takenAt`) | For the Backups console |
 | Evidence | `engine.evidence()` | Snapshots taken |
 | Uploads | `engine.files()` | Files in `uploads/`, incl. planted ones |
-| Comms | `comms` | Escalated / notified times |
+| Comms | `comms`, `tickets` | Escalated / notified times. `tickets`: customers' support tickets (`t`, `ip`, `userAgent`, `about` what they were doing, `status` what they got: `503`, `429`, `403` or `'blocked'`, `text`), newest last; list them in the comms console (D-65) |
+| Customers | `customers.served`, `.failed`, `.lost` | How many customer requests went through, how many the player's actions failed, how many shoppers gave up (for the report) |
 | The ending | `ending` | `'banished'`, `'souls-lost'`, `'flatline'`, `'return'`; undefined while playing |
 | Everything that happened | `events` | See §4. The source for animations and the report |
 
@@ -88,6 +89,8 @@ Every button, console and (later) shell command sends one of these. It returns `
 | `door-shut` | One of Death's soul doors (`move`) is shut (`by` the fix that holds now); he stays away while it holds (D-44) | He recoils from it. Don't name the move on screen |
 | `door-reopened` | That fix lapsed (a flag back on before its patch, a new session after a revoke): the door is his again (D-44) | He turns back toward it |
 | `proxies` | After three IP blocks in a row Death plays from rotating proxies for the rest of the run: blocking addresses no longer cuts him (D-46) | He splits into many shadows |
+| `ticket` | A customer complained (`ticket` is its id in `world.tickets`, `about`, `status`): something the player did failed them (D-65) | A new ticket in the comms console; a phone ringing |
+| `customer-lost` | A customer gave up for good; the heartbeat's maximum is now `max` (D-65) | The top of the heartbeat meter dies a little |
 | `tip-off` | The player tipped Death off | He turns toward the player. Subtle |
 | `patch-applied` | A deploy finished | Small "sealed" beat |
 | `banished` | Every door is closed (soul doors by their real fix, taps included) and no foothold is left, or provisionally with a foothold left (D-44, D-45) | The calm before the ending |

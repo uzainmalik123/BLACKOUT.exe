@@ -1,5 +1,5 @@
 // Every number the engine uses, per difficulty. PRD values cite their row; the rest are D-24 (all "tune").
-import type { ActionId, Difficulty, Feature, MinionId, MoveId, WafRule } from '../rules/vocabulary';
+import type { ActionId, Difficulty, MinionId, MoveId, RequestClass, WafRule } from '../rules/vocabulary';
 
 const REAL_S = 30_000; // one real second in game ms (SYS-01: 1 real s = 30 game s)
 const GAME_MIN = 60_000;
@@ -19,8 +19,15 @@ export interface EngineConfig {
   leakyWaf: boolean; // DEF-12: quiet variants get through on Medium/Hard
   heartbeat: {
     drainPerRealMin: { openDoor: number; minion: number; plug: number; defaced: number; recover: number }; // SYS-06, per REAL minute (D-33)
-    featureWeight: Record<Feature, number>; // per real minute while the feature is off (D-33); D-46's interim weights until SYS-19 measures the cost
     dip: Partial<Record<ActionId, number>>; // D-24: one-off costs
+  };
+  customers: {
+    share: number; // SYS-19, D-65: the share of REC-06's shoppers each loop plays (Easy ≈ 1, Medium ≈ 2, Hard ≈ 4 access lines per real s)
+    cost: Record<RequestClass, number>; // D-65: heartbeat taken at once for each customer request the player's actions fail, by what the customer was doing
+    giveUpAfter: number; // D-65: a shopper who fails this many times in one loop gives up (churn); a `page` failure (an asset, the product list, reviews) annoys but doesn't count
+    churn: number; // D-65: how much the heartbeat's maximum drops, for good, per shopper who gives up
+    recoverAfterGameMs: number; // D-65: SYS-06's recovery waits this long after the last failed customer request
+    rateLimit: { windowMs: number; burst: number }; // D-65: a rate-limited path answers 429 to an address past `burst` hits within `windowMs` recorded ms
   };
   minions: {
     periodGameMs: Record<MinionId, number>; // PRD §4 "Waves (Medium)"
@@ -67,10 +74,17 @@ const MEDIUM: EngineConfig = {
   leakyWaf: true,
   heartbeat: {
     drainPerRealMin: { openDoor: 3, minion: 1.5, plug: 33, defaced: 20, recover: 2 },
-    // D-46 (KI-79, interim): every feature off flatlines the shop in about 10 real minutes, search off alone in about 15.
-    // SYS-19 replaces these with customers' failed requests, complaints and churn lowering the heartbeat's maximum.
-    featureWeight: { search: 6.5, registration: 1.5, 'password-reset': 0.8, uploads: 0.8, ftp: 0.4, 'feedback-captcha': 0.2 },
     dip: { 'DEF-07': 2, 'DEF-09': 10, 'DEF-13': 3, 'DEF-14': 10, 'DEF-16': 1 },
+  },
+  // D-65: a flag, a rate limit, a WAF rule or an IP block costs what it costs the customers (replaces D-46's interim feature weights).
+  // Tuned on Medium, seed 1: everything off flatlines the shop in about 10 real minutes, search off alone in about 15.
+  customers: {
+    share: 0.4,
+    cost: { page: 0.1, search: 1.5, login: 1, signup: 10, basket: 1.5, checkout: 4, feedback: 0.5, complaint: 3, 'password-reset': 2, ftp: 0.5 },
+    giveUpAfter: 2,
+    churn: 1,
+    recoverAfterGameMs: 60 * REAL_S,
+    rateLimit: { windowMs: 15_000, burst: 2 },
   },
   minions: {
     periodGameMs: { 'MIN-01': 120 * REAL_S, 'MIN-02': 180 * REAL_S, 'MIN-03': 240 * REAL_S, 'MIN-04': 300 * REAL_S },
@@ -94,12 +108,12 @@ const MEDIUM: EngineConfig = {
 export const CONFIG: Readonly<Record<Difficulty, EngineConfig>> = {
   easy: {
     ...MEDIUM, pausable: true, breatherGameMs: { min: 45 * REAL_S, max: 60 * REAL_S }, leakyWaf: false,
-    minions: { ...MEDIUM.minions, alongsideDeath: false }, wafEvasion: { 'ATK-01': { a: [], b: ['block-user-agent'] }, 'ATK-08': { d: EASY_LEAKS, e: EASY_LEAKS, f: [], g: [] } },
+    minions: { ...MEDIUM.minions, alongsideDeath: false }, customers: { ...MEDIUM.customers, share: 0.2 }, wafEvasion: { 'ATK-01': { a: [], b: ['block-user-agent'] }, 'ATK-08': { d: EASY_LEAKS, e: EASY_LEAKS, f: [], g: [] } },
     taps: { ...MEDIUM.taps, everyGameMs: { min: 240 * REAL_S, max: 300 * REAL_S } },
   },
   medium: MEDIUM,
   hard: {
-    ...MEDIUM, breatherGameMs: { min: 20 * REAL_S, max: 35 * REAL_S }, minions: { ...MEDIUM.minions, successesPerWave: 2 },
+    ...MEDIUM, breatherGameMs: { min: 20 * REAL_S, max: 35 * REAL_S }, minions: { ...MEDIUM.minions, successesPerWave: 2 }, customers: { ...MEDIUM.customers, share: 0.8 },
     pinnedVariants: { 'ATK-08': { normal: ['f', 'g'], tippedOff: ['f', 'g'] } },
     taps: { ...MEDIUM.taps, everyGameMs: { min: 120 * REAL_S, max: 180 * REAL_S } },
   },

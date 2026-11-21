@@ -9,7 +9,7 @@ import { EMPTY_LIBRARY, type RecordingLibrary } from './library';
 import { SEED_ACCOUNTS } from './seed';
 import { soulsStolen } from './souls';
 import { initialWorld } from './state';
-import { FIXTURE_IPS, FIXTURE_LIBRARY } from './test-fixtures/recordings';
+import { FIXTURE_IPS, FIXTURE_LIBRARY, withTraffic } from './test-fixtures/recordings';
 import { WHOLE_RUN_TIMEOUT_MS } from './test-fixtures/timeouts';
 
 const ips = ['203.0.113.23', '203.0.113.81', '203.0.113.100', '203.0.113.200', '10.0.0.1', 'nope', ...FIXTURE_IPS];
@@ -57,7 +57,8 @@ export function checkEngineInvariants(library: RecordingLibrary, numRuns: number
         expect(soulsStolen(w)).toBeGreaterThanOrEqual(stolen);
         stolen = soulsStolen(w);
         expect(w.heartbeat).toBeGreaterThanOrEqual(0);
-        expect(w.heartbeat).toBeLessThanOrEqual(100);
+        expect(w.heartbeat).toBeLessThanOrEqual(w.heartbeatMax); // D-65: churn lowers the maximum
+        expect(w.heartbeatMax).toBeLessThanOrEqual(100);
       }
       expect(JSON.parse(JSON.stringify(w))).toEqual(w);
     }),
@@ -72,6 +73,10 @@ describe('engine invariants under random play (SYS-17)', () => {
 
   it('holds while Death and the minions actually play (fixture library), including IP blocks mid-move', { timeout: WHOLE_RUN_TIMEOUT_MS }, () => {
     checkEngineInvariants(FIXTURE_LIBRARY, 200);
+  });
+
+  it('holds with the customers playing underneath (D-65): flags, rules, blocks and the plug against the made-up traffic', { timeout: WHOLE_RUN_TIMEOUT_MS }, () => {
+    checkEngineInvariants(withTraffic(FIXTURE_LIBRARY), 150);
   });
 
   it('two runs with the same seed and script produce identical event logs', { timeout: WHOLE_RUN_TIMEOUT_MS }, () => {

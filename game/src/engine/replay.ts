@@ -12,6 +12,7 @@ import { doorHalves, landed, soulKeys } from './doors';
 import { stopperHolds, type VariantInfo } from './facts';
 import type { RecordingLibrary, Variant } from './library';
 import { emit } from './log';
+import { bump, customerAddresses } from './pool';
 import { nextRandom } from './rng';
 import { SEED_ACCOUNTS } from './seed';
 import { breakInto, soulsLeft, steal } from './souls';
@@ -51,6 +52,7 @@ export function breather(world: World): number {
  * play only a slice of its recording (D-41): events `from` up to, not including, `to`.
  */
 export function startReplay(world: World, v: Variant, owner: 'death' | MinionId, ips?: string[], slice?: { from: number; to: number }): Replay {
+  if (v.move === 'CUST') throw new Error('the customer traffic is not a move: SYS-19 plays it (customers.ts)');
   const ratio = CONFIG[world.difficulty].gameMsPerRealMs;
   const saved = owner === 'death' && isMove(v.move) ? world.death.resume[v.move] : undefined;
   const cursor = slice?.from ?? (saved && saved.variant === v.variant && saved.cursor < v.recording.events.length ? saved.cursor : 0);
@@ -138,9 +140,10 @@ function countIpCut(world: World, by: ActionId): void {
 /** D-46 (KI-78): a rotating-proxy pool, drawn from 198.18.0.0/15 (RFC 2544's range: far too many addresses to block by hand). */
 export function proxyPool(world: World): string[] {
   const blocked = new Set(world.firewall.blocked);
+  const held = customerAddresses(world); // D-65: never a customer's
   const pool = new Set<string>();
   while (pool.size < CONFIG[world.difficulty].proxies.pool) {
-    const ip = `198.${18 + Math.floor(nextRandom(world) * 2)}.${Math.floor(nextRandom(world) * 256)}.${1 + Math.floor(nextRandom(world) * 254)}`;
+    const ip = bump(`198.${18 + Math.floor(nextRandom(world) * 2)}.${Math.floor(nextRandom(world) * 256)}.${1 + Math.floor(nextRandom(world) * 254)}`, held);
     if (!blocked.has(ip)) pool.add(ip);
   }
   return [...pool];

@@ -14,7 +14,7 @@ import { initialWorld, type Evidence, type VFile, type World } from './state';
  * Every recording committed in src/recordings/ (REC-02), bundled by Vite (KI-17). Test-only variants such as
  * ATK-08.a, and the retired ATK-08.b/.c, stay in the library; the Director plays only ATK-08's halves (D-31, D-42: `pinnedVariants` in config.ts).
  */
-const COMMITTED = import.meta.glob<Recording>('../recordings/*.json', { eager: true, import: 'default' });
+const COMMITTED = import.meta.glob<Recording>(['../recordings/*.json', '../recordings/traffic/*.json'], { eager: true, import: 'default' }); // traffic/: the customers (D-62)
 export const COMMITTED_LIBRARY: RecordingLibrary = libraryFrom(Object.keys(COMMITTED).sort().map((path) => COMMITTED[path]!));
 
 export interface EngineOptions {
