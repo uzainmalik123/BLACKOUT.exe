@@ -100,14 +100,19 @@ export function checkBanishment(world: World, library: RecordingLibrary): void {
   endRun(world, 'return');
 }
 
+/** D-41: once the ransom (ATK-17, the finale) has landed he starts nothing new; SYS-07 still counts his open routes. */
+export function finaleLanded(world: World): boolean {
+  return world.death.played.some((p) => p.move === 'ATK-17' && p.outcome === 'landed');
+}
+
 function pace(world: World): void {
-  const { pacing, moveGapGameMs } = CONFIG[world.difficulty];
+  const { pacing, breatherGameMs } = CONFIG[world.difficulty];
   const now = world.clock.gameMs;
   const open = openAlerts(world);
   if (open > pacing.delayAboveOpenAlerts) {
     if (!world.death.pacingDelayed) {
       world.death.pacingDelayed = true;
-      world.death.nextMoveAt = Math.max(world.death.nextMoveAt, now) + moveGapGameMs;
+      world.death.nextMoveAt = Math.max(world.death.nextMoveAt, now) + breatherGameMs.max; // unreachable with one wave at a time (KI-58)
     }
   } else world.death.pacingDelayed = false;
   if (open > 0) world.quietAlertsSince = now;
@@ -123,9 +128,13 @@ export function directorTick(world: World, library: RecordingLibrary): void {
     return;
   }
   delete world.death.quietSince;
-  if (world.clock.gameMs < world.death.nextMoveAt) return;
-  const top = Math.max(...candidates.map((m) => m.stage));
-  const move = pick(world, candidates.filter((m) => m.stage === top));
+  if (finaleLanded(world) || world.clock.gameMs < world.death.nextMoveAt) return;
+  if (!CONFIG[world.difficulty].minions.alongsideDeath && world.waves.length > 0) return; // D-41: Easy never overlaps a wave
+  // D-41: not the move just cut by a stopper, unless it is the only one he could pick (KI-56).
+  const fresh = candidates.filter((m) => m.id !== world.death.noRepeat);
+  const pool = fresh.length > 0 ? fresh : candidates;
+  const top = Math.max(...pool.map((m) => m.stage));
+  const move = pick(world, pool.filter((m) => m.stage === top));
   const variants = playableVariants(world, library, move);
   const untried = variants.filter((v) => !world.death.played.some((p) => p.move === move.id && p.variant === v.variant));
   const open = untried.filter((v) => !world.firewall.blocked.includes(v.info.ip));

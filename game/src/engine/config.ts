@@ -9,8 +9,8 @@ export interface EngineConfig {
   pausable: boolean; // SYS-01: only Easy
   tickGameMs: number; // D-24: the engine's sub-step (100 real ms)
   directorPeriodGameMs: number; // SYS-02: every 3 real s
-  moveGapGameMs: number; // D-24: the wait between Death's moves
-  cutRetryGameMs: number; // D-24: the wait after a cut move
+  breatherGameMs: { min: number; max: number }; // D-41: the seeded wait after each of Death's moves, landed or cut (replaces D-24's gaps)
+  ipResumeGameMs: number; // D-24, D-41: the wait before an IP-blocked move carries on from a fresh address
   pacing: { delayAboveOpenAlerts: number; bringForwardAfterQuietGameMs: number }; // SYS-02
   returnDelayGameMs: number; // SYS-07: 2 real min
   patchDurationGameMs: number; // DEF-13: ≈ 20 game min
@@ -24,7 +24,9 @@ export interface EngineConfig {
     periodGameMs: Record<MinionId, number>; // PRD §4 "Waves (Medium)"
     firstWaveGameMs: Record<MinionId, number>; // D-24
     waveDurationGameMs: number; // D-24
-    min02SuccessesPerWave: number; // D-24
+    successesPerWave: number; // D-41: a wave lands at most this many successes (a recorded exfil each)
+    soulCapFraction: number; // D-41: minions take at most this share of the souls over a run (rounded down)
+    alongsideDeath: boolean; // D-41: a wave and a Death move may run at once (the combo); never on Easy
   };
   backupEveryGameMs: number; // DEF-17: hourly snapshots
   scenarioStartIso: string; // D-24
@@ -39,8 +41,8 @@ const MEDIUM: EngineConfig = {
   pausable: false,
   tickGameMs: 3_000,
   directorPeriodGameMs: 3 * REAL_S,
-  moveGapGameMs: 40 * REAL_S,
-  cutRetryGameMs: 10 * REAL_S,
+  breatherGameMs: { min: 30 * REAL_S, max: 45 * REAL_S },
+  ipResumeGameMs: 10 * REAL_S,
   pacing: { delayAboveOpenAlerts: 3, bringForwardAfterQuietGameMs: 60 * REAL_S },
   returnDelayGameMs: 120 * REAL_S,
   patchDurationGameMs: 20 * GAME_MIN,
@@ -54,7 +56,9 @@ const MEDIUM: EngineConfig = {
     periodGameMs: { 'MIN-01': 120 * REAL_S, 'MIN-02': 180 * REAL_S, 'MIN-03': 240 * REAL_S, 'MIN-04': 300 * REAL_S },
     firstWaveGameMs: { 'MIN-01': 30 * REAL_S, 'MIN-02': 60 * REAL_S, 'MIN-03': 90 * REAL_S, 'MIN-04': 120 * REAL_S },
     waveDurationGameMs: 20 * REAL_S,
-    min02SuccessesPerWave: 1,
+    successesPerWave: 1,
+    soulCapFraction: 0.05,
+    alongsideDeath: true,
   },
   backupEveryGameMs: 60 * GAME_MIN,
   scenarioStartIso: '2026-10-31T22:00:00Z',
@@ -63,7 +67,13 @@ const MEDIUM: EngineConfig = {
 };
 
 export const CONFIG: Readonly<Record<Difficulty, EngineConfig>> = {
-  easy: { ...MEDIUM, pausable: true, moveGapGameMs: 60 * REAL_S, leakyWaf: false, wafEvasion: { 'ATK-08': { b: ['block-user-agent'], c: [] } } },
+  easy: {
+    ...MEDIUM, pausable: true, breatherGameMs: { min: 45 * REAL_S, max: 60 * REAL_S }, leakyWaf: false,
+    minions: { ...MEDIUM.minions, alongsideDeath: false }, wafEvasion: { 'ATK-08': { b: ['block-user-agent'], c: [] } },
+  },
   medium: MEDIUM,
-  hard: { ...MEDIUM, moveGapGameMs: 25 * REAL_S, pinnedVariants: { 'ATK-08': { normal: 'c', tippedOff: 'c' } } },
+  hard: {
+    ...MEDIUM, breatherGameMs: { min: 20 * REAL_S, max: 35 * REAL_S }, minions: { ...MEDIUM.minions, successesPerWave: 2 },
+    pinnedVariants: { 'ATK-08': { normal: 'c', tippedOff: 'c' } },
+  },
 };

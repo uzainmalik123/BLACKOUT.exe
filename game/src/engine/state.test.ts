@@ -6,7 +6,7 @@ describe('initialWorld (SYS-04)', () => {
   it('starts with 100 heartbeat, no souls stolen and one Users row per soul', () => {
     const w = initialWorld(1, 'medium');
     expect(w.heartbeat).toBe(100);
-    expect(w.souls).toEqual({ total: SEED_ACCOUNTS.length, stolen: [] });
+    expect(w.souls).toEqual({ total: SEED_ACCOUNTS.length, stolen: [], byMinions: 0 });
     expect(w.accounts).toHaveLength(SEED_ACCOUNTS.length);
   });
 

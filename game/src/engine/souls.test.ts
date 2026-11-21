@@ -1,7 +1,7 @@
 import { LEAKED_PASSWORD_REUSERS, SEED_ACCOUNTS } from './seed';
 import { describe, expect, it } from 'vitest';
 import { eventsOfKind } from './log';
-import { soulsLeft, soulsStolen, steal, stuffOneReuser } from './souls';
+import { minionSoulCap, soulsLeft, soulsStolen, steal, stuffOneReuser } from './souls';
 import { initialWorld } from './state';
 
 describe('souls (SYS-05)', () => {
@@ -40,20 +40,24 @@ describe('souls (SYS-05)', () => {
     expect(soulsLeft(w)).toBe(SEED_ACCOUNTS.length - 1);
   });
 
-  it('MIN-02 only ever breaks into customers who reuse a leaked password (D-26), never an admin, each new one once', () => {
+  it('MIN-02 only ever breaks into customers who reuse a leaked password (D-26), never an admin, each new one once, up to the 5% cap (D-41)', () => {
     const w = initialWorld(3, 'medium');
+    const cap = minionSoulCap(w);
+    expect(cap).toBe(16);
+    expect(cap).toBeLessThan(LEAKED_PASSWORD_REUSERS.length);
     const seen = new Set<number>();
-    for (let i = 0; i < LEAKED_PASSWORD_REUSERS.length; i++) {
+    for (let i = 0; i < cap; i++) {
       const a = stuffOneReuser(w, 'MIN-02')!;
       expect(LEAKED_PASSWORD_REUSERS).toContain(a.id);
       expect(a.role).toBe('customer');
       expect(seen.has(a.id)).toBe(false);
       seen.add(a.id);
     }
-    expect(soulsStolen(w)).toBe(LEAKED_PASSWORD_REUSERS.length);
-    const again = stuffOneReuser(w, 'MIN-02')!; // every reuser taken: still a login (a session for Death), no new soul
+    expect(soulsStolen(w)).toBe(cap);
+    const again = stuffOneReuser(w, 'MIN-02')!; // past the cap: still a login (a session for Death), no new soul
     expect(LEAKED_PASSWORD_REUSERS).toContain(again.id);
-    expect(soulsStolen(w)).toBe(LEAKED_PASSWORD_REUSERS.length);
+    expect(soulsStolen(w)).toBe(cap);
+    expect(steal(w, 'ATK-08', 'Users', [1, 2])).toBe(2); // the cap is the minions' alone
   });
 
   it('MIN-02 cannot use a locked or force-reset account, and finds nothing once every reuser is closed', () => {

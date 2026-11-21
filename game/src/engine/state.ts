@@ -77,6 +77,7 @@ export interface Replay {
   ips?: string[]; // a minion wave's addresses: its access lines rotate through them
   startedAt: number;
   cursor: number; // next recording event to apply
+  endCursor?: number; // D-41: a minion wave's slice stops before this event (after its last success)
   userIds?: Record<string, number>; // recorded Users id → the id it got here, when another account already had it (ATK-06.a and ATK-11.a both insert 326)
 }
 
@@ -119,7 +120,7 @@ export interface World {
   rng: number;
   difficulty: Difficulty;
   clock: { gameMs: number; paused: boolean; lastDirectorTick: number; lastBackupAt: number };
-  souls: { total: number; stolen: Array<{ table: string; key: number }> };
+  souls: { total: number; stolen: Array<{ table: string; key: number }>; byMinions: number }; // byMinions: D-41's 5 % cap
   heartbeat: number;
   accounts: Account[];
   sessions: Session[];
@@ -146,11 +147,13 @@ export interface World {
     quietSince?: number; // SYS-07: routes closed with a foothold left
     returnedThrough?: Foothold;
     resume: Partial<Record<MoveId, { variant: string; cursor: number }>>; // where an IP-cut move continues from a fresh address (D-24)
+    noRepeat?: MoveId; // D-41: cut by a stopper; not picked again until he has started a different move
     nextId: number; // ids for replays, waves, alerts, sessions, backups
   };
   replays: Replay[];
   waves: Wave[];
   nextWaveAt: Record<MinionId, number>;
+  minionCursor: Partial<Record<MinionId, number>>; // D-41: where the next wave's slice of its recording starts
   alerts: Alert[];
   quietAlertsSince: number;
   logs: { access: AccessLine[]; app: AppLine[]; dbChanges: DbChange[] };
@@ -166,7 +169,7 @@ export function initialWorld(seed: number, difficulty: Difficulty): World {
     rng: seed >>> 0,
     difficulty,
     clock: { gameMs: 0, paused: false, lastDirectorTick: 0, lastBackupAt: 0 },
-    souls: { total: SEED_ACCOUNTS.length, stolen: [] },
+    souls: { total: SEED_ACCOUNTS.length, stolen: [], byMinions: 0 },
     heartbeat: 100,
     accounts,
     sessions: [],
@@ -185,6 +188,7 @@ export function initialWorld(seed: number, difficulty: Difficulty): World {
     replays: [],
     waves: [],
     nextWaveAt: { ...config.minions.firstWaveGameMs },
+    minionCursor: {},
     alerts: [],
     quietAlertsSince: 0,
     logs: { access: [], app: [], dbChanges: [] },

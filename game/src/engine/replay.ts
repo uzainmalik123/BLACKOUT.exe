@@ -10,9 +10,10 @@ import { CONFIG } from './config';
 import { stopperHolds, type VariantInfo } from './facts';
 import type { RecordingLibrary, Variant } from './library';
 import { emit } from './log';
+import { nextRandom } from './rng';
 import { SEED_ACCOUNTS } from './seed';
-import { steal } from './souls';
-import type { AccessLine, Replay, World } from './state';
+import { breakInto, steal } from './souls';
+import type { Account, AccessLine, Replay, World } from './state';
 
 const isMove = (id: MoveId | MinionId): id is MoveId => id.startsWith('ATK-');
 
@@ -36,17 +37,30 @@ export function closeAlert(world: World, about: MoveId | MinionId): void {
   emit(world, { kind: 'alert-closed', alert: alert.id, about });
 }
 
-/** Starts playing a variant. Death's moves open an alert and log move-started; waves log their own events. */
-export function startReplay(world: World, v: Variant, owner: 'death' | MinionId, ips?: string[]): Replay {
+/** D-41: the seeded wait after one of Death's moves lands or is stopped. */
+export function breather(world: World): number {
+  const { min, max } = CONFIG[world.difficulty].breatherGameMs;
+  return min + Math.round(nextRandom(world) * (max - min));
+}
+
+/**
+ * Starts playing a variant. Death's moves open an alert and log move-started; waves log their own events. A wave may
+ * play only a slice of its recording (D-41): events `from` up to, not including, `to`.
+ */
+export function startReplay(world: World, v: Variant, owner: 'death' | MinionId, ips?: string[], slice?: { from: number; to: number }): Replay {
   const ratio = CONFIG[world.difficulty].gameMsPerRealMs;
   const saved = owner === 'death' && isMove(v.move) ? world.death.resume[v.move] : undefined;
-  const cursor = saved && saved.variant === v.variant && saved.cursor < v.recording.events.length ? saved.cursor : 0;
-  // An IP-cut move carries on from a fresh address: its next event is due now, as if the tool had never stopped.
+  const cursor = slice?.from ?? (saved && saved.variant === v.variant && saved.cursor < v.recording.events.length ? saved.cursor : 0);
+  // An IP-cut move carries on from a fresh address (and a wave's slice starts) with its next event due now.
   const startedAt = world.clock.gameMs - (cursor > 0 ? v.recording.events[cursor]!.t * ratio : 0);
-  const replay: Replay = { id: nextId(world), owner, move: v.move, variant: v.variant, ip: v.info.ip, recordedIp: v.recording.attackerIp, startedAt, cursor, ...(ips && { ips }) };
+  const replay: Replay = {
+    id: nextId(world), owner, move: v.move, variant: v.variant, ip: v.info.ip, recordedIp: v.recording.attackerIp, startedAt, cursor,
+    ...(ips && { ips }), ...(slice && { endCursor: slice.to }),
+  };
   if (saved && isMove(v.move)) delete world.death.resume[v.move];
   world.replays.push(replay);
   if (owner === 'death' && isMove(v.move)) {
+    if (world.death.noRepeat !== v.move) delete world.death.noRepeat; // D-41: he has started a different move
     openAlert(world, v.move);
     emit(world, { kind: 'move-started', move: v.move, variant: v.variant, stage: MOVE_BY_ID[v.move].stage, ip: v.info.ip });
   }
@@ -61,16 +75,29 @@ function variantOf(library: RecordingLibrary, replay: Replay): Variant | undefin
   return library.variantsOf(replay.move).find((v) => v.variant === replay.variant);
 }
 
-/** Removes a replay. A cut Death move counts as played, logs move-cut, closes its alert and sets a short retry. */
+/**
+ * Removes a replay. A cut Death move counts as played, logs move-cut and closes its alert. An IP block only
+ * interrupts it: it resumes from a fresh address after a short wait (D-24). Any other stopper ends it: a breather,
+ * and he won't pick the same move again until he has started a different one (D-41).
+ */
 export function cutReplay(world: World, replay: Replay, by: ActionId): void {
   world.replays = world.replays.filter((r) => r !== replay);
   if (replay.owner !== 'death' || !isMove(replay.move)) return;
   world.death.played.push({ move: replay.move, variant: replay.variant, outcome: 'cut' });
   if (by === 'DEF-06') world.death.resume[replay.move] = { variant: replay.variant, cursor: replay.cursor };
+  else world.death.noRepeat = replay.move;
   emit(world, { kind: 'move-cut', move: replay.move, variant: replay.variant, by });
   closeAlert(world, replay.move);
-  world.death.nextMoveAt = world.clock.gameMs + (world.death.skipWait ? 0 : CONFIG[world.difficulty].cutRetryGameMs);
+  const wait = by === 'DEF-06' ? CONFIG[world.difficulty].ipResumeGameMs : breather(world);
+  world.death.nextMoveAt = world.clock.gameMs + (world.death.skipWait ? 0 : wait);
   world.death.skipWait = false;
+}
+
+/** A minion success hands Death a user-session for the account it broke into (MIN-02, D-18). */
+export function grantMinionSession(world: World, by: MinionId, victim: Account | undefined): void {
+  if (victim && MINION_BY_ID[by].damage.givesDeath === 'user-session') {
+    world.sessions.push({ id: nextId(world), email: victim.email, kind: 'user', issuedBy: by, keyVersion: world.signingKey.version });
+  }
 }
 
 function whatStops(world: World, replay: Replay, info: VariantInfo): ActionId | undefined {
@@ -162,11 +189,13 @@ function applyEvent(world: World, replay: Replay, e: RecEvent, t: number): void 
       applyFile(world, by, e);
       return;
     case 'exfil':
-      steal(world, by, e.table, e.keys);
+      if (isMove(by)) steal(world, by, e.table, e.keys);
+      else if (e.table === 'Users') for (const key of e.keys) grantMinionSession(world, by, breakInto(world, by, key)); // one recorded success (D-41)
+      else steal(world, by, e.table, e.keys);
   }
 }
 
-/** A Death move that played to the end: its gains land, its alert closes, the next wait starts. */
+/** A Death move that played to the end: its gains land, its alert closes, the breather starts (D-41). */
 function land(world: World, replay: Replay, info: VariantInfo): void {
   world.replays = world.replays.filter((r) => r !== replay);
   if (replay.owner !== 'death' || !isMove(replay.move)) return;
@@ -185,7 +214,7 @@ function land(world: World, replay: Replay, info: VariantInfo): void {
   world.death.played.push({ move: move.id, variant: replay.variant, outcome: 'landed' });
   emit(world, { kind: 'move-landed', move: move.id, variant: replay.variant });
   closeAlert(world, move.id);
-  world.death.nextMoveAt = world.clock.gameMs + (world.death.skipWait ? 0 : CONFIG[world.difficulty].moveGapGameMs);
+  world.death.nextMoveAt = world.clock.gameMs + (world.death.skipWait ? 0 : breather(world));
   world.death.skipWait = false;
 }
 
@@ -200,8 +229,9 @@ export function stepReplays(world: World, library: RecordingLibrary): void {
     }
     const info: VariantInfo = { ...v.info, ip: replay.ip };
     const events = v.recording.events;
+    const end = replay.endCursor ?? events.length;
     const by = whatStops(world, replay, info);
-    if (by === 'DEF-06' && replay.cursor >= events.length) {
+    if (by === 'DEF-06' && replay.cursor >= end) {
       land(world, replay, info); // the tool had already finished; blocking the address changes nothing
       continue;
     }
@@ -210,11 +240,12 @@ export function stepReplays(world: World, library: RecordingLibrary): void {
       continue;
     }
     const now = world.clock.gameMs;
-    while (replay.cursor < events.length && replay.startedAt + events[replay.cursor]!.t * ratio <= now) {
+    while (replay.cursor < end && replay.startedAt + events[replay.cursor]!.t * ratio <= now) {
       applyEvent(world, replay, events[replay.cursor]!, replay.startedAt + events[replay.cursor]!.t * ratio);
       replay.cursor++;
     }
-    if (replay.cursor >= events.length && replay.startedAt + v.recording.durationMs * ratio <= now) land(world, replay, info);
+    const finished = replay.endCursor !== undefined || replay.startedAt + v.recording.durationMs * ratio <= now; // a slice ends at its last event
+    if (replay.cursor >= end && finished) land(world, replay, info);
   }
 }
 

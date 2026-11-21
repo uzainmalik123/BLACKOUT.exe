@@ -3,7 +3,7 @@
 import { describe, expect, it } from 'vitest';
 import { MINION_BY_ID } from '../rules/minions';
 import { MOVE_BY_ID } from '../rules/moves';
-import { FOOTHOLDS, type Feature, type MinionId, type MoveId, type Patch, type PlayerAction, type Stopper } from '../rules/vocabulary';
+import { FOOTHOLDS, type Difficulty, type Feature, type MinionId, type MoveId, type Patch, type PlayerAction, type Stopper } from '../rules/vocabulary';
 import type { GameEvent } from './log';
 import { eventsOfKind } from './log';
 import type { RecEvent } from '../recordings/format';
@@ -12,7 +12,9 @@ import { libraryFrom, type RecordingLibrary } from './library';
 import { runSim, type ScriptedPlayer, type SimResult } from './sim';
 import { soulsStolen } from './souls';
 import { committedLibrary } from './test-fixtures/committed';
-import type { World } from './state';
+import { stepWaves } from './minions';
+import { stepReplays } from './replay';
+import { initialWorld, type World } from './state';
 import { FIXTURE_LIBRARY, fakeRecording } from './test-fixtures/recordings';
 
 const REAL_MIN = 60_000;
@@ -300,4 +302,101 @@ describe('SIM-9: WAF rules against the low-and-slow harvest (D-34)', () => {
       expect(kept(r)).toBeGreaterThanOrEqual(0.9);
     });
   }
+});
+
+describe('D-41: pacing and fairness, in whole runs', () => {
+  const real = committedLibrary();
+  const idle = (seed: number, difficulty: Difficulty, library: RecordingLibrary = real) =>
+    runSim({ seed, difficulty, library, maxRealMs: 20 * REAL_MIN, player: () => [] });
+  const LEVELS: Difficulty[] = ['easy', 'medium', 'hard'];
+
+  /** Walks the log counting running waves and Death moves; returns the most of each ever running at once. */
+  function overlaps(events: GameEvent[]): { waves: number; moves: number; waveWithMove: boolean } {
+    let waves = 0, moves = 0, maxWaves = 0, maxMoves = 0, waveWithMove = false;
+    for (const e of events) {
+      if (e.kind === 'wave-started') waves++;
+      if (e.kind === 'wave-ended') waves--;
+      if (e.kind === 'move-started') moves++;
+      if (e.kind === 'move-landed' || e.kind === 'move-cut') moves--;
+      maxWaves = Math.max(maxWaves, waves);
+      maxMoves = Math.max(maxMoves, moves);
+      if (waves > 0 && moves > 0) waveWithMove = true;
+    }
+    return { waves: maxWaves, moves: maxMoves, waveWithMove };
+  }
+
+  it('an idle run never has two minion waves at once nor two Death moves at once; Easy never runs a wave alongside a move', () => {
+    for (const difficulty of LEVELS) {
+      for (const seed of [1, 2, 3, 4, 5]) {
+        const o = overlaps(idle(seed, difficulty).events);
+        expect(o.waves, `${difficulty} seed ${seed}`).toBe(1);
+        expect(o.moves, `${difficulty} seed ${seed}`).toBe(1);
+        if (difficulty === 'easy') expect(o.waveWithMove, `easy seed ${seed}`).toBe(false);
+      }
+    }
+    expect(overlaps(idle(1, 'medium').events).waveWithMove).toBe(true); // the combo happens on Medium
+  });
+
+  it("breathers: after every move that lands or is stopped, the next one waits within the level's range", () => {
+    for (const difficulty of LEVELS) {
+      const { min, max } = CONFIG[difficulty].breatherGameMs;
+      let checked = 0;
+      for (const seed of [1, 2, 3, 4, 5]) {
+        const events = idle(seed, difficulty).events;
+        events.forEach((e, i) => {
+          if (e.kind !== 'move-landed' && !(e.kind === 'move-cut' && e.by !== 'DEF-06')) return;
+          const next = events.slice(i + 1).find((x) => x.kind === 'move-started');
+          if (!next) return;
+          checked++;
+          expect(next.t - e.t, `${difficulty} seed ${seed}`).toBeGreaterThanOrEqual(min);
+          // Easy may also wait for a wave to end (no combo); Medium/Hard only for the Director's next 3 s tick.
+          if (difficulty !== 'easy') expect(next.t - e.t, `${difficulty} seed ${seed}`).toBeLessThanOrEqual(max + CONFIG[difficulty].directorPeriodGameMs);
+        });
+      }
+      expect(checked, difficulty).toBeGreaterThanOrEqual(10);
+    }
+  });
+
+  it('after a move is cut by a stopper, his next move is a different one (a player who pulls the plug on every break-in, then plugs it back in)', () => {
+    const r = sim(reactor((e, w, act) => {
+      if (e.kind === 'move-started' && MOVE_BY_ID[e.move].stage >= 2 && w.nginx === 'running') act({ type: 'DEF-11' });
+      if (e.kind === 'move-cut' && w.nginx === 'stopped') act({ type: 'DEF-18', what: 'nginx' });
+    }, 0), 8 * REAL_MIN);
+    const cuts = eventsOfKind(r.world, 'move-cut').filter((e) => e.by !== 'DEF-06');
+    expect(cuts.length).toBeGreaterThanOrEqual(3);
+    for (const cut of cuts) {
+      const next = eventsOfKind(r.world, 'move-started').find((e) => e.id > cut.id);
+      if (next) expect(next.move).not.toBe(cut.move);
+    }
+  });
+
+  it('after the ransom (ATK-17) lands no move starts, though stage-5 moves are still open, and the run goes on', () => {
+    const noHarvest = libraryFrom(['ATK-01', 'ATK-03', 'ATK-04', 'ATK-06', 'ATK-11', 'ATK-13', 'ATK-15', 'ATK-17', 'MIN-01', 'MIN-02']
+      .flatMap((m) => real.variantsOf(m as MoveId).map((v) => v.recording)));
+    for (const seed of [1, 2, 3]) {
+      const r = idle(seed, 'medium', noHarvest);
+      const ransom = eventsOfKind(r.world, 'move-landed').find((e) => e.move === 'ATK-17');
+      expect(ransom, `seed ${seed}`).toBeDefined();
+      expect(eventsOfKind(r.world, 'move-started').filter((e) => e.t > ransom!.t), `seed ${seed}`).toEqual([]);
+      const end = eventsOfKind(r.world, 'ending')[0]!;
+      expect(end.ending).toBe('flatline'); // nobody cleaned up the defacement
+      expect(end.t - ransom!.t).toBeGreaterThan(REAL_MIN * 30); // more than a real minute later
+    }
+  });
+
+  it('over two hours of minions alone, they take at most 5% of the souls and keep handing Death sessions past it', () => {
+    const minionsOnly = libraryFrom(['MIN-01', 'MIN-02'].flatMap((m) => real.variantsOf(m as MinionId).map((v) => v.recording)));
+    for (const difficulty of LEVELS) {
+      const w = initialWorld(1, difficulty);
+      for (let i = 0; i < (120 * REAL_MIN) / 100; i++) {
+        w.clock.gameMs += CONFIG[difficulty].tickGameMs;
+        stepReplays(w, minionsOnly);
+        stepWaves(w, minionsOnly);
+      }
+      const cap = Math.floor(w.souls.total * CONFIG[difficulty].minions.soulCapFraction);
+      expect(cap / w.souls.total).toBeLessThanOrEqual(0.05);
+      expect(soulsStolen(w), difficulty).toBe(cap);
+      expect(w.sessions.filter((s) => s.issuedBy === 'MIN-02').length, difficulty).toBeGreaterThan(cap); // sessions past the cap
+    }
+  });
 });
