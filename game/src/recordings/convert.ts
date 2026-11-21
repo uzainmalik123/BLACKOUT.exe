@@ -217,6 +217,10 @@ export function exfilFromResponses(
     throw new Error(`the tool captured ${responses.length} responses, access log has ${access.length} requests`);
   }
   const emails = users.map((u) => u.email).filter((e) => e !== '');
+  // Customers who reused a password share its (unsalted) hash, so a shared hash in a response names
+  // only the users whose email has left too, by then (D-64); a unique hash names its user alone.
+  const hashCount = new Map<string, number>();
+  for (const u of users) hashCount.set(u.password, (hashCount.get(u.password) ?? 0) + 1);
   const leaked = new Set<string>();
   const events: ExfilEvent[] = [];
   responses.forEach((entry, i) => {
@@ -228,7 +232,9 @@ export function exfilFromResponses(
     for (const u of users) {
       const columns = (['email', 'password'] as const).filter((c) => {
         if (u[c] === '' || leaked.has(`${u.id}.${c}`)) return false;
-        return c === 'email' ? carriesEmail(entry.body, u.email, emails) : entry.body.includes(u[c]);
+        if (c === 'email') return carriesEmail(entry.body, u.email, emails);
+        if (!entry.body.includes(u.password)) return false;
+        return hashCount.get(u.password) === 1 || leaked.has(`${u.id}.email`) || carriesEmail(entry.body, u.email, emails);
       });
       if (columns.length === 0) continue;
       columns.forEach((c) => leaked.add(`${u.id}.${c}`));
