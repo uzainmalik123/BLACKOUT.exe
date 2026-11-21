@@ -54,7 +54,7 @@ export type Stopper =
   | { action: 'DEF-10'; feature: Feature }
   | { action: 'DEF-12'; rule: WafRule }
   | { action: 'DEF-13'; patch: Patch }
-  | { action: 'DEF-14'; account: 'used' }
+  | { action: 'DEF-14'; account: 'own' | 'used' } // own: the account he registered is gone (ATK-06); used: every account he uses is gone (ATK-09, D-45)
   | { action: 'DEF-16'; account: 'admin' | 'target' }
   | { action: 'DEF-14' | 'DEF-15' | 'DEF-17' | 'DEF-20'; undo: true };
 

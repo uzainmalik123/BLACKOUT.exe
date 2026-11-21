@@ -1,3 +1,4 @@
+import { footholds } from './facts';
 // SYS-16: the playthrough sims of PRD §10, headless, seed 1, Medium, on the made-up library (test-fixtures).
 // They assert only from the event log (SYS-10). SIM-2's and SIM-5's report lines wait for SYS-11.
 import { describe, expect, it } from 'vitest';
@@ -17,9 +18,10 @@ import { stepWaves } from './minions';
 import { stepReplays } from './replay';
 import { initialWorld, type World } from './state';
 import { FIXTURE_LIBRARY, fakeRecording } from './test-fixtures/recordings';
+import { WHOLE_RUN_TIMEOUT_MS } from './test-fixtures/timeouts';
 
 const REAL_MIN = 60_000;
-const sim = (player: ScriptedPlayer, maxRealMs = 20 * REAL_MIN): SimResult => runSim({ seed: 1, player, library: FIXTURE_LIBRARY, maxRealMs });
+const sim = (player: ScriptedPlayer, maxRealMs = 20 * REAL_MIN, seed = 1): SimResult => runSim({ seed, player, library: FIXTURE_LIBRARY, maxRealMs });
 const ending = (r: SimResult) => eventsOfKind(r.world, 'ending')[0]?.ending;
 const kinds = (r: SimResult) => r.events.map((e) => e.kind);
 
@@ -82,7 +84,7 @@ function bringBack(e: GameEvent, act: Act): void {
   if (e.kind === 'patch-applied' && e.patch in FEATURE_OF_PATCH) act({ type: 'DEF-18', what: FEATURE_OF_PATCH[e.patch as keyof typeof FEATURE_OF_PATCH] });
 }
 
-describe('the playthrough sims (PRD §10, SYS-16)', () => {
+describe('the playthrough sims (PRD §10, SYS-16)', { timeout: WHOLE_RUN_TIMEOUT_MS }, () => {
   it('SIM-1: a player who does nothing loses (every soul or a flatline), never wins, and has lost at least half the souls before the 10th real minute (D-42)', () => {
     const r = sim(() => []);
     expect(['souls-lost', 'flatline']).toContain(ending(r));
@@ -124,22 +126,30 @@ describe('the playthrough sims (PRD §10, SYS-16)', () => {
   it('SIM-4: containing well but never looking for footholds ends in "Banished", then the return through ATK-11', () => {
     // D-30: closing or patching registration stops ATK-11 as well as ATK-06, so this player leaves registration open
     // and gets rid of ATK-06's admin by deleting it (DEF-14, one of ATK-06's stoppers) instead.
-    const r = sim(reactor((e, w, act) => {
+    // The seed decides whether he plants ATK-11 or takes over a customer (ATK-12) at stage 5 before the ransom; the
+    // finale then ends his story moves (D-41). SIM-4 checks every seed where he plants it (KI-80: the others stall).
+    const runs = [1, 2, 3, 4, 5, 6].map((seed) => sim(reactor((e, w, act) => {
       if (e.kind === 'move-started') contain(e.move, e.ip, w, act, { skipFeature: 'registration', skipPatch: 'registration' });
       if (e.kind === 'wave-started') closeMinion(e.minion, act);
       if (e.kind === 'move-landed' && e.move === 'ATK-06') for (const a of w.accounts) if (a.createdBy === 'ATK-06') act({ type: 'DEF-14', email: a.email });
       if (e.kind === 'move-landed') recover(e.move, w, act); // recovers, but never hunts for what he left behind
       bringBack(e, act);
-    }));
-    expect(eventsOfKind(r.world, 'move-landed').map((e) => e.move)).toContain('ATK-11');
-    expect(kinds(r)).toContain('banished');
-    expect(eventsOfKind(r.world, 'return')).toMatchObject([{ through: 'hidden-admin' }]);
-    expect(ending(r)).toBe('return');
+    }), 20 * REAL_MIN, seed));
+    // Runs that stall after the finale with a route he will never play (ATK-02's /ftp, never seen) are KI-80's.
+    const planted = runs.filter((r) => eventsOfKind(r.world, 'move-landed').some((e) => e.move === 'ATK-11') && r.world.ending !== undefined);
+    expect(planted.length).toBeGreaterThanOrEqual(2);
+    for (const r of planted) {
+      expect(kinds(r), `seed ${r.world.seed}`).toContain('banished');
+      expect(ending(r), `seed ${r.world.seed}`).toBe('return');
+      // ATK-11's admin brings him back unless a restore (the recover step) happened to wipe it with the defacement
+      if (r.world.accounts.some((a) => a.createdBy === 'ATK-11')) expect(eventsOfKind(r.world, 'return'), `seed ${r.world.seed}`).toMatchObject([{ through: 'hidden-admin' }]);
+    }
+    expect(planted.filter((r) => eventsOfKind(r.world, 'return')[0]?.through === 'hidden-admin').length).toBeGreaterThanOrEqual(1);
   });
 
-  it('SIM-5: the playbook (snapshot, contain, find and remove footholds, patch, restore, bring back) banishes Death with no return', () => {
+  it('SIM-5: the playbook (snapshot, contain, find and remove footholds, patch, restore, bring back, close every tap) banishes Death with no return', () => {
     let snapshotted = false;
-    const r = sim(reactor((e, w, act) => {
+    const r = sim(withTaps(reactor((e, w, act) => {
       if (e.kind === 'alert-opened' && !snapshotted) {
         snapshotted = true;
         act({ type: 'DEF-05', name: 'initial' });
@@ -152,7 +162,7 @@ describe('the playthrough sims (PRD §10, SYS-16)', () => {
         act({ type: 'DEF-19' });
         act({ type: 'DEF-20', to: 'legal' });
       }
-    }));
+    })));
     expect(ending(r)).toBe('banished');
     expect(eventsOfKind(r.world, 'return')).toEqual([]);
     expect(eventsOfKind(r.world, 'action').some((e) => e.action.type === 'DEF-05')).toBe(true);
@@ -161,11 +171,11 @@ describe('the playthrough sims (PRD §10, SYS-16)', () => {
   });
 
   it('SIM-6: ignoring minions and handling Death perfectly loses noticeable heartbeat and some souls to MIN-02 but can still win', () => {
-    const r = sim(reactor((e, w, act) => {
+    const r = sim(withTaps(reactor((e, w, act) => {
       if (e.kind === 'move-started') contain(e.move, e.ip, w, act, { noLoginRateLimit: true });
       if (e.kind === 'move-landed') eradicate(e.move, w, act);
       bringBack(e, act);
-    }));
+    })));
     expect(eventsOfKind(r.world, 'souls-stolen').filter((e) => e.by === 'MIN-02').length).toBeGreaterThanOrEqual(1);
     const end = eventsOfKind(r.world, 'ending')[0]!;
     expect(end.heartbeat).toBeLessThanOrEqual(90);
@@ -188,6 +198,11 @@ describe('the playthrough sims (PRD §10, SYS-16)', () => {
   });
 });
 
+/** D-44: a win needs every tap closed, so the winning players close each one as it opens. */
+function withTaps(player: ScriptedPlayer): ScriptedPlayer {
+  return (w, realElapsed) => [...player(w, realElapsed), ...closingTaps(w)];
+}
+
 /**
  * D-42: the harvest sims measure the harvest, so their scripted players also close each leaky tap the moment it opens
  * (one WAF path block, as any player who reads the alert would).
@@ -197,7 +212,7 @@ function closingTaps(w: World): PlayerAction[] {
     .map((t) => ({ type: 'DEF-12', rule: TAP_BY_ID[t.id].closedBy.rule }));
 }
 
-describe('SIM-8: the harvest at its recorded speed (D-31, on the halves: D-42)', () => {
+describe('SIM-8: the harvest at its recorded speed (D-31, on the halves: D-42)', { timeout: WHOLE_RUN_TIMEOUT_MS }, () => {
   /** On Hard, ATK-08.f: does the player turn search off within 60 real s of the first SQLITE_ERROR in the app log? */
   function hardHarvest(library: RecordingLibrary, reactAfterRealMs: number | undefined): SimResult {
     let acted = false;
@@ -237,7 +252,7 @@ describe('SIM-8: the harvest at its recorded speed (D-31, on the halves: D-42)',
   }
 });
 
-describe('SYS-06 target times in a running game (D-33)', () => {
+describe('SYS-06 target times in a running game (D-33)', { timeout: WHOLE_RUN_TIMEOUT_MS }, () => {
   const closeAllMinions: PlayerAction[] = [
     { type: 'DEF-07' }, { type: 'DEF-12', rule: { kind: 'block-user-agent', pattern: 'scanner' } },
     { type: 'DEF-12', rule: { kind: 'rate-limit', path: '/api/*' } }, { type: 'DEF-10', feature: 'feedback-captcha', enabled: true },
@@ -275,7 +290,7 @@ describe('SYS-06 target times in a running game (D-33)', () => {
   });
 });
 
-describe('SIM-9: WAF rules against the low-and-slow harvest (D-34, on the halves: D-42)', () => {
+describe('SIM-9: WAF rules against the low-and-slow harvest (D-34, on the halves: D-42)', { timeout: WHOLE_RUN_TIMEOUT_MS }, () => {
   const harvestOnly = (library: RecordingLibrary) =>
     libraryFrom(['ATK-01', 'ATK-08'].flatMap((m) => library.variantsOf(m as 'ATK-01').map((v) => v.recording)));
   /** On Medium (ATK-08.d), 20 s after the first SQLITE_ERROR the player does `actions` once; taps are closed as they open. */
@@ -316,7 +331,7 @@ describe('SIM-9: WAF rules against the low-and-slow harvest (D-34, on the halves
   }
 });
 
-describe('D-41: pacing and fairness, in whole runs', () => {
+describe('D-41: pacing and fairness, in whole runs', { timeout: WHOLE_RUN_TIMEOUT_MS }, () => {
   const real = committedLibrary();
   const idle = (seed: number, difficulty: Difficulty, library: RecordingLibrary = real) =>
     runSim({ seed, difficulty, library, maxRealMs: 20 * REAL_MIN, player: () => [] });
@@ -383,7 +398,7 @@ describe('D-41: pacing and fairness, in whole runs', () => {
     }
   });
 
-  it('after the ransom (ATK-17) lands no move starts, though stage-5 moves are still open, and the run goes on', () => {
+  it('after the ransom (ATK-17) lands no move starts, though stage-5 moves are still open; stuck, he returns through a foothold left (D-46)', () => {
     const noHarvest = libraryFrom(['ATK-01', 'ATK-03', 'ATK-04', 'ATK-06', 'ATK-11', 'ATK-13', 'ATK-15', 'ATK-17', 'MIN-01', 'MIN-02']
       .flatMap((m) => real.variantsOf(m as MoveId).map((v) => v.recording)));
     for (const seed of [1, 2, 3]) {
@@ -392,8 +407,11 @@ describe('D-41: pacing and fairness, in whole runs', () => {
       expect(ransom, `seed ${seed}`).toBeDefined();
       expect(eventsOfKind(r.world, 'move-started').filter((e) => e.t > ransom!.t), `seed ${seed}`).toEqual([]);
       const end = eventsOfKind(r.world, 'ending')[0]!;
-      expect(end.ending).toBe('flatline'); // nobody cleaned up the defacement
-      expect(end.t - ransom!.t).toBeGreaterThan(REAL_MIN * 30); // more than a real minute later
+      // D-46 (KI-80): stuck after the finale, he returns through the foothold the idle player left; or the defacement
+      // flatlines the shop first
+      expect(['return', 'flatline'], `seed ${seed}`).toContain(end.ending);
+      if (end.ending === 'return') expect(footholds(r.world).size, `seed ${seed}`).toBeGreaterThan(0);
+      expect(end.t - ransom!.t).toBeGreaterThan(CONFIG.medium.stuckBreathers * CONFIG.medium.breatherGameMs.max); // at least two breathers later
     }
   });
 

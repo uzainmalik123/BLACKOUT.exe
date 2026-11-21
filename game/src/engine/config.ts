@@ -19,7 +19,7 @@ export interface EngineConfig {
   leakyWaf: boolean; // DEF-12: quiet variants get through on Medium/Hard
   heartbeat: {
     drainPerRealMin: { openDoor: number; minion: number; plug: number; defaced: number; recover: number }; // SYS-06, per REAL minute (D-33)
-    featureWeight: Record<Feature, number>; // D-24's weights, per real minute (D-33)
+    featureWeight: Record<Feature, number>; // per real minute while the feature is off (D-33); D-46's interim weights until SYS-19 measures the cost
     dip: Partial<Record<ActionId, number>>; // D-24: one-off costs
   };
   minions: {
@@ -32,7 +32,14 @@ export interface EngineConfig {
   };
   doors: {
     visitCapFraction: number; // D-42: a visit to a big soul door stops once it has taken this share of the souls left when it started (rounded up)
+    takeAllBelowFraction: number; // D-44: once fewer than this share of the total souls are left, one visit takes the rest
+    pauseGraceGameMs: number; // D-45: a Death move stopped by anything but an IP block freezes in place this long before it is cut
   };
+  proxies: {
+    afterIpCuts: number; // D-46 (KI-78): after this many IP-block cuts in a row he switches to rotating proxies for the rest of the run
+    pool: number; // D-46: addresses in one proxy pool; his lines rotate through them and only blocking all of them cuts him
+  };
+  stuckBreathers: number; // D-46 (KI-80): with nothing he can play for this many of the level's longest breathers, banishment counts only what he can reach
   taps: {
     everyGameMs: { min: number; max: number }; // D-42: the seeded wait before the next leaky tap opens (the first one too)
     maxOpen: number; // D-42: at most this many taps open at once
@@ -60,7 +67,9 @@ const MEDIUM: EngineConfig = {
   leakyWaf: true,
   heartbeat: {
     drainPerRealMin: { openDoor: 3, minion: 1.5, plug: 33, defaced: 20, recover: 2 },
-    featureWeight: { search: 0.3, registration: 0.1, 'password-reset': 0.05, uploads: 0.05, ftp: 0.02, 'feedback-captcha': 0.02 },
+    // D-46 (KI-79, interim): every feature off flatlines the shop in about 10 real minutes, search off alone in about 15.
+    // SYS-19 replaces these with customers' failed requests, complaints and churn lowering the heartbeat's maximum.
+    featureWeight: { search: 6.5, registration: 1.5, 'password-reset': 0.8, uploads: 0.8, ftp: 0.4, 'feedback-captcha': 0.2 },
     dip: { 'DEF-07': 2, 'DEF-09': 10, 'DEF-13': 3, 'DEF-14': 10, 'DEF-16': 1 },
   },
   minions: {
@@ -71,18 +80,21 @@ const MEDIUM: EngineConfig = {
     soulCapFraction: 0.05,
     alongsideDeath: true,
   },
-  doors: { visitCapFraction: 0.5 },
+  doors: { visitCapFraction: 0.5, takeAllBelowFraction: 0.1, pauseGraceGameMs: 10 * REAL_S },
+  proxies: { afterIpCuts: 3, pool: 24 },
+  stuckBreathers: 2,
   taps: { everyGameMs: { min: 180 * REAL_S, max: 240 * REAL_S }, maxOpen: 2, dripEveryGameMs: 60 * REAL_S, dripFraction: 0.01 },
   backupEveryGameMs: 60 * GAME_MIN,
   scenarioStartIso: '2026-10-31T22:00:00Z',
   pinnedVariants: { 'ATK-08': { normal: ['d', 'e'], tippedOff: ['f', 'g'] } }, // D-42: the halves (D-63); .b/.c retired, .a test-only
-  wafEvasion: { 'ATK-08': { d: QUIET_LEAKS, e: QUIET_LEAKS, f: [], g: [] } }, // .d/.e's tamper scripts leak through the SQLi rules; only .f/.g are loud
+  // .d/.e's tamper scripts leak through the SQLi rules; only .f/.g are loud. ATK-01.b's browser agent slips past the ffuf rule (D-46).
+  wafEvasion: { 'ATK-01': { a: [], b: ['block-user-agent'] }, 'ATK-08': { d: QUIET_LEAKS, e: QUIET_LEAKS, f: [], g: [] } },
 };
 
 export const CONFIG: Readonly<Record<Difficulty, EngineConfig>> = {
   easy: {
     ...MEDIUM, pausable: true, breatherGameMs: { min: 45 * REAL_S, max: 60 * REAL_S }, leakyWaf: false,
-    minions: { ...MEDIUM.minions, alongsideDeath: false }, wafEvasion: { 'ATK-08': { d: EASY_LEAKS, e: EASY_LEAKS, f: [], g: [] } },
+    minions: { ...MEDIUM.minions, alongsideDeath: false }, wafEvasion: { 'ATK-01': { a: [], b: ['block-user-agent'] }, 'ATK-08': { d: EASY_LEAKS, e: EASY_LEAKS, f: [], g: [] } },
     taps: { ...MEDIUM.taps, everyGameMs: { min: 240 * REAL_S, max: 300 * REAL_S } },
   },
   medium: MEDIUM,

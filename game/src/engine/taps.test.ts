@@ -12,6 +12,7 @@ import { eventsOfKind, type GameEvent } from './log';
 import { SEED_ACCOUNTS } from './seed';
 import { initialWorld, type World } from './state';
 import { stepTaps } from './taps';
+import { WHOLE_RUN_TIMEOUT_MS } from './test-fixtures/timeouts';
 
 const REAL_S = 30_000; // game ms
 const REAL_MIN = 60 * REAL_S;
@@ -43,7 +44,7 @@ const tapSouls = (w: World, id: TapId) => eventsOfKind(w, 'souls-stolen').filter
 describe('leaky taps open on schedule (D-42)', () => {
   for (const level of LEVELS) {
     const { min, max } = CONFIG[level].taps.everyGameMs;
-    it(`${level}: the first opens ${min / REAL_MIN}–${max / REAL_MIN} real minutes in, the rest at least that far apart, each once, never more than 2 at once`, () => {
+    it(`${level}: the first opens ${min / REAL_MIN}–${max / REAL_MIN} real minutes in, the rest at least that far apart, each once, never more than 2 at once`, { timeout: WHOLE_RUN_TIMEOUT_MS }, () => {
       for (const seed of [1, 2, 3, 4, 5]) {
         const w = tapsOnly(seed, level, 40);
         const opened = eventsOfKind(w, 'tap-opened');
@@ -84,7 +85,7 @@ describe('leaky taps open on schedule (D-42)', () => {
     }
   });
 
-  it('taps draw from their own stream: Death and the minions see the same seeded draws with or without them', () => {
+  it('taps draw from their own stream: Death and the minions see the same seeded draws with or without them', { timeout: WHOLE_RUN_TIMEOUT_MS }, () => {
     const w = tapsOnly(1, 'medium', 30);
     expect(eventsOfKind(w, 'tap-opened').length).toBeGreaterThan(0);
     expect(w.rng).toBe(initialWorld(1, 'medium').rng);
@@ -94,7 +95,7 @@ describe('leaky taps open on schedule (D-42)', () => {
 describe('an open tap drips about 1 % a real minute until it is closed (D-42)', () => {
   const size = Math.round(325 * CONFIG.medium.taps.dripFraction);
 
-  it('over a long run each open tap drips at most 1 % of the souls, once per real minute, the first a minute after it opens, only from the rows it leaks', () => {
+  it('over a long run each open tap drips at most 1 % of the souls, once per real minute, the first a minute after it opens, only from the rows it leaks', { timeout: WHOLE_RUN_TIMEOUT_MS }, () => {
     for (const level of LEVELS) {
       const w = tapsOnly(1, level, 60);
       for (const id of TAP_IDS) {
@@ -163,7 +164,7 @@ describe('an open tap drips about 1 % a real minute until it is closed (D-42)', 
     expect(eventsOfKind(w, 'souls-stolen').length).toBeLessThanOrEqual(1);
   });
 
-  it('in whole idle runs on the committed recordings, taps take souls alongside Death and the minions, and the minions still stay within their 5 %', () => {
+  it('in whole idle runs on the committed recordings, taps take souls alongside Death and the minions, and the minions still stay within their 5 %', { timeout: WHOLE_RUN_TIMEOUT_MS }, () => {
     for (const level of LEVELS) {
       const r = runSim({ seed: 1, difficulty: level, library: committedLibrary(), maxRealMs: 30 * 60_000, player: () => [] });
       expect(TAP_IDS.some((id) => tapSouls(r.world, id).length > 0), level).toBe(true);

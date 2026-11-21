@@ -3,6 +3,7 @@
 import { applyPendingPatches, takeBackupIfDue } from './actions';
 import { realToGameMs } from './clock';
 import { CONFIG } from './config';
+import { refreshDoors } from './doors';
 import { integrateHeartbeat } from './heartbeat';
 import type { RecordingLibrary } from './library';
 import { directorTick } from './director';
@@ -27,6 +28,7 @@ function step(world: World, library: RecordingLibrary, dt: number): void {
   stepReplays(world, library);
   stepWaves(world, library);
   stepTaps(world);
+  refreshDoors(world, library); // D-44: a door is shut only while its fix holds
   integrateHeartbeat(world, dt);
   const config = CONFIG[world.difficulty];
   if (world.clock.gameMs - world.clock.lastDirectorTick >= config.directorPeriodGameMs) {

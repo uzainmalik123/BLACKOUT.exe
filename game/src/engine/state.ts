@@ -80,6 +80,8 @@ export interface Replay {
   endCursor?: number; // D-41: a minion wave's slice stops before this event (after its last success)
   soulCap?: number; // D-42: a big soul door's visit lands once it has taken this many souls (half of those left when it started)
   soulsTaken?: number; // D-42: souls this visit has taken so far
+  takesAll?: boolean; // D-44: started with fewer than 10 % of the souls left: it takes the rest when it lands
+  frozenSince?: number; // D-45: a visit stopped by a fix or the plug waits here, in place, for up to doors.pauseGraceGameMs
   userIds?: Record<string, number>; // recorded Users id → the id it got here, when another account already had it (ATK-06.a and ATK-11.a both insert 326)
 }
 
@@ -156,10 +158,13 @@ export interface World {
     tippedOff: boolean; // he has been tipped off at least once this run (D-31: the quiet harvest)
     quietSince?: number; // SYS-07: routes closed with a foothold left
     returnedThrough?: Foothold;
-    resume: Partial<Record<MoveId, { variant: string; cursor: number; soulCap?: number; soulsTaken?: number }>>; // where an IP-cut move continues from a fresh address (D-24), with a visit's cap (D-42)
+    resume: Partial<Record<MoveId, { variant: string; cursor: number; soulCap?: number; soulsTaken?: number; takesAll?: boolean }>>; // where an IP-cut move continues from a fresh address (D-24), and where a paused visit carries on with its cap (D-42, D-45)
     noRepeat?: MoveId; // D-41: cut by a stopper; not picked again until he has started a different move
-    shutDoors: MoveId[]; // D-42: big soul doors closed for good; he never tries them again
+    shutDoors: MoveId[]; // D-44: big soul doors shut right now (a stopper holds for every half he may play); refreshed every tick, see doors.ts
     lastPick?: 'story' | 'visit'; // D-42: every second move he starts is a visit to one of his open doors
+    ipCutsInRow: number; // D-46: IP-block cuts on his moves since one last landed or was cut by anything else
+    proxies: boolean; // D-46 (KI-78): he switched to rotating proxies (after config.proxies.afterIpCuts IP cuts in a row)
+    stuckSince?: number; // D-46 (KI-80): since when he has had nothing he could play
     nextId: number; // ids for replays, waves, alerts, sessions, backups
   };
   replays: Replay[];
@@ -212,7 +217,7 @@ export function initialWorld(seed: number, difficulty: Difficulty): World {
     backups: [{ id: 0, takenAt: 0, accounts: accounts.map((a) => ({ ...a })), files: [], defacements: [] }],
     evidence: [],
     comms: { notifiedAt: {} },
-    death: { knowledge: [], forgedToken: false, played: [], nextMoveAt: 0, stageSkips: 0, pacingDelayed: false, skipWait: false, tippedOff: false, resume: {}, shutDoors: [], nextId: 1 },
+    death: { knowledge: [], forgedToken: false, played: [], nextMoveAt: 0, stageSkips: 0, pacingDelayed: false, skipWait: false, tippedOff: false, resume: {}, shutDoors: [], ipCutsInRow: 0, proxies: false, nextId: 1 },
     replays: [],
     waves: [],
     nextWaveAt: { ...config.minions.firstWaveGameMs },

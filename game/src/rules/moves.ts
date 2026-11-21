@@ -1,5 +1,5 @@
 // PRD §3: Death's moves, one entry per ATK row, with D-18 (ATK-12/15/16 Needs), D-19 (DEF-12 stops ATK-16) and
-// D-30 (ATK-09/11/17 Needs and stoppers) and D-41 (ATK-13 needs only `map`). prd-sync.test.ts checks every row's stage and stoppers against the PRD table.
+// D-30 (ATK-09/11/17 Needs and stoppers), D-41 (ATK-13 needs only `map`) and D-44 (ATK-10 takes no souls). prd-sync.test.ts checks every row's stage and stoppers against the PRD table.
 // Needs are what must hold for the Director to pick the move; the Director adds stage order on top (SYS-02).
 import type { Foothold, Gain, MoveId, Need, Stage, Stopper } from './vocabulary';
 
@@ -33,14 +33,14 @@ export const MOVES: readonly Move[] = [
   { id: 'ATK-05', stage: 2, name: "Reset a user's password via the security question", attack: 'T1110', needs: [MAP, { featureOn: 'password-reset' }], gains: ['user-session'],
     stoppedBy: [{ action: 'DEF-10', feature: 'password-reset' }, { action: 'DEF-08', account: 'target' }], pri: 'S' },
   { id: 'ATK-06', stage: 3, name: 'Register his own admin', attack: 'T1136', needs: [{ anyOf: [{ anyFoothold: true }, MAP] }], gains: ['own-admin'],
-    stoppedBy: [{ action: 'DEF-10', feature: 'registration' }, { action: 'DEF-13', patch: 'registration' }, { action: 'DEF-14', account: 'used' }], pri: 'M' },
+    stoppedBy: [{ action: 'DEF-10', feature: 'registration' }, { action: 'DEF-13', patch: 'registration' }, { action: 'DEF-14', account: 'own' }], pri: 'M' },
   { id: 'ATK-07', stage: 3, name: 'Reuse a stolen admin token', attack: 'T1550.001', needs: [{ gain: 'admin-session' }], gains: [],
     stoppedBy: [{ action: 'DEF-09' }], pri: 'S' },
   { id: 'ATK-08', stage: 4, name: 'Dump customers through search', attack: 'T1190, T1041', needs: [MAP], gains: ['souls'],
     stoppedBy: [{ action: 'DEF-10', feature: 'search' }, SQLI, { action: 'DEF-12', rule: { kind: 'block-user-agent', pattern: 'sqlmap' } }, { action: 'DEF-13', patch: 'search' }], pri: 'M' }, // which WAF rule stops which variant: D-34
   { id: 'ATK-09', stage: 4, name: 'Scrape users through the admin API', attack: 'T1213', needs: [SESSION], gains: ['souls'],
     stoppedBy: [{ action: 'DEF-08', account: 'used' }, { action: 'DEF-14', account: 'used' }, { action: 'DEF-09' }, { action: 'DEF-13', patch: 'users-access' }], pri: 'M' },
-  { id: 'ATK-10', stage: 4, name: "Walk other customers' baskets", attack: 'T1190', needs: [{ anyOf: [{ gain: 'user-session' }, { anySession: true }] }], gains: ['souls'],
+  { id: 'ATK-10', stage: 4, name: "Walk other customers' baskets", attack: 'T1190', needs: [{ anyOf: [{ gain: 'user-session' }, { anySession: true }] }], gains: [], // D-44: heartbeat only, not a soul door
     stoppedBy: [{ action: 'DEF-13', patch: 'basket-ownership' }, { action: 'DEF-08', account: 'used' }], pri: 'S' },
   { id: 'ATK-11', stage: 5, name: 'Plant a hidden second admin', attack: 'T1136', needs: [MAP], gains: [], foothold: 'hidden-admin',
     stoppedBy: [{ action: 'DEF-10', feature: 'registration' }, { action: 'DEF-13', patch: 'registration' }, { action: 'DEF-14', undo: true }], pri: 'M' }, // DEF-14 removes it once planted
@@ -58,7 +58,7 @@ export const MOVES: readonly Move[] = [
     stoppedBy: [{ action: 'DEF-17', undo: true }, { action: 'DEF-15', undo: true }, { action: 'DEF-20', undo: true }, { action: 'DEF-10', feature: 'uploads' }, PUT_PRODUCTS], pri: 'M' },
 ];
 
-/** D-42: the big soul doors. Once one has landed it is his door: he keeps coming back to it until it is closed for good. */
+/** D-42: the big soul doors. Once one has landed it is his door: he keeps coming back to it while it is open (D-44: a fix shuts it only while it holds). */
 export const SOUL_DOORS: readonly MoveId[] = ['ATK-08', 'ATK-09'];
 
 export const MOVE_BY_ID: Readonly<Record<MoveId, Move>> = Object.fromEntries(MOVES.map((m) => [m.id, m])) as Record<MoveId, Move>;

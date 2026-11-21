@@ -16,6 +16,7 @@ import { FIXTURE_LIBRARY } from './test-fixtures/recordings';
 const load = (file: string) => JSON.parse(readFileSync(new URL(`../recordings/${file}`, import.meta.url), 'utf8')) as Recording;
 const COMMITTED = libraryFrom([load('ATK-03.a.json'), load('ATK-08.a.json')]);
 const medium = CONFIG.medium;
+const GRACE_REAL_MS = medium.doors.pauseGraceGameMs / medium.gameMsPerRealMs + 100; // D-45: a stopped move freezes this long, then is cut
 
 /** Starts a move's first variant as Death and returns the world. */
 function playing(lib: RecordingLibrary, move: Parameters<RecordingLibrary['variantsOf']>[0], variant = 0): World {
@@ -85,7 +86,7 @@ describe('the replay engine (SYS-03)', () => {
     expect(w.logs.access).toHaveLength(n);
   });
 
-  it('cuts the active move when any of its stoppers starts to hold (feature off, WAF rule, patch applied, plug pulled)', () => {
+  it('freezes the active move the tick any of its stoppers starts to hold (feature off, WAF rule, patch applied, plug pulled), and cuts it once the stopper has held for the grace (D-45)', () => {
     const cases: Array<[string, (w: World) => void, string]> = [
       ['feature off', (w) => applyAction(w, { type: 'DEF-10', feature: 'search', enabled: false }), 'DEF-10'],
       ['sqli rule', (w) => applyAction(w, { type: 'DEF-12', rule: { kind: 'sqli' } }), 'DEF-12'],
@@ -98,6 +99,9 @@ describe('the replay engine (SYS-03)', () => {
       const n = w.logs.access.length;
       act(w);
       advance(w, FIXTURE_LIBRARY, 100);
+      expect(w.logs.access, name).toHaveLength(n); // no new line from the next tick on
+      expect(eventsOfKind(w, 'move-cut'), name).toEqual([]); // frozen, not over: a fix protects while it holds
+      advance(w, FIXTURE_LIBRARY, GRACE_REAL_MS);
       expect(eventsOfKind(w, 'move-cut'), name).toMatchObject([{ move: 'ATK-08', by }]);
       expect(w.logs.access, name).toHaveLength(n);
     }
@@ -115,8 +119,9 @@ describe('the replay engine (SYS-03)', () => {
     const easy = initialWorld(1, 'easy');
     easy.waf.push({ kind: 'sqli' });
     startReplay(easy, quiet, 'death');
-    advance(easy, FIXTURE_LIBRARY, 100);
+    advance(easy, FIXTURE_LIBRARY, GRACE_REAL_MS);
     expect(eventsOfKind(easy, 'move-cut')).toMatchObject([{ by: 'DEF-12' }]);
+    expect(eventsOfKind(easy, 'move-landed')).toEqual([]);
   });
 
   it('db and file events shape the world: ATK-06 adds own-admin, ATK-11 the hidden admin, ATK-16 xss-live, ATK-13 a planted file, ATK-05 a user session, ATK-12 a hijack', () => {
@@ -175,7 +180,7 @@ describe('the replay engine (SYS-03)', () => {
     startReplay(w, FIXTURE_LIBRARY.variantsOf('ATK-11')[0]!, 'death');
     advance(w, FIXTURE_LIBRARY, 150); // the insert is in; the move has not ended
     applyAction(w, { type: 'DEF-11' });
-    advance(w, FIXTURE_LIBRARY, 100);
+    advance(w, FIXTURE_LIBRARY, GRACE_REAL_MS);
     expect(eventsOfKind(w, 'move-cut')).toMatchObject([{ move: 'ATK-11', by: 'DEF-11' }]);
     applyAction(w, { type: 'DEF-18', what: 'nginx' });
     startReplay(w, FIXTURE_LIBRARY.variantsOf('ATK-11')[0]!, 'death');

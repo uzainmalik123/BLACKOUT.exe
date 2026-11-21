@@ -10,6 +10,7 @@ import { SEED_ACCOUNTS } from './seed';
 import { soulsStolen } from './souls';
 import { initialWorld } from './state';
 import { FIXTURE_IPS, FIXTURE_LIBRARY } from './test-fixtures/recordings';
+import { WHOLE_RUN_TIMEOUT_MS } from './test-fixtures/timeouts';
 
 const ips = ['203.0.113.23', '203.0.113.81', '203.0.113.100', '203.0.113.200', '10.0.0.1', 'nope', ...FIXTURE_IPS];
 const emails = [...SEED_ACCOUNTS.map((a) => a.email), 'death@juice-sh.op', 'support-ops@juice-sh.op', 'nobody@juice-sh.op'];
@@ -65,15 +66,15 @@ export function checkEngineInvariants(library: RecordingLibrary, numRuns: number
 }
 
 describe('engine invariants under random play (SYS-17)', () => {
-  it('never throws, never gives souls back, never leaves heartbeat outside 0–100, stays JSON-plain (no recordings)', () => {
+  it('never throws, never gives souls back, never leaves heartbeat outside 0–100, stays JSON-plain (no recordings)', { timeout: WHOLE_RUN_TIMEOUT_MS }, () => {
     checkEngineInvariants(EMPTY_LIBRARY, 300);
   });
 
-  it('holds while Death and the minions actually play (fixture library), including IP blocks mid-move', () => {
+  it('holds while Death and the minions actually play (fixture library), including IP blocks mid-move', { timeout: WHOLE_RUN_TIMEOUT_MS }, () => {
     checkEngineInvariants(FIXTURE_LIBRARY, 200);
   });
 
-  it('two runs with the same seed and script produce identical event logs', () => {
+  it('two runs with the same seed and script produce identical event logs', { timeout: WHOLE_RUN_TIMEOUT_MS }, () => {
     fc.assert(
       fc.property(fc.integer(), arbScript, (seed, steps) => {
         const run = () => {

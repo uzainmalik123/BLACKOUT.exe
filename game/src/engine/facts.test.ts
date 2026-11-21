@@ -175,6 +175,10 @@ describe('stopperHolds', () => {
     expect(stopperHolds(w, { action: 'DEF-14', account: 'used' })).toBe(false); // he never had an account of his own
     w.death.played.push({ move: 'ATK-06', variant: 'a', outcome: 'landed' });
     expect(stopperHolds(w, { action: 'DEF-14', account: 'used' })).toBe(true); // he did, and it is gone
+    w.sessions.push({ id: 901, email: 'jim@juice-sh.op', kind: 'user', issuedBy: 'MIN-02', keyVersion: w.signingKey.version });
+    expect(stopperHolds(w, { action: 'DEF-14', account: 'own' })).toBe(true); // ATK-06: his registered account is gone
+    expect(stopperHolds(w, { action: 'DEF-14', account: 'used' })).toBe(false); // ATK-09 (D-45): he still uses jim's account
+    w.sessions.pop();
     w.accounts.push({ id: 326, email: 'death@juice-sh.op', role: 'admin', createdBy: 'ATK-06' });
     expect(stopperHolds(w, { action: 'DEF-14', account: 'used' })).toBe(false);
     w.accounts.pop();

@@ -109,8 +109,13 @@ export function stopperHolds(world: World, stopper: Stopper, variant?: VariantIn
     }
     case 'DEF-13':
       return world.patches.applied.includes(stopper.patch);
-    case 'DEF-14': // the account he registered or planted is gone (only meaningful once he had one)
-      return world.death.played.some((p) => p.outcome === 'landed' && (p.move === 'ATK-06' || p.move === 'ATK-11')) && !world.accounts.some((a) => a.createdBy !== 'seed');
+    case 'DEF-14': { // the account he registered or planted is gone (only meaningful once he had one)
+      const hadOwn = world.death.played.some((p) => p.outcome === 'landed' && (p.move === 'ATK-06' || p.move === 'ATK-11')) && !world.accounts.some((a) => a.createdBy !== 'seed');
+      if (stopper.account === 'own') return hadOwn;
+      // D-45: "on the account he uses" (ATK-09): every account he holds a live session for is gone too, not just his own
+      const used = usedAccountEmails(world);
+      return hadOwn && used.every((e) => account(world, e) === undefined);
+    }
     case 'DEF-16':
       return stopper.account === 'admin' ? account(world, 'admin@juice-sh.op')?.passwordResetAt !== undefined : allReset(world, variant?.targets ?? []);
   }

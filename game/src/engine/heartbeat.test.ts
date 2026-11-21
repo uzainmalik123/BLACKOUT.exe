@@ -26,13 +26,20 @@ describe('heartbeat (SYS-06), rates per real minute (D-33)', () => {
     expect(secondsToFlatline((w) => { w.nginx = 'stopped'; })).toBeCloseTo(181.9, 1);
   });
 
-  it('target times for each cause alone: defacement 5 min, one open door 33 min, one minion 67 min, search off 333 min', () => {
+  it('target times for each cause alone: defacement 5 min, one open door 33 min, one minion 67 min, search off about 15 min (D-46)', () => {
     expect(secondsToFlatline((w) => { w.defacements.push({ productId: 1, kind: 'deface', by: 'ATK-15' }); })).toBeCloseTo(300, 0);
     expect(secondsToFlatline((w) => { w.defacements.push({ productId: 1, kind: 'deface', by: 'ATK-17' }); })).toBeCloseTo(300, 0);
     expect(secondsToFlatline((w) => { w.defacements.push({ productId: 2, kind: 'xss', by: 'ATK-16' }); })).toBeCloseTo(300, 0);
     expect(secondsToFlatline((w) => { w.replays.push(deathReplay); })).toBeCloseTo(2000, 0);
     expect(secondsToFlatline((w) => { w.waves.push(wave); })).toBeCloseTo(4000, 0);
-    expect(secondsToFlatline((w) => { w.features.search = false; })).toBeCloseTo(20_000, -1);
+    expect(secondsToFlatline((w) => { w.features.search = false; })).toBeCloseTo(6000 / 6.5, 0);
+  });
+
+  it('every feature off flatlines the shop within about 10 real minutes (D-46, KI-79 interim)', () => {
+    const t = secondsToFlatline((w) => { for (const f of ['search', 'registration', 'password-reset', 'uploads', 'ftp'] as const) w.features[f] = false; });
+    expect(t).toBeGreaterThan(9 * 60);
+    expect(t).toBeLessThanOrEqual(10.5 * 60);
+    expect(secondsToFlatline((w) => { w.features.search = false; })).toBeLessThanOrEqual(16 * 60);
   });
 
   it('drains per real minute: 33 plug, 20 defaced or XSS, 3 per open door, 1.5 per minion, D-24 weights per disabled feature', () => {

@@ -80,15 +80,17 @@ Every button, console and (later) shell command sends one of these. It returns `
 |---|---|---|
 | `move-started` | Death begins a move | He stirs, the room cools, a panel flickers |
 | `move-landed` | A move succeeded | Death's hand lunges, impact frame, screen shake |
-| `move-cut` | The player stopped a move | He recoils; a hiss |
+| `move-cut` | The player stopped a move (a fix held for 10 real s, or an IP block at once; a visit to a soul door is only paused, D-45) | He recoils; a hiss |
 | `souls-stolen` | `count` souls just taken (`stolen`/`total` so far) | Souls meter drains, wisps fly out |
 | `wave-started` / `wave-ended` | A minion wave arrives / leaves (`closedBy` if the player closed it) | Rats skitter in / scatter |
 | `alert-opened` / `alert-closed` | An alert appears / clears | Alert panel |
 | `tap-opened` / `tap-closed` | A leaky tap starts dripping / stops (`by: 'DEF-12'` if the player closed it, no `by` if it ran dry) | A small leak animation, then a seal |
-| `door-shut` | One of Death's soul doors (`move`) is closed for good (`by` the action that did it); he never tries it again | He recoils from it for good. Don't name the move on screen |
+| `door-shut` | One of Death's soul doors (`move`) is shut (`by` the fix that holds now); he stays away while it holds (D-44) | He recoils from it. Don't name the move on screen |
+| `door-reopened` | That fix lapsed (a flag back on before its patch, a new session after a revoke): the door is his again (D-44) | He turns back toward it |
+| `proxies` | After three IP blocks in a row Death plays from rotating proxies for the rest of the run: blocking addresses no longer cuts him (D-46) | He splits into many shadows |
 | `tip-off` | The player tipped Death off | He turns toward the player. Subtle |
 | `patch-applied` | A deploy finished | Small "sealed" beat |
-| `banished` | Death has no moves left | The calm before the ending |
+| `banished` | Every door is closed (soul doors by their real fix, taps included) and no foothold is left, or provisionally with a foothold left (D-44, D-45) | The calm before the ending |
 | `return` | He came back through a missed foothold | The worst jump-scare of the game |
 | `ending` | The run is over (`ending`, final `souls`, `heartbeat`) | Go to the ending scene |
 | `action` | Something the player did (`ok`, `note`) | Usually nothing; the console already answered |
