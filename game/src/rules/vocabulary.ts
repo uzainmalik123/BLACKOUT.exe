@@ -13,8 +13,12 @@ export type ActionId =
 export type MinionId = 'MIN-01' | 'MIN-02' | 'MIN-03' | 'MIN-04';
 /** The leaky taps (PRD §4.1, D-42): small exposures anyone can scrape. */
 export type TapId = 'TAP-01' | 'TAP-02' | 'TAP-03';
-/** Whoever took souls or wrote a log line: Death, a minion or a leaky tap's scrapers. */
-export type Actor = MoveId | MinionId | TapId;
+/** The customer traffic (REC-06, SYS-19): the one recording that isn't a move. */
+export type CustomerId = 'CUST';
+/** Whoever took souls or wrote a log line: Death, a minion, a leaky tap's scrapers or the customers. */
+export type Actor = MoveId | MinionId | TapId | CustomerId;
+/** What a customer was doing when a request failed (SYS-19, D-65): the backlash charges by class. */
+export type RequestClass = 'page' | 'search' | 'login' | 'signup' | 'basket' | 'checkout' | 'feedback' | 'complaint' | 'password-reset' | 'ftp';
 
 /** What a move gives Death (PRD §3 "Gains"). */
 export type Gain =
@@ -82,6 +86,7 @@ export const PATCHES: readonly Patch[] = ['login', 'registration', 'search', 'ba
 export const FEATURES: readonly Feature[] = ['search', 'registration', 'password-reset', 'uploads', 'ftp', 'feedback-captcha'];
 export const MINION_IDS: readonly MinionId[] = ['MIN-01', 'MIN-02', 'MIN-03', 'MIN-04'];
 export const TAP_IDS: readonly TapId[] = ['TAP-01', 'TAP-02', 'TAP-03'];
+export const REQUEST_CLASSES: readonly RequestClass[] = ['page', 'search', 'login', 'signup', 'basket', 'checkout', 'feedback', 'complaint', 'password-reset', 'ftp'];
 
 /** One player action, as the shell, the consoles and the sims send it to the engine (PRD §5). */
 export type PlayerAction =

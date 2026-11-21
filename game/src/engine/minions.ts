@@ -8,6 +8,7 @@ import { CONFIG } from './config';
 import { stopperHolds } from './facts';
 import type { RecordingLibrary } from './library';
 import { emit } from './log';
+import { bump, customerAddresses } from './pool';
 import { activeDeathReplay, closeAlert, grantMinionSession, openAlert, startReplay } from './replay';
 import { nextRandom } from './rng';
 import { stuffOneReuser } from './souls';
@@ -34,8 +35,9 @@ export function minionClosed(world: World, id: MinionId): boolean {
   return closedBy(world, id) !== undefined;
 }
 
+/** A wave's address, never one a customer holds (D-65). */
 function freshIp(world: World): string {
-  return `203.0.113.${100 + Math.floor(nextRandom(world) * 150)}`;
+  return bump(`203.0.113.${100 + Math.floor(nextRandom(world) * 150)}`, customerAddresses(world), 100, 249);
 }
 
 function startWave(world: World, library: RecordingLibrary, id: MinionId): void {

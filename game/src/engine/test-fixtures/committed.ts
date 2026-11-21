@@ -7,7 +7,9 @@ import { libraryFrom, type RecordingLibrary } from '../library';
 
 const dir = new URL('../../recordings/', import.meta.url);
 
-export function committedLibrary(): RecordingLibrary {
+/** The moves, the minions and, unless `traffic` is false, the customers (traffic/, D-62). */
+export function committedLibrary(traffic = true): RecordingLibrary {
   const files = readdirSync(dir).filter((f) => /^(ATK|MIN)-\d\d\.[a-z]\.json$/.test(f));
-  return libraryFrom(files.map((f) => JSON.parse(readFileSync(new URL(f, dir), 'utf8')) as Recording));
+  const cust = traffic ? readdirSync(new URL('traffic/', dir)).filter((f) => /^CUST\.[a-z]\.json$/.test(f)).map((f) => `traffic/${f}`) : [];
+  return libraryFrom([...files, ...cust].map((f) => JSON.parse(readFileSync(new URL(f, dir), 'utf8')) as Recording));
 }

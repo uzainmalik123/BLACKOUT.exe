@@ -3,13 +3,13 @@
 // and nothing here may ever be copied into src/recordings/. Real recordings replace these as REC-03/REC-05 land.
 import type { AccessEvent, RecEvent, Recording } from '../../recordings/format';
 import { MOVES } from '../../rules/moves';
-import { MINION_IDS, type MinionId, type MoveId } from '../../rules/vocabulary';
+import { MINION_IDS, type CustomerId, type MinionId, type MoveId } from '../../rules/vocabulary';
 import { libraryFrom, type RecordingLibrary } from '../library';
 
 const SHA = (n: number) => n.toString(16).padStart(64, '0');
 
 export function fakeRecording(
-  move: MoveId | MinionId,
+  move: MoveId | MinionId | CustomerId,
   variant: string,
   opts: { ip: string; quiet?: boolean; events?: RecEvent[]; durationMs?: number },
 ): Recording {
@@ -145,6 +145,49 @@ function build(): RecordingLibrary {
 }
 
 export const FIXTURE_LIBRARY: RecordingLibrary = build();
+
+const BROWSERS = [
+  'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15',
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:132.0) Gecko/20100101 Firefox/132.0',
+];
+
+/**
+ * Made-up customer traffic (REC-06's shape, D-65): 8 shoppers on 203.0.113.2–.9 over 60 s, every one doing everything
+ * REC-06's shoppers do, in this order: a page load, the product list and reviews; a search; a login with two typos (three
+ * tries in 3 s: a rate limit 429s the third); a second search; a sign-up; a basket add and a checkout; feedback; a
+ * complaint with an upload; a forgot-password lookup; a look at /ftp. One db insert (a sign-up's Users row) that SYS-19
+ * must never apply. Uniform shoppers, so whichever subset a level plays, every flow is there and the counts are known.
+ */
+export const FIXTURE_VISIT: Array<[string, string, number]> = [
+  ['GET', '/', 200], ['GET', '/main.js', 200], ['GET', '/rest/products/search?q=', 200], ['GET', '/rest/products/1/reviews', 200],
+  ['GET', '/rest/products/search?q=apple', 200],
+  ['POST', '/rest/user/login', 401], ['POST', '/rest/user/login', 401], ['POST', '/rest/user/login', 200], ['GET', '/rest/user/whoami', 200],
+  ['GET', '/rest/products/search?q=juice', 200],
+  ['GET', '/api/SecurityQuestions/', 200], ['POST', '/api/Users/', 201], ['POST', '/api/SecurityAnswers/', 201],
+  ['POST', '/api/BasketItems/', 200], ['GET', '/rest/basket/1', 200], ['POST', '/rest/basket/1/checkout', 200],
+  ['GET', '/rest/captcha/', 200], ['POST', '/api/Feedbacks/', 201],
+  ['POST', '/file-upload', 204], ['POST', '/api/Complaints/', 201],
+  ['GET', '/rest/user/security-question?email=amy%40juice-sh.op', 200], ['POST', '/rest/user/reset-password', 200],
+  ['GET', '/ftp', 200], ['GET', '/ftp/legal.md', 200],
+];
+export const FIXTURE_SHOPPERS = Array.from({ length: 8 }, (_, i) => `203.0.113.${2 + i}`);
+
+export function fakeTraffic(): Recording {
+  const events: RecEvent[] = FIXTURE_SHOPPERS.flatMap((ip, i) =>
+    FIXTURE_VISIT.map(([method, target, status], k): RecEvent => ({ ...access(ip, method, target, status, BROWSERS[i % BROWSERS.length]!, 300), t: 1000 + i * 2000 + k * 1500 })));
+  events.push({ t: 55_000, kind: 'db', op: 'insert', table: 'Users', key: { id: 400 }, after: { id: 400, email: 'new.shopper@example.org', role: 'customer' } });
+  const r = fakeRecording('CUST', 'a', { ip: '203.0.113.1', events, durationMs: 60_000 });
+  return { ...r, label: 'ordinary customers: made-up, 8 shoppers over 60 s' };
+}
+
+export const FIXTURE_TRAFFIC: Recording = fakeTraffic();
+
+/** The same library with the made-up customers playing underneath (SYS-19). */
+export function withTraffic(library: RecordingLibrary, traffic: Recording = FIXTURE_TRAFFIC): RecordingLibrary {
+  const cust = libraryFrom([traffic]).variantsOf('CUST');
+  return { variantsOf: (move) => (move === 'CUST' ? cust : library.variantsOf(move)) };
+}
 
 /** Every attacker address the fixtures use, for tests that want blocks to land mid-move. */
 export const FIXTURE_IPS: readonly string[] = [...MOVES.map((m) => m.id), ...MINION_IDS].flatMap((id) => FIXTURE_LIBRARY.variantsOf(id).map((v) => v.info.ip));

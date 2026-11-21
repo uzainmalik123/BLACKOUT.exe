@@ -7,6 +7,7 @@ import { doorHalves, doorOpenForWin, isDoor, landed, soulKeys, unstolen } from '
 import { anyStopperHolds, footholds, needsHold } from './facts';
 import type { RecordingLibrary, Variant } from './library';
 import { emit, endRun } from './log';
+import { bump, customerAddresses } from './pool';
 import { activeDeathReplay, proxyPool, startReplay } from './replay';
 import { nextRandom, pick } from './rng';
 import type { World } from './state';
@@ -43,14 +44,15 @@ export function pickHalf(world: World, variants: Variant[]): Variant | undefined
 /** The address ranges Death's fresh addresses come from: TEST-NET-3 (D-15), then TEST-NET-2 once it is all blocked (D-45). */
 const RANGES = ['203.0.113', '198.51.100'] as const;
 
-/** A new address for a variant whose recorded IP is blocked: blocking addresses alone never stops him (D-24). */
+/** A new address for a variant whose recorded IP is blocked: blocking addresses alone never stops him (D-24). Never a customer's (D-65). */
 function freshIp(world: World): string {
   const blocked = new Set(world.firewall.blocked);
+  const held = customerAddresses(world);
   const range = RANGES.find((r) => Array.from({ length: 254 }, (_, i) => `${r}.${i + 1}`).some((ip) => !blocked.has(ip))) ?? RANGES[0];
   let ip: string;
   do ip = `${range}.${1 + Math.floor(nextRandom(world) * 254)}`;
   while (blocked.has(ip) && range !== RANGES[0]); // both ranges blocked: any address; the block cuts him again at once
-  return ip;
+  return bump(ip, range === RANGES[0] ? held : new Set([...held, ...blocked])); // a customer's address: step past it without another draw
 }
 
 /** Starts one of Death's variants: from its recorded address, a fresh one if that is blocked (D-24), or a proxy pool (D-46). */

@@ -21,6 +21,7 @@ describe('Engine', () => {
       expect(COMMITTED_LIBRARY.variantsOf(move).map((v) => v.variant), f).toContain(variant);
     }
     expect(COMMITTED_LIBRARY.variantsOf('ATK-08').map((v) => v.variant)).toEqual(['a', 'b', 'c', 'd', 'e', 'f', 'g']); // D-63 halves; D-42 plays only .d–.g
+    expect(COMMITTED_LIBRARY.variantsOf('CUST').map((v) => v.variant)).toEqual(['a']); // the customers, from traffic/ (D-62, D-65)
   });
 
   it('plays both of his sign-ups (ATK-06.a and ATK-11.a record the same new id) as two accounts, in the world and in sqlite3', async () => {
@@ -51,7 +52,7 @@ describe('Engine', () => {
     const e = new Engine({ seed: 1, difficulty: 'medium', baseline: baseline() });
     startReplay(e.world, COMMITTED_LIBRARY.variantsOf('ATK-03')[0]!, 'death');
     e.advance(600);
-    expect(e.accessLog()).toBe('203.0.113.23 - - [31/Oct/2026:22:00:15 +0000] "POST /rest/user/login HTTP/1.1" 200 784 "-" "curl/8.23.0"\n');
+    expect(e.accessLog().split('\n')).toContain('203.0.113.23 - - [31/Oct/2026:22:00:15 +0000] "POST /rest/user/login HTTP/1.1" 200 784 "-" "curl/8.23.0"'); // among the customers' lines (D-65)
     expect(e.act({ type: 'DEF-08', email: 'jim@juice-sh.op' }).ok).toBe(true);
     const g = await e.db();
     expect(g.db.exec("SELECT deletedAt IS NOT NULL FROM Users WHERE email='jim@juice-sh.op'")[0]!.values).toEqual([[1]]);

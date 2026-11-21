@@ -1,6 +1,6 @@
 // The event log (SYS-10): every Death move, minion wave, player action and Kiro call, in game time.
 // The report (SYS-11) and the sims (SYS-16) read only from world.events.
-import type { ActionId, Actor, Ending, Foothold, MinionId, MoveId, Patch, PlayerAction, Stage, TapId } from '../rules/vocabulary';
+import type { ActionId, Actor, Ending, Foothold, MinionId, MoveId, Patch, PlayerAction, RequestClass, Stage, TapId } from '../rules/vocabulary';
 import type { World } from './state';
 
 export type GameEventBody =
@@ -20,6 +20,8 @@ export type GameEventBody =
   | { kind: 'door-shut'; move: MoveId; by: ActionId } // D-44: one of its own stoppers holds for every half he may play
   | { kind: 'door-reopened'; move: MoveId } // D-44: that fix lapsed; the door is his again
   | { kind: 'proxies' } // D-46 (KI-78): after three IP blocks in a row he plays from rotating proxies for the rest of the run
+  | { kind: 'ticket'; ticket: number; about: RequestClass; status: 403 | 429 | 503 | 'blocked' } // D-65: a customer's first failure this loop: a support ticket
+  | { kind: 'customer-lost'; about: RequestClass; max: number } // D-65: a customer gave up (a second failure): the heartbeat's maximum dropped to `max`
   | { kind: 'patch-applied'; patch: Patch }
   | { kind: 'banished' }
   | { kind: 'return'; through: Foothold }
