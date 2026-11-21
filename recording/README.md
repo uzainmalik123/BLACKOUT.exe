@@ -46,5 +46,10 @@ address the attacker gets in the recording (always inside `203.0.113.0/24`).
 | ATK-17.a | `attacks/ATK-17.a.sh` | 203.0.113.171 | `READ_ME_MORTAL.txt` upload and the first product renamed to the demand |
 | MIN-01.a | `attacks/MIN-01.a.sh` | 203.0.113.201 | 24 PHP/WordPress/config probes, zgrab user agent |
 | MIN-02.a | `attacks/MIN-02.a.sh` | 203.0.113.128 to .250 | Credential stuffing, one botnet address per attempt, responses captured |
+| CUST.a | `attacks/CUST.a.sh` | 64 addresses in 203.0.113.2 to .127, none an attacker's | **Not an attack:** ~10 min of ordinary customers (REC-06, D-61), `lib/shoppers.py`; converted to `game/src/recordings/traffic/CUST.a.json` (D-62) |
+
+Customer traffic is recorded the same way: `recording/record.sh CUST a 203.0.113.1` (the third argument is
+only the header's `attackerIp`; every request names its own customer address). `CUST_SCALE=0.05` in the tools
+container's environment runs the same visits 20 times faster, for a quick check of the script.
 
 Stop the rig with `docker compose -f recording/compose.yaml down -v`.
