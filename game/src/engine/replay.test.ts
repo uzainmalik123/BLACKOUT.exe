@@ -46,8 +46,9 @@ describe('the replay engine (SYS-03)', () => {
     expect(w.death.nextMoveAt - w.clock.gameMs).toBeLessThanOrEqual(medium.breatherGameMs.max);
   });
 
-  it('plays ATK-08.a to the end: 402 access lines, 242 app lines, 325 souls stolen, souls-stolen events summing to 325', () => {
+  it('plays ATK-08.a to the end when nothing caps it: 402 access lines, 242 app lines, 325 souls stolen, souls-stolen events summing to 325', () => {
     const w = playing(COMMITTED, 'ATK-08');
+    delete w.replays[0]!.soulCap; // as a reference recording, without D-42's half cap
     advance(w, COMMITTED, 6000);
     expect(w.logs.access).toHaveLength(402);
     expect(w.logs.app).toHaveLength(242);
@@ -55,6 +56,15 @@ describe('the replay engine (SYS-03)', () => {
     expect(eventsOfKind(w, 'souls-stolen').reduce((n, e) => n + e.count, 0)).toBe(325);
     expect(renderAppLog(w).split('\n')[0]).toBe('Error: SQLITE_ERROR: near ",": syntax error');
     expect(w.ending).toBe('souls-lost');
+  });
+
+  it("as one of Death's visits, ATK-08.a stops at half the souls left (163 of 325) and lands (D-42)", () => {
+    const w = playing(COMMITTED, 'ATK-08');
+    expect(w.replays[0]).toMatchObject({ soulCap: 163, soulsTaken: 0 });
+    advance(w, COMMITTED, 6000);
+    expect(soulsStolen(w)).toBe(163);
+    expect(eventsOfKind(w, 'move-landed')).toMatchObject([{ move: 'ATK-08', variant: 'a' }]);
+    expect(w.ending).not.toBe('souls-lost');
   });
 
   it('blocking the IP mid-ATK-08 stops new lines from that IP within one tick', () => {

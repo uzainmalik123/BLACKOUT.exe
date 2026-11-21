@@ -2,7 +2,7 @@
 // Times are game milliseconds since the scenario start (SYS-01). Derived facts (gains, footholds) live in facts.ts.
 import type { Row } from '../recordings/format';
 import type { GameEvent } from './log';
-import type { Difficulty, Ending, Feature, Foothold, MinionId, MoveId, Patch, WafRule } from '../rules/vocabulary';
+import type { Actor, Difficulty, Ending, Feature, Foothold, MinionId, MoveId, Patch, TapId, WafRule } from '../rules/vocabulary';
 import { FEATURE_DEFAULTS } from '../rules/vocabulary';
 import { CONFIG } from './config';
 import { SEED_ACCOUNTS } from './seed';
@@ -58,7 +58,7 @@ export interface AccessLine {
   bytes: number;
   referer: string;
   userAgent: string;
-  by: MoveId | MinionId;
+  by: Actor;
 }
 
 export interface AppLine {
@@ -78,6 +78,8 @@ export interface Replay {
   startedAt: number;
   cursor: number; // next recording event to apply
   endCursor?: number; // D-41: a minion wave's slice stops before this event (after its last success)
+  soulCap?: number; // D-42: a big soul door's visit lands once it has taken this many souls (half of those left when it started)
+  soulsTaken?: number; // D-42: souls this visit has taken so far
   userIds?: Record<string, number>; // recorded Users id → the id it got here, when another account already had it (ATK-06.a and ATK-11.a both insert 326)
 }
 
@@ -93,9 +95,17 @@ export interface Wave {
 
 export interface Alert {
   id: number;
-  about: MoveId | MinionId;
+  about: Actor;
   openedAt: number;
   closedAt?: number;
+}
+
+/** An open leaky tap (D-42, PRD §4.1). */
+export interface OpenTap {
+  id: TapId;
+  openedAt: number;
+  nextDripAt: number;
+  drips: number;
 }
 
 export interface Backup {
@@ -141,19 +151,22 @@ export interface World {
     played: Array<{ move: MoveId; variant: string; outcome: 'landed' | 'cut' }>;
     nextMoveAt: number;
     stageSkips: number; // tip-offs not yet spent (D-19)
-    pacingDelayed: boolean; // SYS-02: the one-off delay for > 3 open alerts has been applied
+    pacingDelayed: boolean; // SYS-02, D-43: the delay for 2+ open alerts has been applied since his last move started
     skipWait: boolean; // a tip-off during an active move: the next wait is skipped when it ends
     tippedOff: boolean; // he has been tipped off at least once this run (D-31: the quiet harvest)
     quietSince?: number; // SYS-07: routes closed with a foothold left
     returnedThrough?: Foothold;
-    resume: Partial<Record<MoveId, { variant: string; cursor: number }>>; // where an IP-cut move continues from a fresh address (D-24)
+    resume: Partial<Record<MoveId, { variant: string; cursor: number; soulCap?: number; soulsTaken?: number }>>; // where an IP-cut move continues from a fresh address (D-24), with a visit's cap (D-42)
     noRepeat?: MoveId; // D-41: cut by a stopper; not picked again until he has started a different move
+    shutDoors: MoveId[]; // D-42: big soul doors closed for good; he never tries them again
+    lastPick?: 'story' | 'visit'; // D-42: every second move he starts is a visit to one of his open doors
     nextId: number; // ids for replays, waves, alerts, sessions, backups
   };
   replays: Replay[];
   waves: Wave[];
   nextWaveAt: Record<MinionId, number>;
   minionCursor: Partial<Record<MinionId, number>>; // D-41: where the next wave's slice of its recording starts
+  taps: { open: OpenTap[]; opened: TapId[]; nextAt: number; rng: number }; // D-42: leaky taps; their own seeded stream, so Death's draws don't move
   alerts: Alert[];
   quietAlertsSince: number;
   logs: { access: AccessLine[]; app: AppLine[]; dbChanges: DbChange[] };
@@ -161,9 +174,24 @@ export interface World {
   ending?: Ending;
 }
 
+/** D-42: the taps' own PRNG state, derived from the run's seed. */
+export function tapSeed(seed: number): number {
+  return (seed ^ 0x7a9c3e15) >>> 0;
+}
+
+/** mulberry32, the same generator as rng.ts, on an explicit state: returns the value and the next state. */
+export function mulberry(state: number): { value: number; state: number } {
+  const next = (state + 0x6d2b79f5) >>> 0;
+  let t = next;
+  t = Math.imul(t ^ (t >>> 15), t | 1);
+  t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+  return { value: ((t ^ (t >>> 14)) >>> 0) / 4294967296, state: next };
+}
+
 export function initialWorld(seed: number, difficulty: Difficulty): World {
   const config = CONFIG[difficulty];
   const accounts = SEED_ACCOUNTS.map((a) => ({ ...a }));
+  const firstTap = mulberry(tapSeed(seed)); // D-42: the first tap opens one seeded interval in
   return {
     seed,
     rng: seed >>> 0,
@@ -184,11 +212,12 @@ export function initialWorld(seed: number, difficulty: Difficulty): World {
     backups: [{ id: 0, takenAt: 0, accounts: accounts.map((a) => ({ ...a })), files: [], defacements: [] }],
     evidence: [],
     comms: { notifiedAt: {} },
-    death: { knowledge: [], forgedToken: false, played: [], nextMoveAt: 0, stageSkips: 0, pacingDelayed: false, skipWait: false, tippedOff: false, resume: {}, nextId: 1 },
+    death: { knowledge: [], forgedToken: false, played: [], nextMoveAt: 0, stageSkips: 0, pacingDelayed: false, skipWait: false, tippedOff: false, resume: {}, shutDoors: [], nextId: 1 },
     replays: [],
     waves: [],
     nextWaveAt: { ...config.minions.firstWaveGameMs },
     minionCursor: {},
+    taps: { open: [], opened: [], nextAt: config.taps.everyGameMs.min + Math.round(firstTap.value * (config.taps.everyGameMs.max - config.taps.everyGameMs.min)), rng: firstTap.state },
     alerts: [],
     quietAlertsSince: 0,
     logs: { access: [], app: [], dbChanges: [] },

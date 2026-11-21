@@ -1,6 +1,6 @@
 // Souls (SYS-05, D-08): one per Users row of the seed (D-24); stolen rows never come back. Accounts Death made
 // himself (ATK-06, ATK-11) are never souls, even when a dump takes them.
-import { SOUL_TABLES, type MinionId, type MoveId } from '../rules/vocabulary';
+import { SOUL_TABLES, type Actor, type MinionId } from '../rules/vocabulary';
 import { CONFIG } from './config';
 import { emit } from './log';
 import { pick } from './rng';
@@ -11,18 +11,22 @@ const isSoulTable = (table: string) => (SOUL_TABLES as readonly string[]).includ
 const SEED_IDS: ReadonlySet<number> = new Set(SEED_ACCOUNTS.map((a) => a.id));
 const REUSERS: ReadonlySet<number> = new Set(LEAKED_PASSWORD_REUSERS);
 
-const isMinion = (by: MoveId | MinionId) => by.startsWith('MIN-');
+const isMinion = (by: Actor) => by.startsWith('MIN-');
 
 /** D-41: how many souls minions may take over a whole run. */
 export function minionSoulCap(world: World): number {
   return Math.floor(world.souls.total * CONFIG[world.difficulty].minions.soulCapFraction);
 }
 
-/** Records the rows an exfil took; returns how many were new souls. Minions stop taking souls at their cap (D-41). */
-export function steal(world: World, by: MoveId | MinionId, table: string, keys: number[]): number {
+/**
+ * Records the rows an exfil took; returns how many were new souls. Minions stop taking souls at their cap (D-41); a
+ * visit to a big soul door stops at `limit` new souls (D-42's half cap).
+ */
+export function steal(world: World, by: Actor, table: string, keys: number[], limit = Infinity): number {
   if (!isSoulTable(table)) return 0;
   let count = 0;
   for (const key of keys) {
+    if (count >= limit) break;
     if (!SEED_IDS.has(key)) continue; // one of Death's own accounts, not a customer
     if (world.souls.stolen.some((s) => s.table === table && s.key === key)) continue;
     if (isMinion(by) && world.souls.byMinions >= minionSoulCap(world)) break;

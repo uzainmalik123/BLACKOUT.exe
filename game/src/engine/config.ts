@@ -3,6 +3,8 @@ import type { ActionId, Difficulty, Feature, MinionId, MoveId, WafRule } from '.
 
 const REAL_S = 30_000; // one real second in game ms (SYS-01: 1 real s = 30 game s)
 const GAME_MIN = 60_000;
+const QUIET_LEAKS: Array<WafRule['kind']> = ['sqli', 'block-user-agent']; // D-34 on Medium/Hard: the quiet harvest's tamper scripts and random agent
+const EASY_LEAKS: Array<WafRule['kind']> = ['block-user-agent']; // D-34 on Easy: the SQLi rule set stops it
 
 export interface EngineConfig {
   gameMsPerRealMs: number; // SYS-01
@@ -11,7 +13,7 @@ export interface EngineConfig {
   directorPeriodGameMs: number; // SYS-02: every 3 real s
   breatherGameMs: { min: number; max: number }; // D-41: the seeded wait after each of Death's moves, landed or cut (replaces D-24's gaps)
   ipResumeGameMs: number; // D-24, D-41: the wait before an IP-blocked move carries on from a fresh address
-  pacing: { delayAboveOpenAlerts: number; bringForwardAfterQuietGameMs: number }; // SYS-02
+  pacing: { delayAtOpenAlerts: number; bringForwardAfterQuietGameMs: number }; // SYS-02; D-43: the delay fires at this many open alerts
   returnDelayGameMs: number; // SYS-07: 2 real min
   patchDurationGameMs: number; // DEF-13: ≈ 20 game min
   leakyWaf: boolean; // DEF-12: quiet variants get through on Medium/Hard
@@ -28,10 +30,19 @@ export interface EngineConfig {
     soulCapFraction: number; // D-41: minions take at most this share of the souls over a run (rounded down)
     alongsideDeath: boolean; // D-41: a wave and a Death move may run at once (the combo); never on Easy
   };
+  doors: {
+    visitCapFraction: number; // D-42: a visit to a big soul door stops once it has taken this share of the souls left when it started (rounded up)
+  };
+  taps: {
+    everyGameMs: { min: number; max: number }; // D-42: the seeded wait before the next leaky tap opens (the first one too)
+    maxOpen: number; // D-42: at most this many taps open at once
+    dripEveryGameMs: number; // D-42: an open tap drips once per real minute
+    dripFraction: number; // D-42: each drip takes this share of the total souls (rounded, at least 1)
+  };
   backupEveryGameMs: number; // DEF-17: hourly snapshots
   scenarioStartIso: string; // D-24
-  /** SYS-08, D-31: the only variant Death may play of these moves, normally and once tipped off. Other variants stay for reference. */
-  pinnedVariants: Partial<Record<MoveId, { normal: string; tippedOff: string }>>;
+  /** SYS-08, D-31, D-42: the only variants Death may play of these moves, normally and once tipped off. Other variants stay for reference. */
+  pinnedVariants: Partial<Record<MoveId, { normal: string[]; tippedOff: string[] }>>;
   /** SYS-08, D-34: the WAF rule kinds each variant of these moves slips past. A move listed here ignores D-24's generic quiet-variant leak. */
   wafEvasion: Partial<Record<MoveId, Record<string, Array<WafRule['kind']>>>>;
 }
@@ -43,7 +54,7 @@ const MEDIUM: EngineConfig = {
   directorPeriodGameMs: 3 * REAL_S,
   breatherGameMs: { min: 30 * REAL_S, max: 45 * REAL_S },
   ipResumeGameMs: 10 * REAL_S,
-  pacing: { delayAboveOpenAlerts: 3, bringForwardAfterQuietGameMs: 60 * REAL_S },
+  pacing: { delayAtOpenAlerts: 2, bringForwardAfterQuietGameMs: 60 * REAL_S },
   returnDelayGameMs: 120 * REAL_S,
   patchDurationGameMs: 20 * GAME_MIN,
   leakyWaf: true,
@@ -60,20 +71,24 @@ const MEDIUM: EngineConfig = {
     soulCapFraction: 0.05,
     alongsideDeath: true,
   },
+  doors: { visitCapFraction: 0.5 },
+  taps: { everyGameMs: { min: 180 * REAL_S, max: 240 * REAL_S }, maxOpen: 2, dripEveryGameMs: 60 * REAL_S, dripFraction: 0.01 },
   backupEveryGameMs: 60 * GAME_MIN,
   scenarioStartIso: '2026-10-31T22:00:00Z',
-  pinnedVariants: { 'ATK-08': { normal: 'b', tippedOff: 'c' } },
-  wafEvasion: { 'ATK-08': { b: ['sqli', 'block-user-agent'], c: [] } }, // .b's tamper scripts leak through the SQLi rules; only .c is loud
+  pinnedVariants: { 'ATK-08': { normal: ['d', 'e'], tippedOff: ['f', 'g'] } }, // D-42: the halves (D-63); .b/.c retired, .a test-only
+  wafEvasion: { 'ATK-08': { d: QUIET_LEAKS, e: QUIET_LEAKS, f: [], g: [] } }, // .d/.e's tamper scripts leak through the SQLi rules; only .f/.g are loud
 };
 
 export const CONFIG: Readonly<Record<Difficulty, EngineConfig>> = {
   easy: {
     ...MEDIUM, pausable: true, breatherGameMs: { min: 45 * REAL_S, max: 60 * REAL_S }, leakyWaf: false,
-    minions: { ...MEDIUM.minions, alongsideDeath: false }, wafEvasion: { 'ATK-08': { b: ['block-user-agent'], c: [] } },
+    minions: { ...MEDIUM.minions, alongsideDeath: false }, wafEvasion: { 'ATK-08': { d: EASY_LEAKS, e: EASY_LEAKS, f: [], g: [] } },
+    taps: { ...MEDIUM.taps, everyGameMs: { min: 240 * REAL_S, max: 300 * REAL_S } },
   },
   medium: MEDIUM,
   hard: {
     ...MEDIUM, breatherGameMs: { min: 20 * REAL_S, max: 35 * REAL_S }, minions: { ...MEDIUM.minions, successesPerWave: 2 },
-    pinnedVariants: { 'ATK-08': { normal: 'c', tippedOff: 'c' } },
+    pinnedVariants: { 'ATK-08': { normal: ['f', 'g'], tippedOff: ['f', 'g'] } },
+    taps: { ...MEDIUM.taps, everyGameMs: { min: 120 * REAL_S, max: 180 * REAL_S } },
   },
 };

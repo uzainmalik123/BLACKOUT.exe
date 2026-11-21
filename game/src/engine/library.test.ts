@@ -32,16 +32,16 @@ describe('the recording library', () => {
     expect(() => libraryFrom([bad as Recording])).toThrow(/attackerIp/);
   });
 
-  it('every fixture recording passes validateRecording and every move and minion has 3 variants', () => {
+  it('every fixture recording passes validateRecording and every move and minion has 3 variants (ATK-08 also its four halves, D-63)', () => {
     for (const id of [...MOVES.map((m) => m.id), ...MINION_IDS]) {
       const vs = FIXTURE_LIBRARY.variantsOf(id);
-      expect(vs.map((v) => v.variant), id).toEqual(['a', 'b', 'c']);
+      expect(vs.map((v) => v.variant), id).toEqual(id === 'ATK-08' ? ['a', 'b', 'c', 'd', 'e', 'f', 'g'] : ['a', 'b', 'c']);
       for (const v of vs) {
         expect(validateRecording(v.recording), `${id}.${v.variant}`).toEqual([]);
         expect(v.recording.move).toBe(id);
       }
       expect(vs[2]!.info.quiet).toBe(true);
-      expect(new Set(vs.map((v) => v.info.ip)).size).toBe(3);
+      expect(new Set(vs.map((v) => v.info.ip)).size).toBe(vs.length);
     }
   });
 

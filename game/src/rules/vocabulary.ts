@@ -11,6 +11,10 @@ export type ActionId =
   | 'DEF-01' | 'DEF-02' | 'DEF-03' | 'DEF-04' | 'DEF-05' | 'DEF-06' | 'DEF-07' | 'DEF-08' | 'DEF-09' | 'DEF-10'
   | 'DEF-11' | 'DEF-12' | 'DEF-13' | 'DEF-14' | 'DEF-15' | 'DEF-16' | 'DEF-17' | 'DEF-18' | 'DEF-19' | 'DEF-20';
 export type MinionId = 'MIN-01' | 'MIN-02' | 'MIN-03' | 'MIN-04';
+/** The leaky taps (PRD §4.1, D-42): small exposures anyone can scrape. */
+export type TapId = 'TAP-01' | 'TAP-02' | 'TAP-03';
+/** Whoever took souls or wrote a log line: Death, a minion or a leaky tap's scrapers. */
+export type Actor = MoveId | MinionId | TapId;
 
 /** What a move gives Death (PRD §3 "Gains"). */
 export type Gain =
@@ -77,6 +81,7 @@ export const FOOTHOLDS: readonly Foothold[] = ['hidden-admin', 'hijacked-user', 
 export const PATCHES: readonly Patch[] = ['login', 'registration', 'search', 'basket-ownership', 'change-password', 'token-verify', 'product-update', 'users-access'];
 export const FEATURES: readonly Feature[] = ['search', 'registration', 'password-reset', 'uploads', 'ftp', 'feedback-captcha'];
 export const MINION_IDS: readonly MinionId[] = ['MIN-01', 'MIN-02', 'MIN-03', 'MIN-04'];
+export const TAP_IDS: readonly TapId[] = ['TAP-01', 'TAP-02', 'TAP-03'];
 
 /** One player action, as the shell, the consoles and the sims send it to the engine (PRD §5). */
 export type PlayerAction =

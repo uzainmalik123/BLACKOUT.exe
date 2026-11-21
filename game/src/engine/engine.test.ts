@@ -8,7 +8,6 @@ import { gains } from './facts';
 import { eventsOfKind } from './log';
 import { startReplay } from './replay';
 import { runSim } from './sim';
-import { soulsStolen } from './souls';
 
 const baseline = () => readFileSync(new URL('../recordings/juiceshop.sqlite', import.meta.url));
 
@@ -20,7 +19,7 @@ describe('Engine', () => {
       const [move, variant] = f.replace(/\.json$/, '').split(/\.(?=[a-z]$)/) as [MoveId, string];
       expect(COMMITTED_LIBRARY.variantsOf(move).map((v) => v.variant), f).toContain(variant);
     }
-    expect(COMMITTED_LIBRARY.variantsOf('ATK-08').map((v) => v.variant)).toEqual(['a', 'b', 'c']);
+    expect(COMMITTED_LIBRARY.variantsOf('ATK-08').map((v) => v.variant)).toEqual(['a', 'b', 'c', 'd', 'e', 'f', 'g']); // D-63 halves; D-42 plays only .d–.g
   });
 
   it('plays both of his sign-ups (ATK-06.a and ATK-11.a record the same new id) as two accounts, in the world and in sqlite3', async () => {
@@ -88,17 +87,20 @@ describe('Engine', () => {
 
 describe('a real run on the committed recordings, nobody at the keyboard (KI-17)', () => {
   const REAL_MIN = 60_000;
-  const idle = (seed: number, difficulty: 'easy' | 'medium' | 'hard') => runSim({ seed, difficulty, library: COMMITTED_LIBRARY, maxRealMs: 20 * REAL_MIN, player: () => [] });
+  // D-42: half a door per visit, so an idle run lasts longer than it did; 30 real minutes is room for every level.
+  const idle = (seed: number, difficulty: 'easy' | 'medium' | 'hard') => runSim({ seed, difficulty, library: COMMITTED_LIBRARY, maxRealMs: 30 * REAL_MIN, player: () => [] });
 
-  it('seed 1, Medium: Death climbs the stages in order (scan, break in, admin, harvest) and takes every soul; no false win', () => {
+  it('seed 1, Medium: Death climbs the stages in order (scan, break in, admin, harvest), keeps robbing the search door, and the player loses; no false win', () => {
     const r = idle(1, 'medium');
     const landed = eventsOfKind(r.world, 'move-landed').map((e) => e.move);
-    expect(landed.map((m) => MOVE_BY_ID[m].stage)).toEqual([1, 2, 3]);
-    expect(eventsOfKind(r.world, 'move-started').map((e) => `${e.move}.${e.variant}`).at(-1)).toBe('ATK-08.b'); // D-31: .b on Medium
+    expect(landed.slice(0, 4).map((m) => MOVE_BY_ID[m].stage)).toEqual([1, 2, 3, 4]);
+    const harvests = eventsOfKind(r.world, 'move-started').filter((e) => e.move === 'ATK-08').map((e) => e.variant);
+    expect(harvests[0]).toBe('d'); // D-42: the quiet halves on Medium
+    expect(harvests.length).toBeGreaterThanOrEqual(3); // he keeps coming back to his door
     expect(eventsOfKind(r.world, 'banished')).toEqual([]);
-    expect(eventsOfKind(r.world, 'ending')).toMatchObject([{ ending: 'souls-lost' }]);
-    expect(soulsStolen(r.world)).toBe(r.world.souls.total);
-    expect(r.realMs).toBeLessThan(10 * REAL_MIN); // SIM-1 on the real recordings
+    expect(['souls-lost', 'flatline']).toContain(eventsOfKind(r.world, 'ending')[0]?.ending);
+    const byTen = eventsOfKind(r.world, 'souls-stolen').filter((e) => e.t <= 10 * REAL_MIN * 30).at(-1)!.stolen;
+    expect(byTen).toBeGreaterThanOrEqual(r.world.souls.total / 2); // SIM-1 on the real recordings (D-42)
   });
 
   it('on every level and a few seeds: stage order holds, he reaches the harvest, ATK-08.a never plays, and an idle player never wins', () => {
@@ -114,7 +116,7 @@ describe('a real run on the committed recordings, nobody at the keyboard (KI-17)
         }
         expect(highest, `${difficulty} seed ${seed}`).toBeGreaterThanOrEqual(3);
         expect(started.some((e) => MOVE_BY_ID[e.move].stage === 4), `${difficulty} seed ${seed}`).toBe(true);
-        expect(started.filter((e) => e.move === 'ATK-08').map((e) => e.variant)).not.toContain('a');
+        for (const v of ['a', 'b', 'c']) expect(started.filter((e) => e.move === 'ATK-08').map((e) => e.variant)).not.toContain(v); // D-42: only the halves
         expect(['souls-lost', 'flatline'], `${difficulty} seed ${seed}`).toContain(eventsOfKind(r.world, 'ending')[0]?.ending); // D-41: after the ransom he stops, and the defacement can flatline the shop first
       }
     }
