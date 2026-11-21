@@ -125,7 +125,7 @@ describe('the replay engine (SYS-03)', () => {
     expect(footholds(run('ATK-14')).has('forged-token')).toBe(true);
     const w17 = run('ATK-17');
     expect(gains(w17).has('ransom')).toBe(true);
-    expect(w17.bannerDefacedBy).toBe('ATK-17');
+    expect(w17.defacements).toEqual([{ productId: 1, kind: 'deface', by: 'ATK-17' }]); // product 1 renamed, as in ATK-17.a
     expect(gains(run('ATK-01')).has('map')).toBe(true);
     expect(gains(run('ATK-04')).has('admin-password')).toBe(true);
     const w06 = run('ATK-06');

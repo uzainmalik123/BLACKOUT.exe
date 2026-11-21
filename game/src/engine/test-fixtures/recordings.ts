@@ -110,9 +110,9 @@ function eventsFor(id: MoveId | MinionId, ip: string, quiet: boolean, variant = 
     ];
     case 'ATK-17': return [
       access(ip, 'POST', '/file-upload', 204, ua ?? 'curl/8.0'),
-      { t: 0, kind: 'file', op: 'add', path: 'READ_ME_MORTAL.txt', size: 66, sha256: SHA(17) },
-      access(ip, 'PUT', '/api/Products/3', 200, ua ?? 'curl/8.0'),
-      { t: 0, kind: 'db', op: 'update', table: 'Products', key: { id: 3 }, before: { description: 'Now with even more' }, after: { description: 'PAY OR THE SOULS BURN' } },
+      { t: 0, kind: 'file', op: 'add', path: 'complaints/READ_ME_MORTAL.txt', size: 66, sha256: SHA(17) },
+      access(ip, 'PUT', '/api/Products/1', 200, ua ?? 'curl/8.0'), // like ATK-17.a: the first product on the home page renamed
+      { t: 0, kind: 'db', op: 'update', table: 'Products', key: { id: 1 }, before: { name: 'Apple Juice (1000ml)', description: 'The all-time classic.' }, after: { name: 'READ_ME_MORTAL', description: 'PAY OR THE SOULS BURN' } },
     ];
     case 'MIN-01': return many(20, (i) => access(ip, 'GET', ['/wp-admin', '/.env', '/phpmyadmin', '/wp-login.php'][i % 4]!, 404, ua ?? 'python-requests/2.31 scanner'));
     case 'MIN-02': return many(10, (i) => access(ip, 'POST', '/rest/user/login', i === 9 ? 200 : 401, ua ?? 'Mozilla/5.0 (stuffer)'));

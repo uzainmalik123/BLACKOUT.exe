@@ -21,7 +21,9 @@ export type Foothold = 'hidden-admin' | 'hijacked-user' | 'planted-file' | 'forg
 /** The feature-flags console (DEF-10). */
 export type Feature = 'search' | 'registration' | 'password-reset' | 'uploads' | 'ftp' | 'feedback-captcha';
 /** The holes the deploy console can patch (DEF-13). */
-export type Patch = 'login' | 'registration' | 'search' | 'basket-ownership' | 'change-password' | 'token-verify' | 'product-update';
+export type Patch =
+  | 'login' | 'registration' | 'search' | 'basket-ownership' | 'change-password' | 'token-verify' | 'product-update'
+  | 'users-access'; // D-30: access control on GET /api/Users (ATK-09)
 /** The WAF console (DEF-12). */
 export type WafRule =
   | { kind: 'sqli' }
@@ -35,7 +37,6 @@ export type Need =
   | { anyOf: Need[] }
   | { anySession: true }
   | { anyFoothold: true }
-  | { anyAdmin: true }
   | { stageGain: Stage }
   | { featureOn: Feature }
   | { loginNotRateLimited: true };
@@ -51,7 +52,7 @@ export type Stopper =
   | { action: 'DEF-13'; patch: Patch }
   | { action: 'DEF-14'; account: 'used' }
   | { action: 'DEF-16'; account: 'admin' | 'target' }
-  | { action: 'DEF-15' | 'DEF-17' | 'DEF-20'; undo: true };
+  | { action: 'DEF-14' | 'DEF-15' | 'DEF-17' | 'DEF-20'; undo: true };
 
 /** The feature flags at the start of a run: everything on, the feedback CAPTCHA off. */
 export const FEATURE_DEFAULTS: Readonly<Record<Feature, boolean>> = {
@@ -69,7 +70,11 @@ export const RETURN_GRANTS: Readonly<Record<Foothold, Gain>> = {
 };
 
 export const STAGES: readonly Stage[] = [1, 2, 3, 4, 5, 6];
+export const GAINS: readonly Gain[] = [
+  'map', 'secrets-leaked', 'admin-session', 'admin-password', 'user-session', 'own-admin', 'souls', 'defaced', 'xss-live', 'ransom',
+];
 export const FOOTHOLDS: readonly Foothold[] = ['hidden-admin', 'hijacked-user', 'planted-file', 'forged-token'];
+export const PATCHES: readonly Patch[] = ['login', 'registration', 'search', 'basket-ownership', 'change-password', 'token-verify', 'product-update', 'users-access'];
 export const FEATURES: readonly Feature[] = ['search', 'registration', 'password-reset', 'uploads', 'ftp', 'feedback-captcha'];
 export const MINION_IDS: readonly MinionId[] = ['MIN-01', 'MIN-02', 'MIN-03', 'MIN-04'];
 

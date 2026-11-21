@@ -77,6 +77,7 @@ export interface Replay {
   ips?: string[]; // a minion wave's addresses: its access lines rotate through them
   startedAt: number;
   cursor: number; // next recording event to apply
+  userIds?: Record<string, number>; // recorded Users id → the id it got here, when another account already had it (ATK-06.a and ATK-11.a both insert 326)
 }
 
 export interface Wave {
@@ -102,7 +103,6 @@ export interface Backup {
   accounts: Account[];
   files: VFile[];
   defacements: Defacement[];
-  bannerDefacedBy?: MoveId;
 }
 
 export interface Evidence {
@@ -125,8 +125,7 @@ export interface World {
   sessions: Session[];
   signingKey: { version: number; rotatedAt?: number };
   files: VFile[];
-  defacements: Defacement[];
-  bannerDefacedBy?: MoveId;
+  defacements: Defacement[]; // ATK-15/16, and ATK-17's renamed first product (no route writes the banner: KI-03)
   features: Record<Feature, boolean>;
   firewall: { blocked: string[] };
   waf: WafRule[];
