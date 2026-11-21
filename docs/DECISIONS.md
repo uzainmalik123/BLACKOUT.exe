@@ -39,6 +39,7 @@
 | D-35 | ATK-08.b is quiet as well as slow: `--random-agent` and the `randomcase` tamper script, still with `--delay` (~2.5 min); ATK-08.c keeps sqlmap's own user agent (closes KI-22) | Accepted |
 | D-36 | New split: Uzain builds the brain (engine, shell logic, Kiro server, report grading, recordings, content text, hosting); the teammate builds every scene, the renderer, art, sound and the terminal window, from `docs/SCENES.md` and `docs/ENGINE_API.md` | Accepted |
 | D-40 | The engine synced to the PRD after D-30: the PRD's text follows D-24 (DEF-06 only interrupts ATK-01; SYS-03's resume; SYS-07 counts what the Director could pick); DEF-14 on ATK-11 is an undo; ATK-17 defaces product 1; souls are seed rows only; MIN-02 breaks into leaked-password reusers only; a colliding sign-up gets the next free id; a test holds `moves.ts` to PRD §3 | Accepted |
+| D-60 | Ordinary customer traffic: a recorded shopper loop (REC-06) plays under everything (SYS-19), from an address pool shared with Death and the minions, and shows the cost of the player's actions as customers' failed requests | Accepted |
 
 ### D-01: Pivot to an incident-response game
 - **Context:** (2026-11-08) Reanimator raised dead repos so Death could attack them. Any agent can revive a repo on its own, so the product added nothing, and the UI had drifted into a pile of screens with no vision.
@@ -209,4 +210,9 @@
   - **SYS-17 gets a PRD test** (`game/src/rules/prd-sync.test.ts`): it parses PRD §3 and fails when a move's stage, priority, stoppers (the DEF ids in "Stopped by", notes in brackets and later sentences left out), gains or the gains its Needs name differ from `moves.ts`, and when §3/§5's summary counts don't match the rows.
   - **SIM-4's scripted player** leaves registration open (closing or patching it now stops ATK-11 too, D-30) and deletes ATK-06's admin instead.
 - **Consequences:** a PRD ruling on Death's moves that isn't mirrored in the rules data now fails `npm run health`. Every committed recording plays in a real run (KI-17 closed). Questions this raised for the team are KI-48 to KI-51.
+
+### D-60: Customer traffic
+- **Context:** (2026-11-21) KI-60: the logs only ever held Death's and the minions' requests, so every line was suspicious, the briefing's "what normal looks like" had nothing to compare against, and spotting the attacker was far easier than in a real incident.
+- **Decision:** REC-06 records a loop of ordinary shoppers on the same rig; SYS-19 plays it underneath everything. Customers, Death and the minions draw addresses from one pool across all three documentation ranges (192.0.2.0/24, 198.51.100.0/24, 203.0.113.0/24), so the range never gives anyone away; recordings keep D-15's rewrite to 203.0.113.0/24 and the engine remaps at replay. Customer requests react to the player's actions (`503` for a disabled feature, `429` for a rate limit, blocked by matching WAF rules and blocked IPs, absent with the plug pulled).
+- **Consequences:** the heartbeat cost of an action becomes visible as real customers failing, which is the business side of containment (NIST 800-61). The engine's IP handling changes from "always 203.0.113.0/24" to the shared pool. Decision and issue numbers 60–79 are this work's block.
 

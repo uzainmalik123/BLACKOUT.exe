@@ -38,7 +38,7 @@
 | KI-51 | ATK-13's Needs say "any session", but KI-03 found the complaint upload needs no login (the same kind of finding D-30 ruled on for ATK-09/11/17). `moves.ts` follows the PRD row; the team rules | Minor | Open |
 | KI-52 | Replayed sign-ups keep their related rows' recorded ids: in the shell's `sqlite3`, ATK-11's `Wallets` row (id 326) replaces ATK-06's, and ATK-06.a's and MIN-02.a's `Baskets` rows share ids (6…) and overwrite each other (`INSERT OR REPLACE`). The engine's accounts and the `Users` rows are right (D-40); only these side tables in the shell's copy are off | Minor | Open |
 | KI-53 | ATK-08.b's recording label still says `space2randomblank`; D-35 recorded it with the `randomcase` tamper. The label is shown nowhere yet, and the engine reads only its `quiet` prefix (D-24) | Minor | Open |
-| KI-60 | The logs only ever contain Death's and the minions' traffic: no recording or engine part produces ordinary customer traffic. The briefing's "what normal looks like" (CON-01) describes it, but the player never sees it, so every line in the log is suspicious and spotting the attacker is easier than in a real incident. Needs a PRD row (e.g. a recorded customer-traffic loop played underneath everything) | Major | Open |
+| KI-60 | The logs only ever contain Death's and the minions' traffic: no recording or engine part produces ordinary customer traffic. The briefing's "what normal looks like" (CON-01) describes it, but the player never sees it, so every line in the log is suspicious and spotting the attacker is easier than in a real incident. Ruled: REC-06 + SYS-19 (D-60); closes when both are done | Major | Open |
 
 ### KI-03: Juice Shop facts (v20.4.0, checked 2026-11-17 and 2026-11-20)
 
