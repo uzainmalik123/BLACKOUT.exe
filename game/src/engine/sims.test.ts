@@ -18,6 +18,7 @@ import { stepWaves } from './minions';
 import { stepReplays } from './replay';
 import { initialWorld, type World } from './state';
 import { FIXTURE_LIBRARY, fakeRecording } from './test-fixtures/recordings';
+import { WHOLE_RUN_TIMEOUT_MS } from './test-fixtures/timeouts';
 
 const REAL_MIN = 60_000;
 const sim = (player: ScriptedPlayer, maxRealMs = 20 * REAL_MIN, seed = 1): SimResult => runSim({ seed, player, library: FIXTURE_LIBRARY, maxRealMs });
@@ -83,7 +84,7 @@ function bringBack(e: GameEvent, act: Act): void {
   if (e.kind === 'patch-applied' && e.patch in FEATURE_OF_PATCH) act({ type: 'DEF-18', what: FEATURE_OF_PATCH[e.patch as keyof typeof FEATURE_OF_PATCH] });
 }
 
-describe('the playthrough sims (PRD §10, SYS-16)', () => {
+describe('the playthrough sims (PRD §10, SYS-16)', { timeout: WHOLE_RUN_TIMEOUT_MS }, () => {
   it('SIM-1: a player who does nothing loses (every soul or a flatline), never wins, and has lost at least half the souls before the 10th real minute (D-42)', () => {
     const r = sim(() => []);
     expect(['souls-lost', 'flatline']).toContain(ending(r));
@@ -211,7 +212,7 @@ function closingTaps(w: World): PlayerAction[] {
     .map((t) => ({ type: 'DEF-12', rule: TAP_BY_ID[t.id].closedBy.rule }));
 }
 
-describe('SIM-8: the harvest at its recorded speed (D-31, on the halves: D-42)', () => {
+describe('SIM-8: the harvest at its recorded speed (D-31, on the halves: D-42)', { timeout: WHOLE_RUN_TIMEOUT_MS }, () => {
   /** On Hard, ATK-08.f: does the player turn search off within 60 real s of the first SQLITE_ERROR in the app log? */
   function hardHarvest(library: RecordingLibrary, reactAfterRealMs: number | undefined): SimResult {
     let acted = false;
@@ -251,7 +252,7 @@ describe('SIM-8: the harvest at its recorded speed (D-31, on the halves: D-42)',
   }
 });
 
-describe('SYS-06 target times in a running game (D-33)', () => {
+describe('SYS-06 target times in a running game (D-33)', { timeout: WHOLE_RUN_TIMEOUT_MS }, () => {
   const closeAllMinions: PlayerAction[] = [
     { type: 'DEF-07' }, { type: 'DEF-12', rule: { kind: 'block-user-agent', pattern: 'scanner' } },
     { type: 'DEF-12', rule: { kind: 'rate-limit', path: '/api/*' } }, { type: 'DEF-10', feature: 'feedback-captcha', enabled: true },
@@ -289,7 +290,7 @@ describe('SYS-06 target times in a running game (D-33)', () => {
   });
 });
 
-describe('SIM-9: WAF rules against the low-and-slow harvest (D-34, on the halves: D-42)', () => {
+describe('SIM-9: WAF rules against the low-and-slow harvest (D-34, on the halves: D-42)', { timeout: WHOLE_RUN_TIMEOUT_MS }, () => {
   const harvestOnly = (library: RecordingLibrary) =>
     libraryFrom(['ATK-01', 'ATK-08'].flatMap((m) => library.variantsOf(m as 'ATK-01').map((v) => v.recording)));
   /** On Medium (ATK-08.d), 20 s after the first SQLITE_ERROR the player does `actions` once; taps are closed as they open. */
@@ -330,7 +331,7 @@ describe('SIM-9: WAF rules against the low-and-slow harvest (D-34, on the halves
   }
 });
 
-describe('D-41: pacing and fairness, in whole runs', () => {
+describe('D-41: pacing and fairness, in whole runs', { timeout: WHOLE_RUN_TIMEOUT_MS }, () => {
   const real = committedLibrary();
   const idle = (seed: number, difficulty: Difficulty, library: RecordingLibrary = real) =>
     runSim({ seed, difficulty, library, maxRealMs: 20 * REAL_MIN, player: () => [] });

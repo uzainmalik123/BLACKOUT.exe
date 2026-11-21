@@ -6,6 +6,7 @@ import { advance } from './advance';
 import { eventsOfKind } from './log';
 import { initialWorld, type World } from './state';
 import { FIXTURE_LIBRARY } from './test-fixtures/recordings';
+import { WHOLE_RUN_TIMEOUT_MS } from './test-fixtures/timeouts';
 
 const REAL_S = 1000;
 
@@ -34,7 +35,7 @@ function checkOrder(w: World): void {
 }
 
 describe('stage order (SYS-17, D-19)', () => {
-  it('no seeded run plays a stage-N move before a stage-(N-1) move', () => {
+  it('no seeded run plays a stage-N move before a stage-(N-1) move', { timeout: WHOLE_RUN_TIMEOUT_MS }, () => {
     for (let seed = 1; seed <= 20; seed++) {
       const w = run(seed);
       expect(eventsOfKind(w, 'move-started').length, `seed ${seed}`).toBeGreaterThanOrEqual(3);

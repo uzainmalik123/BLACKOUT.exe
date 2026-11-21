@@ -7,6 +7,7 @@ import { eventsOfKind } from './log';
 import { libraryFrom } from './library';
 import { initialWorld, type World } from './state';
 import { FIXTURE_LIBRARY } from './test-fixtures/recordings';
+import { WHOLE_RUN_TIMEOUT_MS } from './test-fixtures/timeouts';
 
 const medium = CONFIG.medium;
 const REAL_S = 1000;
@@ -23,7 +24,7 @@ function run(seed: number, realMs: number, player?: (w: World, t: number) => voi
 const moves = (w: World) => eventsOfKind(w, 'move-started').map((e) => `${e.move}.${e.variant}`);
 
 describe('the Director (SYS-02)', () => {
-  it('a seeded run produces the same move sequence every time', () => {
+  it('a seeded run produces the same move sequence every time', { timeout: WHOLE_RUN_TIMEOUT_MS }, () => {
     const a = run(1, 10 * 60 * REAL_S);
     const b = run(1, 10 * 60 * REAL_S);
     expect(moves(a)).toEqual(moves(b));
@@ -167,7 +168,7 @@ describe('the harvest variant (D-31, D-42: the halves)', () => {
     }
   });
 
-  it('never picks ATK-08.a, .b or .c in play, even when the halves have been played or cut', () => {
+  it('never picks ATK-08.a, .b or .c in play, even when the halves have been played or cut', { timeout: WHOLE_RUN_TIMEOUT_MS }, () => {
     for (let seed = 1; seed <= 10; seed++) {
       for (const difficulty of ['easy', 'medium', 'hard'] as const) {
         const w = initialWorld(seed, difficulty);

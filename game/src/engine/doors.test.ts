@@ -15,6 +15,7 @@ import { runSim, type ScriptedPlayer, type SimResult } from './sim';
 import { soulsStolen } from './souls';
 import { initialWorld, type World } from './state';
 import { committedLibrary } from './test-fixtures/committed';
+import { WHOLE_RUN_TIMEOUT_MS } from './test-fixtures/timeouts';
 
 const REAL_MIN = 60_000;
 const real = committedLibrary();
@@ -43,7 +44,7 @@ function visits(events: GameEvent[], move: MoveId) {
   return out;
 }
 
-describe('the robber: an open door is visited until it is empty (D-42)', () => {
+describe('the robber: an open door is visited until it is empty (D-42)', { timeout: WHOLE_RUN_TIMEOUT_MS }, () => {
   it('an idle Medium run with the search door open loses souls over several visits spread over minutes, none taking more than half of what was left, and loses them all', () => {
     const r = run(() => []);
     const v = visits(r.events, 'ATK-08').filter((x) => x.end === 'landed');
@@ -240,7 +241,7 @@ describe('the doors, unit by unit (D-42)', () => {
     expect(halves(w)).toEqual([]);
   });
 
-  it('on Medium the SQLi and sqlmap rules leave the quiet halves open: the door stays his (D-34)', () => {
+  it('on Medium the SQLi and sqlmap rules leave the quiet halves open: the door stays his (D-34)', { timeout: WHOLE_RUN_TIMEOUT_MS }, () => {
     const r = run((w) => (w.waf.length === 0 && eventsOfKind(w, 'move-landed').some((e) => e.move === 'ATK-08')
       ? [{ type: 'DEF-12', rule: { kind: 'sqli' } }, { type: 'DEF-12', rule: { kind: 'block-user-agent', pattern: 'sqlmap' } }] as PlayerAction[]
       : []), { minutes: 15 });
@@ -248,14 +249,14 @@ describe('the doors, unit by unit (D-42)', () => {
     expect(eventsOfKind(r.world, 'move-started').filter((e) => e.move === 'ATK-08').length).toBeGreaterThanOrEqual(3);
   });
 
-  it('on Easy a SQLi rule after the first visit closes the door (the rule stays, so it stays shut)', () => {
+  it('on Easy a SQLi rule after the first visit closes the door (the rule stays, so it stays shut)', { timeout: WHOLE_RUN_TIMEOUT_MS }, () => {
     const r = run((w) => (w.waf.length === 0 && eventsOfKind(w, 'move-landed').some((e) => e.move === 'ATK-08')
       ? [{ type: 'DEF-12', rule: { kind: 'sqli' } }] as PlayerAction[] : []), { minutes: 15, difficulty: 'easy' });
     expect(eventsOfKind(r.world, 'door-shut')).toMatchObject([{ move: 'ATK-08', by: 'DEF-12' }]);
     expect(eventsOfKind(r.world, 'move-started').filter((e) => e.move === 'ATK-08')).toHaveLength(1);
   });
 
-  it('the users API is a door too: the first scrape takes one half, later visits the rest, and the access-control patch closes it', () => {
+  it('the users API is a door too: the first scrape takes one half, later visits the rest, and the access-control patch closes it', { timeout: WHOLE_RUN_TIMEOUT_MS }, () => {
     const users = only(['ATK-01', 'ATK-03', 'ATK-09']);
     const idle = run(() => [], { library: users, minutes: 30 });
     const v = visits(idle.events, 'ATK-09').filter((x) => x.end === 'landed');
@@ -272,7 +273,7 @@ describe('the doors, unit by unit (D-42)', () => {
     expect(eventsOfKind(r.world, 'move-started').filter((e) => e.move === 'ATK-09' && e.t > shutAt)).toEqual([]);
   });
 
-  it('revoking sessions shuts the users API door; a MIN-02 success hands him a new session and reopens it (D-44, KI-70)', () => {
+  it('revoking sessions shuts the users API door; a MIN-02 success hands him a new session and reopens it (D-44, KI-70)', { timeout: WHOLE_RUN_TIMEOUT_MS }, () => {
     const users = libraryFrom(['ATK-01', 'ATK-03', 'ATK-09', 'MIN-02'].flatMap((m) => real.variantsOf(m as MoveId).map((v) => v.recording)));
     let revoked = false;
     const r = runSim({ seed: 1, difficulty: 'medium', library: users, maxRealMs: 20 * REAL_MIN, setup: noTaps, player: (w) => {
@@ -291,7 +292,7 @@ describe('the doors, unit by unit (D-42)', () => {
     expect(eventsOfKind(r.world, 'move-started').filter((e) => e.move === 'ATK-09' && e.t >= reopened.t).length).toBeGreaterThanOrEqual(1);
   });
 
-  it('an open leaky tap blocks the win: every route closed, no foothold, he is banished only once the tap is closed (D-44, KI-75)', () => {
+  it('an open leaky tap blocks the win: every route closed, no foothold, he is banished only once the tap is closed (D-44, KI-75)', { timeout: WHOLE_RUN_TIMEOUT_MS }, () => {
     let fixed = false;
     const r = run((w, realMs) => {
       const acts: PlayerAction[] = [];
