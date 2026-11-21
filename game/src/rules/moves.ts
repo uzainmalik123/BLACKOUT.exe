@@ -1,5 +1,5 @@
 // PRD §3: Death's moves, one entry per ATK row, with D-18 (ATK-12/15/16 Needs), D-19 (DEF-12 stops ATK-16) and
-// D-30 (ATK-09/11/17 Needs and stoppers). prd-sync.test.ts checks every row's stage and stoppers against the PRD table.
+// D-30 (ATK-09/11/17 Needs and stoppers) and D-41 (ATK-13 needs only `map`). prd-sync.test.ts checks every row's stage and stoppers against the PRD table.
 // Needs are what must hold for the Director to pick the move; the Director adds stage order on top (SYS-02).
 import type { Foothold, Gain, MoveId, Need, Stage, Stopper } from './vocabulary';
 
@@ -46,7 +46,7 @@ export const MOVES: readonly Move[] = [
     stoppedBy: [{ action: 'DEF-10', feature: 'registration' }, { action: 'DEF-13', patch: 'registration' }, { action: 'DEF-14', undo: true }], pri: 'M' }, // DEF-14 removes it once planted
   { id: 'ATK-12', stage: 5, name: 'Take over a real customer', attack: 'T1098', needs: [{ gain: 'user-session' }], gains: [], foothold: 'hijacked-user',
     stoppedBy: [{ action: 'DEF-16', account: 'target' }, { action: 'DEF-13', patch: 'change-password' }], pri: 'S' },
-  { id: 'ATK-13', stage: 5, name: 'Plant a file', attack: 'T1105', needs: [{ anySession: true }], gains: [], foothold: 'planted-file',
+  { id: 'ATK-13', stage: 5, name: 'Plant a file', attack: 'T1105', needs: [MAP], gains: [], foothold: 'planted-file',
     stoppedBy: [{ action: 'DEF-15', undo: true }, { action: 'DEF-10', feature: 'uploads' }], pri: 'M' },
   { id: 'ATK-14', stage: 5, name: 'Forge his own login token', attack: 'T1606', needs: [MAP, { anyOf: [{ gain: 'secrets-leaked' }, { stageGain: 3 }] }], gains: [], foothold: 'forged-token',
     stoppedBy: [{ action: 'DEF-13', patch: 'token-verify' }], pri: 'S' },

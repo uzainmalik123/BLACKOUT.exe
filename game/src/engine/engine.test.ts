@@ -115,7 +115,7 @@ describe('a real run on the committed recordings, nobody at the keyboard (KI-17)
         expect(highest, `${difficulty} seed ${seed}`).toBeGreaterThanOrEqual(3);
         expect(started.some((e) => MOVE_BY_ID[e.move].stage === 4), `${difficulty} seed ${seed}`).toBe(true);
         expect(started.filter((e) => e.move === 'ATK-08').map((e) => e.variant)).not.toContain('a');
-        expect(eventsOfKind(r.world, 'ending')[0]?.ending, `${difficulty} seed ${seed}`).toBe('souls-lost');
+        expect(['souls-lost', 'flatline'], `${difficulty} seed ${seed}`).toContain(eventsOfKind(r.world, 'ending')[0]?.ending); // D-41: after the ransom he stops, and the defacement can flatline the shop first
       }
     }
   });

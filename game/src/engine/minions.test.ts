@@ -55,10 +55,10 @@ describe('minion waves (PRD §4)', () => {
 
   it('MIN-02 steals one soul per success and hands Death a user-session; DEF-07 closes the wave', () => {
     const w = initialWorld(2, 'medium');
-    runWaves(w, 61_000);
+    runWaves(w, 60_100);
     expect(started(w, 'MIN-02')).toHaveLength(1);
     expect(soulsStolen(w)).toBe(0);
-    runWaves(w, medium.minions.waveDurationGameMs / 30 / 2 + 100); // halfway through the wave
+    runWaves(w, 1000); // its recorded success, an exfil 0.5 s in (D-41)
     expect(soulsStolen(w)).toBe(1);
     expect(eventsOfKind(w, 'souls-stolen')).toMatchObject([{ by: 'MIN-02', count: 1 }]);
     expect(w.sessions).toMatchObject([{ kind: 'user', issuedBy: 'MIN-02' }]);

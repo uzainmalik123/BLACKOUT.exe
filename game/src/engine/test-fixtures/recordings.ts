@@ -115,7 +115,10 @@ function eventsFor(id: MoveId | MinionId, ip: string, quiet: boolean, variant = 
       { t: 0, kind: 'db', op: 'update', table: 'Products', key: { id: 1 }, before: { name: 'Apple Juice (1000ml)', description: 'The all-time classic.' }, after: { name: 'READ_ME_MORTAL', description: 'PAY OR THE SOULS BURN' } },
     ];
     case 'MIN-01': return many(20, (i) => access(ip, 'GET', ['/wp-admin', '/.env', '/phpmyadmin', '/wp-login.php'][i % 4]!, 404, ua ?? 'python-requests/2.31 scanner'));
-    case 'MIN-02': return many(10, (i) => access(ip, 'POST', '/rest/user/login', i === 9 ? 200 : 401, ua ?? 'Mozilla/5.0 (stuffer)'));
+    case 'MIN-02': return [ // like MIN-02.a: failed logins, and each success an exfil of a leaked-password reuser (D-41)
+      ...many(10, (i) => ({ ...access(ip, 'POST', '/rest/user/login', i % 5 === 4 ? 200 : 401, ua ?? 'Mozilla/5.0 (stuffer)'), t: 1 + i * 100 })),
+      ...[43, 51].map((key, k): RecEvent => ({ t: 1 + (4 + 5 * k) * 100 + 1, kind: 'exfil', table: 'Users', keys: [key], columns: ['email', 'password'] })),
+    ];
     case 'MIN-03': return many(20, (i) => access(ip, 'GET', `/api/Products?page=${i}`, 200, ua ?? 'Go-http-client/1.1', 4000));
     case 'MIN-04': return many(5, () => access(ip, 'POST', '/api/Feedbacks', 201, ua ?? 'python-requests/2.31'));
   }

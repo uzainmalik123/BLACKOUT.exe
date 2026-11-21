@@ -42,7 +42,8 @@ describe('the replay engine (SYS-03)', () => {
     expect(eventsOfKind(w, 'move-landed')).toMatchObject([{ move: 'ATK-03', variant: 'a' }]);
     expect(w.death.played).toEqual([{ move: 'ATK-03', variant: 'a', outcome: 'landed' }]);
     expect(w.alerts[0]!.closedAt).toBeDefined();
-    expect(w.death.nextMoveAt).toBe(w.clock.gameMs + medium.moveGapGameMs);
+    expect(w.death.nextMoveAt - w.clock.gameMs).toBeGreaterThanOrEqual(medium.breatherGameMs.min); // the breather (D-41)
+    expect(w.death.nextMoveAt - w.clock.gameMs).toBeLessThanOrEqual(medium.breatherGameMs.max);
   });
 
   it('plays ATK-08.a to the end: 402 access lines, 242 app lines, 325 souls stolen, souls-stolen events summing to 325', () => {
@@ -68,7 +69,7 @@ describe('the replay engine (SYS-03)', () => {
     expect(eventsOfKind(w, 'move-cut')).toMatchObject([{ move: 'ATK-08', variant: 'a', by: 'DEF-06' }]);
     expect(w.death.played).toEqual([{ move: 'ATK-08', variant: 'a', outcome: 'cut' }]);
     expect(w.alerts[0]!.closedAt).toBeDefined();
-    expect(w.death.nextMoveAt).toBeLessThanOrEqual(w.clock.gameMs + medium.cutRetryGameMs);
+    expect(w.death.nextMoveAt).toBeLessThanOrEqual(w.clock.gameMs + medium.ipResumeGameMs);
     expect(w.death.nextMoveAt).toBeGreaterThan(w.clock.gameMs);
     advance(w, COMMITTED, 2000);
     expect(w.logs.access).toHaveLength(n);
