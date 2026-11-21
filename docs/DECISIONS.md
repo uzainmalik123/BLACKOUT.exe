@@ -38,6 +38,7 @@
 | D-34 | WAF vs ATK-08: the SQLi rule set stops ATK-08.b on Easy only (tamper scripts leak through on Medium/Hard); a sqlmap user-agent rule matches only ATK-08.c; SIM-9 | Accepted |
 | D-35 | ATK-08.b is quiet as well as slow: `--random-agent` and the `randomcase` tamper script, still with `--delay` (~2.5 min); ATK-08.c keeps sqlmap's own user agent (closes KI-22) | Accepted |
 | D-36 | New split: Uzain builds the brain (engine, shell logic, Kiro server, report grading, recordings, content text, hosting); the teammate builds every scene, the renderer, art, sound and the terminal window, from `docs/SCENES.md` and `docs/ENGINE_API.md` | Accepted |
+| D-60 | Ordinary customer traffic: a recorded shopper loop (REC-06) plays under everything (SYS-19), from an address pool shared with Death and the minions, and shows the cost of the player's actions as customers' failed requests | Accepted |
 
 ### D-01: Pivot to an incident-response game
 - **Context:** (2026-11-08) Reanimator raised dead repos so Death could attack them. Any agent can revive a repo on its own, so the product added nothing, and the UI had drifted into a pile of screens with no vision.
@@ -195,4 +196,9 @@
 - **Context:** (2026-11-21) Nothing visible exists yet with 13 days left, and the teammate's strength is UI. D-21 had given her the shell and the writing too.
 - **Decision:** Uzain (with Claude) owns the brain: engine, the shell's logic (SYS-09, still built from a Kiro spec, KDEV-02), Kiro's server (SYS-12), report grading (SYS-11), recordings, the content text (CON-01/03/04/05) and hosting. The teammate owns every scene (UI-01 to UI-08), the renderer, art (CON-06), sound and the terminal window. `docs/SCENES.md` fixes what each scene must contain and leaves layout and style to her; `docs/ENGINE_API.md` is the contract, including the agreed shapes of the shell, Kiro and the report so she builds against stubs now.
 - **Consequences:** separate folders, so the two never edit the same files. Supersedes D-21's split.
+
+### D-60: Customer traffic
+- **Context:** (2026-11-21) KI-60: the logs only ever held Death's and the minions' requests, so every line was suspicious, the briefing's "what normal looks like" had nothing to compare against, and spotting the attacker was far easier than in a real incident.
+- **Decision:** REC-06 records a loop of ordinary shoppers on the same rig; SYS-19 plays it underneath everything. Customers, Death and the minions draw addresses from one pool across all three documentation ranges (192.0.2.0/24, 198.51.100.0/24, 203.0.113.0/24), so the range never gives anyone away; recordings keep D-15's rewrite to 203.0.113.0/24 and the engine remaps at replay. Customer requests react to the player's actions (`503` for a disabled feature, `429` for a rate limit, blocked by matching WAF rules and blocked IPs, absent with the plug pulled).
+- **Consequences:** the heartbeat cost of an action becomes visible as real customers failing, which is the business side of containment (NIST 800-61). The engine's IP handling changes from "always 203.0.113.0/24" to the shared pool. Decision and issue numbers 60–79 are this work's block.
 
