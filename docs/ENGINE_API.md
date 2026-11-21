@@ -87,6 +87,7 @@ Every button, console and (later) shell command sends one of these. It returns `
 | `tap-opened` / `tap-closed` | A leaky tap starts dripping / stops (`by: 'DEF-12'` if the player closed it, no `by` if it ran dry) | A small leak animation, then a seal |
 | `door-shut` | One of Death's soul doors (`move`) is shut (`by` the fix that holds now); he stays away while it holds (D-44) | He recoils from it. Don't name the move on screen |
 | `door-reopened` | That fix lapsed (a flag back on before its patch, a new session after a revoke): the door is his again (D-44) | He turns back toward it |
+| `proxies` | After three IP blocks in a row Death plays from rotating proxies for the rest of the run: blocking addresses no longer cuts him (D-46) | He splits into many shadows |
 | `tip-off` | The player tipped Death off | He turns toward the player. Subtle |
 | `patch-applied` | A deploy finished | Small "sealed" beat |
 | `banished` | Every door is closed (soul doors by their real fix, taps included) and no foothold is left, or provisionally with a foothold left (D-44, D-45) | The calm before the ending |

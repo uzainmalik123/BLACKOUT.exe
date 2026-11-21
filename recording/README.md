@@ -33,6 +33,7 @@ address the attacker gets in the recording (always inside `203.0.113.0/24`).
 | Variant | Script | Public IP | What it is |
 |---|---|---|---|
 | ATK-01.a | `attacks/ATK-01.a.sh` | 203.0.113.11 | ffuf root scan with `common.txt` and auto-calibration, ffuf's own user agent |
+| ATK-01.b | `attacks/ATK-01.b.sh` | 203.0.113.13 | The quiet scan (D-46, KI-77): the same ffuf scan and list with a browser user agent, 2 threads at 40 requests a second, ~2 min; same hits as .a |
 | ATK-03.a | `attacks/ATK-03.a.sh` | 203.0.113.23 | Login SQLi, one request, curl's own user agent (its `before.sqlite` is the baseline) |
 | ATK-04.a | `attacks/ATK-04.a.sh` | 203.0.113.44 | Hydra against the admin login, 30 passwords, 4 tasks, Hydra's own user agent |
 | ATK-06.a | `attacks/ATK-06.a.sh` | 203.0.113.61 | Admin sign-up by mass assignment, then its login and the admin page's data |
