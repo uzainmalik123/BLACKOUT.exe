@@ -1,12 +1,14 @@
-// D-42: soul doors. Once a big door (ATK-08, ATK-09) has landed it is his: he keeps coming back to it, each visit
-// taking at most half of the souls left, until one of its own stoppers closes it for good. IP blocks and the plug only
-// pause it. Runs on the committed recordings unless a test says otherwise; taps are switched off where they would blur
-// what a test counts (taps.test.ts covers them).
+// D-42, D-44: soul doors. Once a big door (ATK-08, ATK-09) has landed it is his: he keeps coming back to it, each visit
+// taking at most half of the souls left (the rest once fewer than 10 % remain), while it is open. A door is shut only
+// while one of its own stoppers holds, and reopens when that fix lapses; a cut visit is paused, never over (D-45).
+// Runs on the committed recordings unless a test says otherwise; taps are switched off where they would blur what a
+// test counts (taps.test.ts covers them).
 import { describe, expect, it } from 'vitest';
 import { MOVE_BY_ID, SOUL_DOORS } from '../rules/moves';
 import type { MoveId, PlayerAction } from '../rules/vocabulary';
 import { CONFIG } from './config';
-import { candidateMoves, pickHalf, playableVariants, unstolen } from './director';
+import { candidateMoves, pickHalf, playableVariants } from './director';
+import { closingStopper, refreshDoors, unstolen } from './doors';
 import { libraryFrom, type RecordingLibrary } from './library';
 import { eventsOfKind, type GameEvent } from './log';
 import { runSim, type ScriptedPlayer, type SimResult } from './sim';
@@ -47,11 +49,15 @@ describe('the robber: an open door is visited until it is empty (D-42)', () => {
     const v = visits(r.events, 'ATK-08').filter((x) => x.end === 'landed');
     expect(v.length).toBeGreaterThanOrEqual(5);
     expect(v.at(-1)!.t - v[0]!.t).toBeGreaterThan(10 * REAL_MIN * 30); // spread over more than ten real minutes
+    const threshold = r.world.souls.total * CONFIG.medium.doors.takeAllBelowFraction;
     for (const x of v) {
+      if (x.left < threshold) continue; // D-44: the last visit takes the rest
       expect(x.took, `visit at ${x.t / 30000} s`).toBeLessThanOrEqual(Math.ceil(x.left / 2));
       if (x.left >= 20) expect(x.took / x.left).toBeLessThanOrEqual(0.55);
     }
     expect(v[0]!.took).toBeGreaterThan(150); // the first visit is a real blow (half the shop)
+    expect(v.at(-1)!.left).toBeLessThan(threshold); // D-44: once fewer than 10 % are left, one visit takes the rest
+    expect(v.at(-1)!.took).toBe(v.at(-1)!.left);
     expect(eventsOfKind(r.world, 'ending')).toMatchObject([{ ending: 'souls-lost' }]);
     expect(soulsStolen(r.world)).toBe(r.world.souls.total);
   });
@@ -61,7 +67,7 @@ describe('the robber: an open door is visited until it is empty (D-42)', () => {
     expect(v.slice(0, 3).map((x) => x.variant)).toEqual(['d', 'e', 'e']);
   });
 
-  it('a player who closes the search door for good after the first visit never loses another soul to it, and Death never tries it again', () => {
+  it('a player who closes the search door with its patch after the first visit never loses another soul to it, and Death never tries it again', () => {
     let done = false;
     const r = run((w) => {
       if (done || !eventsOfKind(w, 'move-landed').some((e) => e.move === 'ATK-08')) return [];
@@ -75,18 +81,29 @@ describe('the robber: an open door is visited until it is empty (D-42)', () => {
     expect(eventsOfKind(r.world, 'ending')).toMatchObject([{ ending: 'banished' }]); // no route, no foothold left
   });
 
-  it('a stopper that cuts a visit closes the door for good, even once the stopper lapses (switching search back on does not reopen it: KI-70)', () => {
+  it('a flag that cuts a visit shuts the door only while it holds: search back on reopens it and he resumes the same half where he stopped (D-44, KI-70)', () => {
     let off = false, on = false;
     const r = run((w) => {
       const visit = eventsOfKind(w, 'move-started').filter((e) => e.move === 'ATK-08')[1];
       if (!off && visit && w.clock.gameMs > visit.t + 70 * 30_000) { off = true; return [{ type: 'DEF-10', feature: 'search', enabled: false }]; }
-      if (off && !on && eventsOfKind(w, 'move-cut').length > 0) { on = true; return [{ type: 'DEF-18', what: 'search' }]; }
+      if (off && !on && eventsOfKind(w, 'move-cut').length > 0 && w.clock.gameMs > eventsOfKind(w, 'move-cut')[0]!.t + 30 * 30_000) { on = true; return [{ type: 'DEF-18', what: 'search' }]; }
       return [];
-    }, { minutes: 20 });
-    expect(eventsOfKind(r.world, 'move-cut')).toMatchObject([{ move: 'ATK-08', by: 'DEF-10' }]);
+    }, { minutes: 25 });
+    const cut = eventsOfKind(r.world, 'move-cut')[0]!;
+    expect(cut).toMatchObject({ move: 'ATK-08', by: 'DEF-10' });
     expect(eventsOfKind(r.world, 'door-shut')).toMatchObject([{ move: 'ATK-08', by: 'DEF-10' }]);
+    expect(eventsOfKind(r.world, 'door-reopened')).toMatchObject([{ move: 'ATK-08' }]);
+    expect(eventsOfKind(r.world, 'door-reopened')[0]!.t).toBeGreaterThan(eventsOfKind(r.world, 'door-shut')[0]!.t);
     expect(r.world.features.search).toBe(true);
-    expect(eventsOfKind(r.world, 'move-started').filter((e) => e.move === 'ATK-08')).toHaveLength(2);
+    const after = eventsOfKind(r.world, 'move-started').filter((e) => e.move === 'ATK-08' && e.t > cut.t);
+    expect(after.length).toBeGreaterThanOrEqual(1); // his again, no new first entry
+    expect(after[0]!.variant).toBe(cut.variant); // the paused half carries on
+    expect(after[0]!.t).toBeGreaterThanOrEqual(eventsOfKind(r.world, 'door-reopened')[0]!.t);
+    const paused = visits(r.events, 'ATK-08')[1]!;
+    const resumed = visits(r.events, 'ATK-08').find((x) => x.t === after[0]!.t)!;
+    expect(paused.took + resumed.took).toBeLessThanOrEqual(Math.ceil(paused.left / 2)); // the cap carries over
+    expect(eventsOfKind(r.world, 'souls-stolen').some((e) => e.by === 'ATK-08' && e.t > cut.t)).toBe(true);
+    expect(eventsOfKind(r.world, 'ending')).not.toMatchObject([{ ending: 'banished' }]);
   });
 
   it('IP-blocking a visit only pauses it: he comes back from a fresh address to the same half, carrying on where he stopped', () => {
@@ -109,7 +126,7 @@ describe('the robber: an open door is visited until it is empty (D-42)', () => {
     expect(pausedVisit.took + resumed[0]!.took).toBeLessThanOrEqual(Math.ceil(pausedVisit.left / 2)); // the cap carries over
   });
 
-  it('pulling the plug on a visit only pauses the door: he comes back once the shop is up again', () => {
+  it('pulling the plug on a visit freezes it in place: back up within the grace, the same visit carries on with no cut and its cap (D-45)', () => {
     let pulled = false, back = false;
     const r = run((w) => {
       const visit = eventsOfKind(w, 'move-started').filter((e) => e.move === 'ATK-08')[1];
@@ -117,10 +134,32 @@ describe('the robber: an open door is visited until it is empty (D-42)', () => {
       if (pulled && !back) { back = true; return [{ type: 'DEF-18', what: 'nginx' }]; }
       return [];
     }, { minutes: 20 });
+    expect(eventsOfKind(r.world, 'move-cut')).toEqual([]);
+    expect(eventsOfKind(r.world, 'door-shut')).toEqual([]);
+    const second = visits(r.events, 'ATK-08')[1]!;
+    expect(second.end).toBe('landed');
+    expect(second.took).toBeLessThanOrEqual(Math.ceil(second.left / 2));
+  });
+
+  it('a plug held past the grace cuts the visit; once the shop is up he resumes the same half where he stopped, without a breather (D-45)', () => {
+    let pulledAt: number | undefined, back = false;
+    const r = run((w) => {
+      const visit = eventsOfKind(w, 'move-started').filter((e) => e.move === 'ATK-08')[1];
+      if (pulledAt === undefined && visit && w.clock.gameMs > visit.t + 60 * 30_000) { pulledAt = w.clock.gameMs; return [{ type: 'DEF-11' }]; }
+      if (pulledAt !== undefined && !back && w.clock.gameMs > pulledAt + 20 * 30_000) { back = true; return [{ type: 'DEF-18', what: 'nginx' }]; }
+      return [];
+    }, { minutes: 20 });
     const cut = eventsOfKind(r.world, 'move-cut')[0]!;
     expect(cut).toMatchObject({ move: 'ATK-08', by: 'DEF-11' });
+    expect(cut.t - pulledAt!).toBeGreaterThanOrEqual(CONFIG.medium.doors.pauseGraceGameMs);
+    expect(cut.t - pulledAt!).toBeLessThanOrEqual(CONFIG.medium.doors.pauseGraceGameMs + CONFIG.medium.tickGameMs); // the freeze starts on the next tick
     expect(eventsOfKind(r.world, 'door-shut')).toEqual([]);
-    expect(eventsOfKind(r.world, 'move-started').filter((e) => e.move === 'ATK-08' && e.t > cut.t).length).toBeGreaterThanOrEqual(1);
+    const after = eventsOfKind(r.world, 'move-started').filter((e) => e.move === 'ATK-08' && e.t > cut.t);
+    expect(after[0]!.variant).toBe(cut.variant);
+    expect(after[0]!.t - (pulledAt! + 20 * 30_000)).toBeLessThanOrEqual(2 * CONFIG.medium.directorPeriodGameMs); // no breather
+    const paused = visits(r.events, 'ATK-08')[1]!;
+    const resumed = visits(r.events, 'ATK-08').find((x) => x.t === after[0]!.t)!;
+    expect(paused.took + resumed.took).toBeLessThanOrEqual(Math.ceil(paused.left / 2)); // the cap carries over
   });
 
   it('every second move he starts is a visit while story moves remain, and after the ransom every move is a visit', () => {
@@ -179,11 +218,26 @@ describe('the doors, unit by unit (D-42)', () => {
     expect(halves(w).map((v) => v.variant)).toEqual(['f', 'g']);
   });
 
-  it('a door closed for good is never playable again, whatever lapses (no retrying a patched hole)', () => {
+  it('a door is shut while one of its own stoppers holds for every half he may play, and his again once it lapses (D-44)', () => {
     const w = hisSearchDoor();
-    w.death.shutDoors.push('ATK-08');
+    expect(closingStopper(w, searchDoor, MOVE_BY_ID['ATK-08'])).toBeUndefined();
+    w.features.search = false;
+    refreshDoors(w, searchDoor);
+    expect(closingStopper(w, searchDoor, MOVE_BY_ID['ATK-08'])).toMatchObject({ action: 'DEF-10' });
+    expect(w.death.shutDoors).toEqual(['ATK-08']);
+    expect(eventsOfKind(w, 'door-shut')).toMatchObject([{ move: 'ATK-08', by: 'DEF-10' }]);
     expect(halves(w)).toEqual([]);
     expect(candidateMoves(w, searchDoor).map((m) => m.id)).not.toContain('ATK-08');
+    w.features.search = true;
+    refreshDoors(w, searchDoor);
+    expect(w.death.shutDoors).toEqual([]);
+    expect(eventsOfKind(w, 'door-reopened')).toMatchObject([{ move: 'ATK-08' }]);
+    expect(halves(w).map((v) => v.variant)).toEqual(['d', 'e']);
+    expect(candidateMoves(w, searchDoor).map((m) => m.id)).toContain('ATK-08');
+    w.patches.applied.push('search'); // the real fix holds whatever the flag does
+    refreshDoors(w, searchDoor);
+    expect(closingStopper(w, searchDoor, MOVE_BY_ID['ATK-08'])).toMatchObject({ action: 'DEF-13' });
+    expect(halves(w)).toEqual([]);
   });
 
   it('on Medium the SQLi and sqlmap rules leave the quiet halves open: the door stays his (D-34)', () => {
@@ -194,19 +248,19 @@ describe('the doors, unit by unit (D-42)', () => {
     expect(eventsOfKind(r.world, 'move-started').filter((e) => e.move === 'ATK-08').length).toBeGreaterThanOrEqual(3);
   });
 
-  it('on Easy a SQLi rule after the first visit closes the door for good', () => {
+  it('on Easy a SQLi rule after the first visit closes the door (the rule stays, so it stays shut)', () => {
     const r = run((w) => (w.waf.length === 0 && eventsOfKind(w, 'move-landed').some((e) => e.move === 'ATK-08')
       ? [{ type: 'DEF-12', rule: { kind: 'sqli' } }] as PlayerAction[] : []), { minutes: 15, difficulty: 'easy' });
     expect(eventsOfKind(r.world, 'door-shut')).toMatchObject([{ move: 'ATK-08', by: 'DEF-12' }]);
     expect(eventsOfKind(r.world, 'move-started').filter((e) => e.move === 'ATK-08')).toHaveLength(1);
   });
 
-  it('the users API is a door too: the first scrape takes one half, later visits the rest, and the access-control patch closes it for good', () => {
+  it('the users API is a door too: the first scrape takes one half, later visits the rest, and the access-control patch closes it', () => {
     const users = only(['ATK-01', 'ATK-03', 'ATK-09']);
     const idle = run(() => [], { library: users, minutes: 30 });
     const v = visits(idle.events, 'ATK-09').filter((x) => x.end === 'landed');
     expect(v.length).toBeGreaterThanOrEqual(3);
-    for (const x of v) expect(x.took).toBeLessThanOrEqual(Math.ceil(x.left / 2));
+    for (const x of v) if (x.left >= 325 * CONFIG.medium.doors.takeAllBelowFraction) expect(x.took).toBeLessThanOrEqual(Math.ceil(x.left / 2)); // D-44: under 10 % one visit takes the rest
     let patched = false;
     const r = run((w) => {
       if (patched || !eventsOfKind(w, 'move-landed').some((e) => e.move === 'ATK-09')) return [];
@@ -216,5 +270,43 @@ describe('the doors, unit by unit (D-42)', () => {
     expect(eventsOfKind(r.world, 'door-shut')).toMatchObject([{ move: 'ATK-09', by: 'DEF-13' }]);
     const shutAt = eventsOfKind(r.world, 'door-shut')[0]!.t;
     expect(eventsOfKind(r.world, 'move-started').filter((e) => e.move === 'ATK-09' && e.t > shutAt)).toEqual([]);
+  });
+
+  it('revoking sessions shuts the users API door; a MIN-02 success hands him a new session and reopens it (D-44, KI-70)', () => {
+    const users = libraryFrom(['ATK-01', 'ATK-03', 'ATK-09', 'MIN-02'].flatMap((m) => real.variantsOf(m as MoveId).map((v) => v.recording)));
+    let revoked = false;
+    const r = runSim({ seed: 1, difficulty: 'medium', library: users, maxRealMs: 20 * REAL_MIN, setup: noTaps, player: (w) => {
+      if (revoked || !eventsOfKind(w, 'move-landed').some((e) => e.move === 'ATK-09')) return [];
+      revoked = true;
+      return [{ type: 'DEF-09' }];
+    } });
+    const shut = eventsOfKind(r.world, 'door-shut').find((e) => e.move === 'ATK-09')!;
+    expect(shut).toMatchObject({ by: 'DEF-09' });
+    const reopened = eventsOfKind(r.world, 'door-reopened').find((e) => e.move === 'ATK-09' && e.t > shut.t)!;
+    expect(reopened).toBeDefined();
+    const session = r.world.events.find((e) => e.kind === 'souls-stolen' && e.by === 'MIN-02' && e.t > shut.t)!;
+    expect(session).toBeDefined();
+    expect(reopened.t).toBeGreaterThanOrEqual(session.t);
+    expect(eventsOfKind(r.world, 'move-started').filter((e) => e.move === 'ATK-09' && e.t > shut.t && e.t < reopened.t)).toEqual([]);
+    expect(eventsOfKind(r.world, 'move-started').filter((e) => e.move === 'ATK-09' && e.t >= reopened.t).length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('an open leaky tap blocks the win: every route closed, no foothold, he is banished only once the tap is closed (D-44, KI-75)', () => {
+    let fixed = false;
+    const r = run((w, realMs) => {
+      const acts: PlayerAction[] = [];
+      if (!fixed && eventsOfKind(w, 'move-landed').some((e) => e.move === 'ATK-08')) { fixed = true; acts.push({ type: 'DEF-10', feature: 'search', enabled: false }, { type: 'DEF-13', patch: 'search' }); }
+      if (realMs >= 12 * REAL_MIN) for (const t of w.taps.open) acts.push({ type: 'DEF-12', rule: { kind: 'block-path', method: 'GET', path: t.id === 'TAP-01' ? '/support/logs' : t.id === 'TAP-02' ? '/rest/memories' : '/rest/products/*/reviews' } });
+      return acts;
+    }, { minutes: 20, taps: true });
+    const opened = eventsOfKind(r.world, 'tap-opened')[0]!;
+    expect(opened.t).toBeLessThan(12 * REAL_MIN * 30);
+    expect(eventsOfKind(r.world, 'patch-applied')).toMatchObject([{ patch: 'search' }]);
+    expect(eventsOfKind(r.world, 'patch-applied')[0]!.t).toBeLessThan(12 * REAL_MIN * 30);
+    const ending = eventsOfKind(r.world, 'ending')[0]!;
+    expect(ending).toMatchObject({ ending: 'banished' });
+    expect(ending.t).toBeGreaterThanOrEqual(12 * REAL_MIN * 30);
+    expect(eventsOfKind(r.world, 'tap-closed').some((e) => e.by === 'DEF-12')).toBe(true);
+    expect(r.world.taps.open).toEqual([]);
   });
 });

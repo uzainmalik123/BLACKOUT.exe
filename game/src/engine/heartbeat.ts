@@ -10,7 +10,7 @@ const clamp = (x: number) => Math.min(100, Math.max(0, x));
 export function drainPerRealMinute(world: World): number {
   const { drainPerRealMin: d, featureWeight } = CONFIG[world.difficulty].heartbeat;
   let drain = 0;
-  if (world.replays.some((r) => r.owner === 'death')) drain += d.openDoor;
+  if (world.replays.some((r) => r.owner === 'death' && r.frozenSince === undefined)) drain += d.openDoor; // a frozen visit isn't using the door (D-45)
   drain += d.minion * world.waves.length;
   for (const f of FEATURES) if (world.features[f] !== FEATURE_DEFAULTS[f]) drain += featureWeight[f];
   if (world.nginx === 'stopped') drain += d.plug;

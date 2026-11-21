@@ -32,6 +32,8 @@ export interface EngineConfig {
   };
   doors: {
     visitCapFraction: number; // D-42: a visit to a big soul door stops once it has taken this share of the souls left when it started (rounded up)
+    takeAllBelowFraction: number; // D-44: once fewer than this share of the total souls are left, one visit takes the rest
+    pauseGraceGameMs: number; // D-45: a Death move stopped by anything but an IP block freezes in place this long before it is cut
   };
   taps: {
     everyGameMs: { min: number; max: number }; // D-42: the seeded wait before the next leaky tap opens (the first one too)
@@ -71,7 +73,7 @@ const MEDIUM: EngineConfig = {
     soulCapFraction: 0.05,
     alongsideDeath: true,
   },
-  doors: { visitCapFraction: 0.5 },
+  doors: { visitCapFraction: 0.5, takeAllBelowFraction: 0.1, pauseGraceGameMs: 10 * REAL_S },
   taps: { everyGameMs: { min: 180 * REAL_S, max: 240 * REAL_S }, maxOpen: 2, dripEveryGameMs: 60 * REAL_S, dripFraction: 0.01 },
   backupEveryGameMs: 60 * GAME_MIN,
   scenarioStartIso: '2026-10-31T22:00:00Z',

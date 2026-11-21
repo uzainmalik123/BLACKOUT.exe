@@ -17,7 +17,8 @@ export type GameEventBody =
   | { kind: 'alert-closed'; alert: number; about: Actor }
   | { kind: 'tap-opened'; tap: TapId }
   | { kind: 'tap-closed'; tap: TapId; by?: ActionId } // no `by`: it ran dry
-  | { kind: 'door-shut'; move: MoveId; by: ActionId }
+  | { kind: 'door-shut'; move: MoveId; by: ActionId } // D-44: one of its own stoppers holds for every half he may play
+  | { kind: 'door-reopened'; move: MoveId } // D-44: that fix lapsed; the door is his again
   | { kind: 'patch-applied'; patch: Patch }
   | { kind: 'banished' }
   | { kind: 'return'; through: Foothold }

@@ -124,7 +124,7 @@ describe('the PRD tables (SYS-17)', () => {
 
   it('souls moves are the harvest stage and ransom ends the chain', () => {
     const souls: Move[] = MOVES.filter((m) => m.gains.includes('souls'));
-    expect(souls.map((m) => m.id)).toEqual(['ATK-08', 'ATK-09', 'ATK-10']);
+    expect(souls.map((m) => m.id)).toEqual(['ATK-08', 'ATK-09']); // D-44: ATK-10 and ATK-16 hurt heartbeat only
     expect(souls.every((m) => m.stage === 4)).toBe(true);
     expect(MOVE_BY_ID['ATK-17'].gains).toEqual(['ransom']);
   });
