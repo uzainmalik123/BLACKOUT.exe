@@ -1,8 +1,9 @@
-// Converts one raw run from recording/record.sh into src/recordings/<MOVE>.<variant>.json (D-15).
+// Converts one raw run from recording/record.sh into src/recordings/<MOVE>.<variant>.json (D-15);
+// customer traffic (move CUST, REC-06) goes to src/recordings/traffic/ instead, so it's never loaded as a move (D-62).
 //   npm run recording:convert -- ../recording/runs/ATK-03.a [--baseline]
 // --baseline also copies the run's before.sqlite to src/recordings/juiceshop.sqlite, the DB the game boots from.
 import { createHash } from 'node:crypto';
-import { copyFileSync, existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
 import initSqlJs from 'sql.js';
 import {
@@ -21,6 +22,8 @@ import {
 import { isTestNet3, type RecEvent, type Recording } from '../src/recordings/format.ts';
 
 const OUT_DIR = resolve(import.meta.dirname, '../src/recordings');
+/** Customer traffic (REC-06) is not a move: it lives one folder down, out of the moves' `*.json` (D-62). */
+const TRAFFIC_MOVE = 'CUST';
 
 function walk(root: string): Map<string, FileInfo> {
   const files = new Map<string, FileInfo>();
@@ -79,7 +82,9 @@ async function main(): Promise<void> {
   }
 
   const rec = buildRecording(meta, events);
-  const out = join(OUT_DIR, `${meta.move}.${meta.variant}.json`);
+  const outDir = meta.move === TRAFFIC_MOVE ? join(OUT_DIR, 'traffic') : OUT_DIR;
+  mkdirSync(outDir, { recursive: true });
+  const out = join(outDir, `${meta.move}.${meta.variant}.json`);
   writeFileSync(out, serialize(rec));
   const count = (kind: RecEvent['kind']) => rec.events.filter((e) => e.kind === kind).length;
   console.log(`${relative(process.cwd(), out)}: ${rec.events.length} events (access ${count('access')}, app ${count('app')}, db ${count('db')}, file ${count('file')}, exfil ${count('exfil')}), ${rec.durationMs} ms`);

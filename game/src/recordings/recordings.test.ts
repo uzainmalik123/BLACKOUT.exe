@@ -7,6 +7,8 @@ import { isTestNet3, validateRecording, type AccessEvent, type DbEvent, type Exf
 
 const dir = new URL('./', import.meta.url);
 const jsonFiles = readdirSync(dir).filter((f) => f.endsWith('.json'));
+// Customer traffic (REC-06) sits one folder down so it's never loaded as a move (D-62).
+const trafficFiles = readdirSync(new URL('traffic/', dir)).filter((f) => f.endsWith('.json')).map((f) => `traffic/${f}`);
 const raw = (file: string) => readFileSync(new URL(file, dir), 'utf8');
 const load = (file: string) => JSON.parse(raw(file)) as Recording;
 const accessOf = (r: Recording) => r.events.filter((e): e is AccessEvent => e.kind === 'access');
@@ -24,10 +26,10 @@ describe('every committed recording', () => {
     expect(jsonFiles).toEqual(expect.arrayContaining(moves.map((m) => (m.includes('.') ? `${m}.json` : `${m}.a.json`))));
   });
 
-  it.each(jsonFiles)('%s is valid D-15, named after its move and variant, with no rig address left', (file) => {
+  it.each([...jsonFiles, ...trafficFiles])('%s is valid D-15, named after its move and variant, with no rig address left', (file) => {
     const r = load(file);
     expect(validateRecording(r)).toEqual([]);
-    expect(file).toBe(`${r.move}.${r.variant}.json`);
+    expect(file).toBe(`${r.move === 'CUST' ? 'traffic/' : ''}${r.move}.${r.variant}.json`);
     expect(raw(file)).not.toMatch(/\b10\.66\.\d+\.\d+\b/);
     expect(accessOf(r).every((e) => isTestNet3(e.ip))).toBe(true);
   });
@@ -226,6 +228,44 @@ describe('MIN-02.a: credential stuffing wave', () => {
     expect(stolen).toHaveLength(wins.length);
     expect(stolen.every((id) => id > 25)).toBe(true);
     expect(exfilOf(r).map((e) => e.t)).toEqual(wins.map((e) => e.t));
+  });
+});
+
+describe('CUST.a: ordinary customer traffic (REC-06, D-61)', () => {
+  const r = load('traffic/CUST.a.json');
+  const access = accessOf(r);
+
+  it('is in traffic/, not among the moves, and lasts about ten minutes', () => {
+    expect(trafficFiles).toContain('traffic/CUST.a.json');
+    expect(jsonFiles.some((f) => f.startsWith('CUST'))).toBe(false);
+    expect(r.durationMs).toBeGreaterThan(540_000);
+    expect(r.durationMs).toBeLessThan(720_000);
+  });
+
+  it('comes from 40 to 80 addresses, none a Death or minion address, all with browser user agents', () => {
+    const ips = new Set(access.map((e) => e.ip));
+    expect(ips.size).toBeGreaterThanOrEqual(40);
+    expect(ips.size).toBeLessThanOrEqual(80);
+    const attackers = new Set(readdirSync(dir).filter((f) => f.endsWith('.json')).flatMap((f) => accessOf(load(f)).map((e) => e.ip)));
+    expect([...ips].filter((ip) => attackers.has(ip))).toEqual([]);
+    expect(access.every((e) => e.userAgent.startsWith('Mozilla/5.0'))).toBe(true);
+  });
+
+  it('has the ordinary things shoppers do, nothing broken and no attack payloads', () => {
+    const has = (method: string, target: RegExp, status: number) => access.some((e) => e.method === method && target.test(e.target) && e.status === status);
+    expect(has('GET', /^\/rest\/products\/search\?q=[a-z]/, 200)).toBe(true);
+    expect(has('POST', /^\/rest\/user\/login$/, 401)).toBe(true);
+    expect(has('POST', /^\/rest\/user\/login$/, 200)).toBe(true);
+    expect(has('POST', /^\/api\/BasketItems\/$/, 200)).toBe(true);
+    expect(has('POST', /^\/rest\/basket\/\d+\/checkout$/, 200)).toBe(true);
+    expect(has('POST', /^\/api\/Users\/$/, 201)).toBe(true);
+    expect(has('POST', /^\/api\/Feedbacks\/$/, 201)).toBe(true);
+    expect(has('POST', /^\/file-upload$/, 204)).toBe(true);
+    expect(has('POST', /^\/api\/Complaints\/$/, 201)).toBe(true);
+    expect(access.filter((e) => e.status >= 500)).toEqual([]);
+    expect(access.filter((e) => /union|select|%27|'|<script|\.\.\/|\.php/i.test(e.target))).toEqual([]);
+    const admins = dbOf(r).filter((e) => e.table === 'Users' && e.op === 'insert' && e.after?.role !== 'customer');
+    expect(admins).toEqual([]);
   });
 });
 

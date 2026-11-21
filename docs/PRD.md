@@ -318,6 +318,7 @@ Rows not listed here are `planned`. A PR that moves a row adds or updates its li
 | REC-03 | building | One variant each so far for ATK-01, 03, 04, 06, 11, 13, 15, 17 (`.a`); ATK-08: `.a` (test-only), `.b` low and slow and quiet (D-35) and `.c` loud (D-32), both retired from play (D-42), and the halves (D-63) `.d`/`.e` (quiet) and `.f`/`.g` (loud), the ones in play; ATK-09: the halves `.b`/`.c` (one-by-one scraping, D-63). The leaky taps (§4.1) still need recordings (KI-59) |
 | REC-04 | done | 300 seeded customers (D-26); baseline `juiceshop.sqlite` has 325 users |
 | REC-05 | building | MIN-01.a, MIN-02.a (the must minions); MIN-03/04 still to record |
+| REC-06 | done | `recording/attacks/CUST.a.sh` + `lib/shoppers.py` (D-61): `game/src/recordings/traffic/CUST.a.json` (D-62), 601 s, 3,055 requests from 64 addresses, 90 visits incl. 8 checkouts, 6 sign-ups, 3 feedbacks, 2 PDF complaints, 11 failed logins; 1.05 MB |
 | ATK-01 | building | Recorded (ATK-01.a); plays headless in the engine (every committed recording is loaded, D-40); no UI yet. Stopped by the scanner rule; DEF-06 only interrupts it (D-40) |
 | ATK-03 | building | Recorded (ATK-03.a); plays headless in the engine (SYS-03); no UI yet |
 | ATK-04 | building | Recorded (ATK-04.a); plays headless in the engine (every committed recording is loaded, D-40); no UI yet |
