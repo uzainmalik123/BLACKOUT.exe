@@ -161,7 +161,6 @@ function restore(world: World, b: Backup): void {
   world.accounts = structuredClone(b.accounts);
   world.files = structuredClone(b.files);
   world.defacements = structuredClone(b.defacements);
-  world.bannerDefacedBy = b.bannerDefacedBy;
   world.sessions = world.sessions.filter((s) => world.accounts.some((a) => a.email === s.email));
 }
 
@@ -194,6 +193,5 @@ export function takeBackupIfDue(world: World): void {
   world.backups.push({
     id, takenAt: world.clock.gameMs,
     accounts: structuredClone(world.accounts), files: structuredClone(world.files), defacements: structuredClone(world.defacements),
-    ...(world.bannerDefacedBy !== undefined ? { bannerDefacedBy: world.bannerDefacedBy } : {}),
   });
 }

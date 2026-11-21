@@ -38,6 +38,7 @@
 | D-34 | WAF vs ATK-08: the SQLi rule set stops ATK-08.b on Easy only (tamper scripts leak through on Medium/Hard); a sqlmap user-agent rule matches only ATK-08.c; SIM-9 | Accepted |
 | D-35 | ATK-08.b is quiet as well as slow: `--random-agent` and the `randomcase` tamper script, still with `--delay` (~2.5 min); ATK-08.c keeps sqlmap's own user agent (closes KI-22) | Accepted |
 | D-36 | New split: Uzain builds the brain (engine, shell logic, Kiro server, report grading, recordings, content text, hosting); the teammate builds every scene, the renderer, art, sound and the terminal window, from `docs/SCENES.md` and `docs/ENGINE_API.md` | Accepted |
+| D-40 | The engine synced to the PRD after D-30: the PRD's text follows D-24 (DEF-06 only interrupts ATK-01; SYS-03's resume; SYS-07 counts what the Director could pick); DEF-14 on ATK-11 is an undo; ATK-17 defaces product 1; souls are seed rows only; MIN-02 breaks into leaked-password reusers only; a colliding sign-up gets the next free id; a test holds `moves.ts` to PRD §3 | Accepted |
 | D-60 | Ordinary customer traffic: a recorded shopper loop (REC-06) plays under everything (SYS-19), from an address pool shared with Death and the minions, and shows the cost of the player's actions as customers' failed requests | Accepted |
 
 ### D-01: Pivot to an incident-response game
@@ -196,6 +197,19 @@
 - **Context:** (2026-11-21) Nothing visible exists yet with 13 days left, and the teammate's strength is UI. D-21 had given her the shell and the writing too.
 - **Decision:** Uzain (with Claude) owns the brain: engine, the shell's logic (SYS-09, still built from a Kiro spec, KDEV-02), Kiro's server (SYS-12), report grading (SYS-11), recordings, the content text (CON-01/03/04/05) and hosting. The teammate owns every scene (UI-01 to UI-08), the renderer, art (CON-06), sound and the terminal window. `docs/SCENES.md` fixes what each scene must contain and leaves layout and style to her; `docs/ENGINE_API.md` is the contract, including the agreed shapes of the shell, Kiro and the report so she builds against stubs now.
 - **Consequences:** separate folders, so the two never edit the same files. Supersedes D-21's split.
+
+### D-40: The engine synced to the PRD after D-30
+- **Context:** (2026-11-20) D-30 changed the Needs and stoppers of ATK-09, ATK-11 and ATK-17 in the PRD, but `game/src/rules/moves.ts` still had the old ones, the engine loaded only two recordings (KI-17), and a review of the engine (PR #63) left a few PRD rows describing behaviour D-24 had already changed. Syncing them needed a few readings the PRD leaves open; none changes a rule the team ruled on.
+- **Decision:**
+  - **PRD text follows D-24 (no rule change):** ATK-01's "Stopped by" is the scanner rule (DEF-12); DEF-06 only interrupts the scan, which resumes from a fresh IP where it stopped. SYS-03 says the same of every move. SYS-07's "no move whose Needs hold" means no move the Director could actually pick: its Needs hold, a recorded variant isn't stopped, and stage order allows it (`candidateMoves` in `director.ts`). §5's summary is 17 must, 3 should (KI-16).
+  - **DEF-14 on ATK-11 is an undo stopper**, as the row says ("removes it once planted"): it removes a planted hidden admin but doesn't stop a new one being planted. Otherwise deleting ATK-06's admin would also stop ATK-11, though ATK-11 now needs only `map`.
+  - **ATK-17's rename of product 1 is a defacement** (the defacements list, by ATK-17), so backups, DEF-17, the defaced drain and the `defaced` gain treat it like ATK-15; `ransom` stays the note in `uploads/complaints/`. No banner model (KI-03).
+  - **Souls are rows of the seed only:** a dump that takes ATK-06's or ATK-11's admin adds no soul.
+  - **MIN-02 breaks into leaked-password reusers only** (the 28 customers D-26 seeded with a leaked password, listed in `engine/seed.ts`), and only while the account can still log in (not locked by DEF-08, no forced reset by DEF-16). Once every reuser is stolen, a success still hands Death a `user-session` but takes no new soul.
+  - **A sign-up whose recorded id is taken gets the next free id** (ATK-06.a and ATK-11.a were each recorded on a fresh shop and both insert 326), as the shop's autoincrement would.
+  - **SYS-17 gets a PRD test** (`game/src/rules/prd-sync.test.ts`): it parses PRD §3 and fails when a move's stage, priority, stoppers (the DEF ids in "Stopped by", notes in brackets and later sentences left out), gains or the gains its Needs name differ from `moves.ts`, and when §3/§5's summary counts don't match the rows.
+  - **SIM-4's scripted player** leaves registration open (closing or patching it now stops ATK-11 too, D-30) and deletes ATK-06's admin instead.
+- **Consequences:** a PRD ruling on Death's moves that isn't mirrored in the rules data now fails `npm run health`. Every committed recording plays in a real run (KI-17 closed). Questions this raised for the team are KI-48 to KI-51.
 
 ### D-60: Customer traffic
 - **Context:** (2026-11-21) KI-60: the logs only ever held Death's and the minions' requests, so every line was suspicious, the briefing's "what normal looks like" had nothing to compare against, and spotting the attacker was far easier than in a real incident.

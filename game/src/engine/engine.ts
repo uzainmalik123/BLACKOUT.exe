@@ -1,7 +1,5 @@
 // The engine the game runs: one World, the recordings it may play, and the sql.js copy the shell's `sqlite3`
 // reads. The UI and the shell talk to this class; everything underneath is pure functions over the World.
-import atk03a from '../recordings/ATK-03.a.json';
-import atk08a from '../recordings/ATK-08.a.json';
 import type { Recording } from '../recordings/format';
 import type { Difficulty, PlayerAction } from '../rules/vocabulary';
 import { applyAction, type ActionResult } from './actions';
@@ -12,8 +10,12 @@ import { renderAccessLog, renderAppLog } from './replay';
 import { openBaseline, syncDb, type GameDb } from './sqldb';
 import { initialWorld, type Evidence, type VFile, type World } from './state';
 
-/** The recordings committed in src/recordings/ (REC-02). */
-export const COMMITTED_LIBRARY: RecordingLibrary = libraryFrom([atk03a as Recording, atk08a as Recording]);
+/**
+ * Every recording committed in src/recordings/ (REC-02), bundled by Vite (KI-17). Test-only variants such as
+ * ATK-08.a stay in the library; the Director never picks them in play (D-31: `pinnedVariants` in config.ts).
+ */
+const COMMITTED = import.meta.glob<Recording>('../recordings/*.json', { eager: true, import: 'default' });
+export const COMMITTED_LIBRARY: RecordingLibrary = libraryFrom(Object.keys(COMMITTED).sort().map((path) => COMMITTED[path]!));
 
 export interface EngineOptions {
   seed: number;

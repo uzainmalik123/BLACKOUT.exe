@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { MOVE_BY_ID } from '../rules/moves';
-import { anyStopperHolds, footholds, gains, needHolds, stopperHolds, usedAccountEmails, type VariantInfo } from './facts';
+import { anyStopperHolds, footholds, gains, needHolds, needsHold, stopperHolds, usedAccountEmails, type VariantInfo } from './facts';
 import { initialWorld, type World } from './state';
 
 const loud: VariantInfo = { ip: '203.0.113.81', quiet: false, targets: [] };
@@ -59,12 +59,11 @@ describe('derived gains and footholds', () => {
 });
 
 describe('needHolds', () => {
-  it('evaluates anyOf, anySession, anyFoothold, anyAdmin, stageGain 3 (own-admin), featureOn, loginNotRateLimited', () => {
+  it('evaluates anyOf, anySession, anyFoothold, stageGain 3 (own-admin), featureOn, loginNotRateLimited', () => {
     const w = initialWorld(1, 'medium');
     expect(needHolds(w, { featureOn: 'search' })).toBe(true);
     expect(needHolds(w, { loginNotRateLimited: true })).toBe(true);
     expect(needHolds(w, { anySession: true })).toBe(false);
-    expect(needHolds(w, { anyAdmin: true })).toBe(false);
     expect(needHolds(w, { anyFoothold: true })).toBe(false);
     expect(needHolds(w, { stageGain: 3 })).toBe(false);
     expect(needHolds(w, { anyOf: [{ gain: 'map' }, { featureOn: 'ftp' }] })).toBe(true);
@@ -74,12 +73,65 @@ describe('needHolds', () => {
     expect(needHolds(w, { featureOn: 'search' })).toBe(false);
     w.sessions.push({ id: 1, email: 'jim@juice-sh.op', kind: 'user', issuedBy: 'MIN-02', keyVersion: 1 });
     expect(needHolds(w, { anySession: true })).toBe(true);
-    expect(needHolds(w, { anyAdmin: true })).toBe(false);
     w.accounts.push({ id: 326, email: 'death@juice-sh.op', role: 'admin', createdBy: 'ATK-06' });
-    expect(needHolds(w, { anyAdmin: true })).toBe(true);
     expect(needHolds(w, { stageGain: 3 })).toBe(true);
     w.files.push({ path: 'x', size: 1, sha256: 'c'.repeat(64), plantedBy: 'ATK-13' });
     expect(needHolds(w, { anyFoothold: true })).toBe(true);
+  });
+});
+
+describe('D-30: Needs and stoppers of ATK-09, ATK-11 and ATK-17', () => {
+  const map = (w: World) => w.death.knowledge.push('map');
+
+  it('ATK-09 needs a user session, an admin session or his own admin, but not a hidden admin alone', () => {
+    const atk09 = MOVE_BY_ID['ATK-09'];
+    const w = initialWorld(1, 'medium');
+    map(w);
+    expect(needsHold(w, atk09)).toBe(false);
+    w.accounts.push({ id: 326, email: 'support-ops@juice-sh.op', role: 'admin', createdBy: 'ATK-11' });
+    expect(needsHold(w, atk09)).toBe(false); // the hidden admin is a foothold, not a session
+    w.sessions.push({ id: 1, email: 'jim@juice-sh.op', kind: 'user', issuedBy: 'MIN-02', keyVersion: 1 });
+    expect(needsHold(w, atk09)).toBe(true);
+    w.sessions = [];
+    adminSession(w);
+    expect(needsHold(w, atk09)).toBe(true);
+    w.sessions = [];
+    w.accounts.push({ id: 327, email: 'reaper@example.org', role: 'admin', createdBy: 'ATK-06' });
+    expect(needsHold(w, atk09)).toBe(true);
+  });
+
+  it('ATK-09 is stopped by the /api/Users access-control patch (DEF-13)', () => {
+    const w = initialWorld(1, 'medium');
+    expect(anyStopperHolds(w, MOVE_BY_ID['ATK-09'], loud)).toBe(false);
+    w.patches.applied.push('users-access');
+    expect(anyStopperHolds(w, MOVE_BY_ID['ATK-09'], loud)).toBe(true);
+  });
+
+  it('ATK-11 and ATK-17 need only map', () => {
+    const w = initialWorld(1, 'medium');
+    expect(needsHold(w, MOVE_BY_ID['ATK-11'])).toBe(false);
+    expect(needsHold(w, MOVE_BY_ID['ATK-17'])).toBe(false);
+    map(w);
+    expect(needsHold(w, MOVE_BY_ID['ATK-11'])).toBe(true);
+    expect(needsHold(w, MOVE_BY_ID['ATK-17'])).toBe(true);
+  });
+
+  it('registration off (DEF-10) or patched (DEF-13) stops ATK-11 and ATK-06 together', () => {
+    for (const close of [(w: World) => { w.features.registration = false; }, (w: World) => { w.patches.applied.push('registration'); }]) {
+      const w = initialWorld(1, 'medium');
+      close(w);
+      expect(anyStopperHolds(w, MOVE_BY_ID['ATK-11'], loud)).toBe(true);
+      expect(anyStopperHolds(w, MOVE_BY_ID['ATK-06'], loud)).toBe(true);
+    }
+  });
+
+  it('uploads off (DEF-10) or a WAF rule blocking PUT /api/Products (DEF-12) stops ATK-17, even its quiet variants', () => {
+    const off = initialWorld(1, 'medium');
+    off.features.uploads = false;
+    expect(anyStopperHolds(off, MOVE_BY_ID['ATK-17'], loud)).toBe(true);
+    const waf = initialWorld(1, 'medium');
+    waf.waf.push({ kind: 'block-path', method: 'PUT', path: '/api/Products' });
+    expect(anyStopperHolds(waf, MOVE_BY_ID['ATK-17'], quiet)).toBe(true);
   });
 });
 

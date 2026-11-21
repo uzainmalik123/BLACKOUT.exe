@@ -335,3 +335,12 @@ export const SEED_ACCOUNTS: readonly Account[] = [
 ];
 
 export const SEED_PRODUCT_COUNT = 56;
+
+/**
+ * The seeded customers who reuse a leaked password (D-26: about 1 in 10, `recording/attacks/lib/customers.py`):
+ * the only accounts credential stuffing (MIN-02) can break into. seed.test.ts checks this list against the baseline's
+ * password hashes and against MIN-02.a's successes.
+ */
+export const LEAKED_PASSWORD_REUSERS: readonly number[] = [
+  43, 51, 59, 60, 79, 80, 83, 84, 85, 89, 118, 119, 165, 185, 187, 203, 205, 213, 217, 220, 226, 261, 271, 278, 297, 302, 303, 310,
+];

@@ -28,7 +28,7 @@ describe('heartbeat (SYS-06), rates per real minute (D-33)', () => {
 
   it('target times for each cause alone: defacement 5 min, one open door 33 min, one minion 67 min, search off 333 min', () => {
     expect(secondsToFlatline((w) => { w.defacements.push({ productId: 1, kind: 'deface', by: 'ATK-15' }); })).toBeCloseTo(300, 0);
-    expect(secondsToFlatline((w) => { w.bannerDefacedBy = 'ATK-17'; })).toBeCloseTo(300, 0);
+    expect(secondsToFlatline((w) => { w.defacements.push({ productId: 1, kind: 'deface', by: 'ATK-17' }); })).toBeCloseTo(300, 0);
     expect(secondsToFlatline((w) => { w.defacements.push({ productId: 2, kind: 'xss', by: 'ATK-16' }); })).toBeCloseTo(300, 0);
     expect(secondsToFlatline((w) => { w.replays.push(deathReplay); })).toBeCloseTo(2000, 0);
     expect(secondsToFlatline((w) => { w.waves.push(wave); })).toBeCloseTo(4000, 0);

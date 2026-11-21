@@ -10,6 +10,7 @@ import { CONFIG } from './config';
 import { stopperHolds, type VariantInfo } from './facts';
 import type { RecordingLibrary, Variant } from './library';
 import { emit } from './log';
+import { SEED_ACCOUNTS } from './seed';
 import { steal } from './souls';
 import type { AccessLine, Replay, World } from './state';
 
@@ -79,10 +80,44 @@ function whatStops(world: World, replay: Replay, info: VariantInfo): ActionId | 
   return stoppers.find((s) => stopperHolds(world, s, info))?.action;
 }
 
-function applyDb(world: World, by: MoveId | MinionId, e: DbEvent, t: number): void {
+/**
+ * Each recording was made on a fresh shop, so two of Death's sign-ups can carry the same new Users id (ATK-06.a and
+ * ATK-11.a both insert 326). The second gets the next free id, as the real shop's autoincrement would, and the
+ * replay remembers it for the rest of its events (the Users key and any UserId column).
+ */
+function userIdFor(world: World, replay: Replay, e: DbEvent, by: MoveId): number {
+  const recorded = Number(Object.values(e.key)[0]);
+  const mapped = replay.userIds?.[String(recorded)];
+  if (mapped !== undefined) return mapped;
+  if (e.table !== 'Users' || e.op !== 'insert' || !e.after) return recorded;
+  const email = String(e.after.email ?? '');
+  const holder = world.accounts.find((x) => x.id === recorded);
+  if (!holder || (holder.createdBy === by && holder.email === email)) return recorded; // free, or a retried move's own row
+  const fresh = Math.max(...SEED_ACCOUNTS.map((a) => a.id), ...world.accounts.map((a) => a.id)) + 1;
+  replay.userIds = { ...replay.userIds, [String(recorded)]: fresh };
+  return fresh;
+}
+
+function remapped(e: DbEvent, replay: Replay, id: number): DbEvent {
+  const map = replay.userIds;
+  if (!map) return e;
+  const fix = (row?: Record<string, unknown>) => {
+    if (!row) return row;
+    const out = { ...row } as NonNullable<DbEvent['after']>;
+    if (e.table === 'Users' && 'id' in out) out.id = id;
+    if (typeof out.UserId === 'number' && map[String(out.UserId)] !== undefined) out.UserId = map[String(out.UserId)]!;
+    return out;
+  };
+  const key = e.table === 'Users' ? { [Object.keys(e.key)[0]!]: id } : e.key;
+  return { ...e, key, ...(e.before && { before: fix(e.before) }), ...(e.after && { after: fix(e.after) }) };
+}
+
+function applyDb(world: World, replay: Replay, recorded: DbEvent, t: number): void {
+  const by = replay.move;
+  const id = isMove(by) && recorded.table === 'Users' ? userIdFor(world, replay, recorded, by) : Number(Object.values(recorded.key)[0]);
+  const e = remapped(recorded, replay, id);
   world.logs.dbChanges.push({ t, op: e.op, table: e.table, key: e.key, ...(e.before && { before: e.before }), ...(e.after && { after: e.after }) });
   if (!isMove(by)) return;
-  const id = Number(Object.values(e.key)[0]);
   if (e.table === 'Users') {
     if (e.op === 'insert' && e.after) {
       const role = String(e.after.role ?? 'customer') as World['accounts'][number]['role'];
@@ -97,11 +132,8 @@ function applyDb(world: World, by: MoveId | MinionId, e: DbEvent, t: number): vo
       world.accounts = world.accounts.filter((x) => x.id !== id);
     }
   } else if (e.table === 'Products' && e.op === 'update' && e.after?.description !== undefined) {
-    if (by === 'ATK-17') world.bannerDefacedBy = by;
-    else {
-      const text = String(e.after.description);
-      world.defacements.push({ productId: id, kind: /<script|<iframe/i.test(text) ? 'xss' : 'deface', by });
-    }
+    const text = String(e.after.description);
+    world.defacements.push({ productId: id, kind: /<script|<iframe/i.test(text) ? 'xss' : 'deface', by }); // ATK-17 renames product 1 (ATK-17.a)
   }
 }
 
@@ -124,7 +156,7 @@ function applyEvent(world: World, replay: Replay, e: RecEvent, t: number): void 
       world.logs.app.push({ t, text: e.text, by });
       return;
     case 'db':
-      applyDb(world, by, e, t);
+      applyDb(world, replay, e, t);
       return;
     case 'file':
       applyFile(world, by, e);

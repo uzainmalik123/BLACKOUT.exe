@@ -15,7 +15,6 @@ function producible(need: Need): boolean {
   if ('anyOf' in need) return need.anyOf.some(producible);
   if ('anySession' in need) return allGains.has('admin-session') || allGains.has('user-session');
   if ('anyFoothold' in need) return MOVES.some((m) => m.foothold !== undefined);
-  if ('anyAdmin' in need) return allGains.has('admin-session') || allGains.has('own-admin') || allGains.has('admin-password');
   if ('stageGain' in need) return stagesWithGains.has(need.stageGain);
   if ('featureOn' in need) return FEATURE_DEFAULTS[need.featureOn];
   if ('loginNotRateLimited' in need) return true; // nothing is rate-limited at the start
@@ -26,7 +25,7 @@ const stopperAction = (s: Stopper): ActionId => s.action;
 const preEmptive = (s: Stopper) => !('undo' in s);
 
 describe('the PRD tables (SYS-17)', () => {
-  it('has the PRD counts: 17 moves (10 must, 7 should), 20 actions (17 must, 3 should: the rows, not the summary line; KI-16), 4 minions', () => {
+  it('has the PRD counts: 17 moves (10 must, 7 should), 20 actions (17 must, 3 should), 4 minions', () => {
     expect(MOVES).toHaveLength(17);
     expect(MOVES.filter((m) => m.pri === 'M')).toHaveLength(10);
     expect(ACTIONS).toHaveLength(20);
