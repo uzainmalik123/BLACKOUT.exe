@@ -7,7 +7,7 @@ import { doorHalves, doorOpenForWin, isDoor, landed, soulKeys, unstolen } from '
 import { anyStopperHolds, footholds, needsHold } from './facts';
 import type { RecordingLibrary, Variant } from './library';
 import { emit, endRun } from './log';
-import { activeDeathReplay, startReplay } from './replay';
+import { activeDeathReplay, proxyPool, startReplay } from './replay';
 import { nextRandom, pick } from './rng';
 import type { World } from './state';
 
@@ -51,6 +51,17 @@ function freshIp(world: World): string {
   do ip = `${range}.${1 + Math.floor(nextRandom(world) * 254)}`;
   while (blocked.has(ip) && range !== RANGES[0]); // both ranges blocked: any address; the block cuts him again at once
   return ip;
+}
+
+/** Starts one of Death's variants: from its recorded address, a fresh one if that is blocked (D-24), or a proxy pool (D-46). */
+function play(world: World, chosen: Variant): void {
+  if (world.death.proxies) {
+    const ips = proxyPool(world);
+    startReplay(world, { ...chosen, info: { ...chosen.info, ip: ips[0]! } }, 'death', ips);
+    return;
+  }
+  const variant = world.firewall.blocked.includes(chosen.info.ip) ? { ...chosen, info: { ...chosen.info, ip: freshIp(world) } } : chosen;
+  startReplay(world, variant, 'death');
 }
 
 /** Every move whose route is open: Needs hold, a variant he may play isn't stopped, a door has rows left. */
@@ -97,13 +108,14 @@ export function returnGrants(foothold: Foothold): Gain {
 }
 
 /**
- * SYS-07. With every route closed (whatever its stage, D-45): no foothold and no open tap → banished (win); a tap
+ * SYS-07. With every route closed (whatever its stage, D-45; once he is stuck, only the routes he can reach, D-46): no foothold and no open tap → banished (win); a tap
  * still dripping → not yet (D-44). A foothold → he goes quiet, and after the return delay comes back through it
  * (the return, an ending: D-24). Reopening a route ends the quiet.
  */
 export function checkBanishment(world: World, library: RecordingLibrary): void {
   if (world.ending) return;
-  if (openRoutes(world, library).length > 0) {
+  const routes = isStuck(world) ? reachableRoutes(world, library) : openRoutes(world, library);
+  if (routes.length > 0) {
     delete world.death.quietSince;
     return;
   }
@@ -132,6 +144,29 @@ export function finaleLanded(world: World): boolean {
   return world.death.played.some((p) => p.move === 'ATK-17' && p.outcome === 'landed');
 }
 
+/** What he could start now: the moves the Director can pick, only his doors after the finale (D-41). */
+export function pickableMoves(world: World, library: RecordingLibrary): Move[] {
+  const candidates = candidateMoves(world, library);
+  return finaleLanded(world) ? candidates.filter((m) => isHisDoor(world, m)) : candidates;
+}
+
+/**
+ * D-46 (KI-80): what still counts once he is stuck: the routes he can actually reach (what he could start now) and
+ * every soul door still open, i.e. without its real fix (D-45: a flag or a revoke shuts it only while it holds).
+ * A story route above a stage he can't enter, or one after the finale, no longer counts.
+ */
+export function reachableRoutes(world: World, library: RecordingLibrary): Move[] {
+  const pickable = pickableMoves(world, library);
+  const doorsOpen = MOVES.filter((m) => isDoor(m) && !pickable.includes(m) && doorOpenForWin(world, library, m, needsHold(world, m)));
+  return [...pickable, ...doorsOpen];
+}
+
+/** D-46 (KI-80): he has had nothing he could play for config.stuckBreathers of the level's longest breathers. */
+export function isStuck(world: World): boolean {
+  const { stuckBreathers, breatherGameMs } = CONFIG[world.difficulty];
+  return world.death.stuckSince !== undefined && world.clock.gameMs - world.death.stuckSince >= stuckBreathers * breatherGameMs.max;
+}
+
 function pace(world: World): void {
   const { pacing, breatherGameMs } = CONFIG[world.difficulty];
   const now = world.clock.gameMs;
@@ -156,10 +191,12 @@ export function directorTick(world: World, library: RecordingLibrary): void {
   if (world.ending || world.nginx === 'stopped' || activeDeathReplay(world)) return; // nothing reaches a stopped server
   pace(world);
   const candidates = candidateMoves(world, library);
-  if (candidates.length === 0) {
+  if (pickableMoves(world, library).length === 0) {
+    world.death.stuckSince ??= world.clock.gameMs; // D-46: nothing he can play; after two breathers only what he can reach counts
     checkBanishment(world, library);
     return;
   }
+  delete world.death.stuckSince;
   delete world.death.quietSince;
   if (world.clock.gameMs < world.death.nextMoveAt) return;
   if (!CONFIG[world.difficulty].minions.alongsideDeath && world.waves.length > 0) return; // D-41: Easy never overlaps a wave
@@ -195,9 +232,8 @@ export function directorTick(world: World, library: RecordingLibrary): void {
   const open = untried.filter((v) => !world.firewall.blocked.includes(v.info.ip));
   const resumable = variants.find((v) => world.death.resume[move.id]?.variant === v.variant);
   const chosen = (resumable ?? open[0] ?? untried[0] ?? variants[0])!;
-  const variant = world.firewall.blocked.includes(chosen.info.ip) ? { ...chosen, info: { ...chosen.info, ip: freshIp(world) } } : chosen;
   if (move.stage > nextStage(world, library)) world.death.stageSkips -= 1;
-  startReplay(world, variant, 'death');
+  play(world, chosen);
 }
 
 /** D-42: starts a big soul door, a first entry or a visit: the paused half if there is one, else the half pickHalf chooses. */
@@ -206,6 +242,5 @@ function startDoor(world: World, library: RecordingLibrary, move: Move): void {
   const saved = world.death.resume[move.id as MoveId];
   const chosen = variants.find((v) => saved?.variant === v.variant) ?? pickHalf(world, variants);
   if (!chosen) return;
-  const variant = world.firewall.blocked.includes(chosen.info.ip) ? { ...chosen, info: { ...chosen.info, ip: freshIp(world) } } : chosen;
-  startReplay(world, variant, 'death');
+  play(world, chosen);
 }

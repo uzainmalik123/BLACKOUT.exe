@@ -19,6 +19,7 @@ export type GameEventBody =
   | { kind: 'tap-closed'; tap: TapId; by?: ActionId } // no `by`: it ran dry
   | { kind: 'door-shut'; move: MoveId; by: ActionId } // D-44: one of its own stoppers holds for every half he may play
   | { kind: 'door-reopened'; move: MoveId } // D-44: that fix lapsed; the door is his again
+  | { kind: 'proxies' } // D-46 (KI-78): after three IP blocks in a row he plays from rotating proxies for the rest of the run
   | { kind: 'patch-applied'; patch: Patch }
   | { kind: 'banished' }
   | { kind: 'return'; through: Foothold }

@@ -155,15 +155,18 @@ describe('the ransom is the finale (D-41 rule 6)', () => {
     return w;
   }
 
-  it('after ATK-17 lands he starts no new move though ATK-15 is open, and the run goes on', () => {
+  it('after ATK-17 lands he starts no new move though ATK-15 is open; stuck for two breathers with no soul door open and no foothold, he is banished (D-46, KI-80)', () => {
     const w = afterRansom();
-    for (let i = 0; i < 100; i++) {
+    const stuckFor = CONFIG.medium.stuckBreathers * CONFIG.medium.breatherGameMs.max;
+    const start = w.clock.gameMs;
+    for (let i = 0; i < 100 && !w.ending; i++) {
       w.clock.gameMs += 3 * REAL_S;
       directorTick(w, strike);
+      if (w.clock.gameMs - start < stuckFor) expect(w.ending).toBeUndefined();
     }
     expect(eventsOfKind(w, 'move-started')).toEqual([]);
-    expect(eventsOfKind(w, 'banished')).toEqual([]);
-    expect(w.ending).toBeUndefined();
+    expect(w.ending).toBe('banished');
+    expect(eventsOfKind(w, 'ending')[0]!.t - start).toBeLessThanOrEqual(stuckFor + 3 * REAL_S);
   });
 
   it('closing his last route with no foothold left still banishes him (SYS-07 as before)', () => {

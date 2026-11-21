@@ -1,3 +1,4 @@
+import { footholds } from './facts';
 // SYS-16: the playthrough sims of PRD §10, headless, seed 1, Medium, on the made-up library (test-fixtures).
 // They assert only from the event log (SYS-10). SIM-2's and SIM-5's report lines wait for SYS-11.
 import { describe, expect, it } from 'vitest';
@@ -396,7 +397,7 @@ describe('D-41: pacing and fairness, in whole runs', () => {
     }
   });
 
-  it('after the ransom (ATK-17) lands no move starts, though stage-5 moves are still open, and the run goes on', () => {
+  it('after the ransom (ATK-17) lands no move starts, though stage-5 moves are still open; stuck, he returns through a foothold left (D-46)', () => {
     const noHarvest = libraryFrom(['ATK-01', 'ATK-03', 'ATK-04', 'ATK-06', 'ATK-11', 'ATK-13', 'ATK-15', 'ATK-17', 'MIN-01', 'MIN-02']
       .flatMap((m) => real.variantsOf(m as MoveId).map((v) => v.recording)));
     for (const seed of [1, 2, 3]) {
@@ -405,8 +406,11 @@ describe('D-41: pacing and fairness, in whole runs', () => {
       expect(ransom, `seed ${seed}`).toBeDefined();
       expect(eventsOfKind(r.world, 'move-started').filter((e) => e.t > ransom!.t), `seed ${seed}`).toEqual([]);
       const end = eventsOfKind(r.world, 'ending')[0]!;
-      expect(end.ending).toBe('flatline'); // nobody cleaned up the defacement
-      expect(end.t - ransom!.t).toBeGreaterThan(REAL_MIN * 30); // more than a real minute later
+      // D-46 (KI-80): stuck after the finale, he returns through the foothold the idle player left; or the defacement
+      // flatlines the shop first
+      expect(['return', 'flatline'], `seed ${seed}`).toContain(end.ending);
+      if (end.ending === 'return') expect(footholds(r.world).size, `seed ${seed}`).toBeGreaterThan(0);
+      expect(end.t - ransom!.t).toBeGreaterThan(CONFIG.medium.stuckBreathers * CONFIG.medium.breatherGameMs.max); // at least two breathers later
     }
   });
 

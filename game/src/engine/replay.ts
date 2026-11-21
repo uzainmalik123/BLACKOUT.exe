@@ -102,6 +102,7 @@ export function cutReplay(world: World, replay: Replay, by: ActionId): void {
   if (replay.owner !== 'death' || !isMove(replay.move)) return;
   const visit = isDoor(replay.move) && landed(world, replay.move); // his door: a visit, not a first entry
   world.death.played.push({ move: replay.move, variant: replay.variant, outcome: 'cut' });
+  countIpCut(world, by);
   if (by === 'DEF-06' || visit) {
     world.death.resume[replay.move] = {
       variant: replay.variant, cursor: replay.cursor,
@@ -116,6 +117,33 @@ export function cutReplay(world: World, replay: Replay, by: ActionId): void {
   const wait = by === 'DEF-06' ? CONFIG[world.difficulty].ipResumeGameMs : visit ? 0 : breather(world);
   world.death.nextMoveAt = world.clock.gameMs + (world.death.skipWait ? 0 : wait);
   world.death.skipWait = false;
+}
+
+/**
+ * D-46 (KI-78): three IP-block cuts in a row and he switches to rotating proxies for the rest of the run: blocking
+ * addresses stays whack-a-mole. A move that lands, or a cut by anything else, starts the count again.
+ */
+function countIpCut(world: World, by: ActionId): void {
+  if (by !== 'DEF-06') {
+    world.death.ipCutsInRow = 0;
+    return;
+  }
+  world.death.ipCutsInRow += 1;
+  if (!world.death.proxies && world.death.ipCutsInRow >= CONFIG[world.difficulty].proxies.afterIpCuts) {
+    world.death.proxies = true;
+    emit(world, { kind: 'proxies' });
+  }
+}
+
+/** D-46 (KI-78): a rotating-proxy pool, drawn from 198.18.0.0/15 (RFC 2544's range: far too many addresses to block by hand). */
+export function proxyPool(world: World): string[] {
+  const blocked = new Set(world.firewall.blocked);
+  const pool = new Set<string>();
+  while (pool.size < CONFIG[world.difficulty].proxies.pool) {
+    const ip = `198.${18 + Math.floor(nextRandom(world) * 2)}.${Math.floor(nextRandom(world) * 256)}.${1 + Math.floor(nextRandom(world) * 254)}`;
+    if (!blocked.has(ip)) pool.add(ip);
+  }
+  return [...pool];
 }
 
 /** A minion success hands Death a user-session for the account it broke into (MIN-02, D-18). */
@@ -243,6 +271,7 @@ function land(world: World, library: RecordingLibrary, replay: Replay, info: Var
   }
   if (move.foothold === 'forged-token') world.death.forgedToken = true;
   world.death.played.push({ move: move.id, variant: replay.variant, outcome: 'landed' });
+  world.death.ipCutsInRow = 0;
   emit(world, { kind: 'move-landed', move: move.id, variant: replay.variant });
   closeAlert(world, move.id);
   world.death.nextMoveAt = world.clock.gameMs + (world.death.skipWait ? 0 : breather(world));
@@ -261,7 +290,13 @@ export function stepReplays(world: World, library: RecordingLibrary): void {
     const info: VariantInfo = { ...v.info, ip: replay.ip };
     const events = v.recording.events;
     const end = replay.endCursor ?? events.length;
-    const by = whatStops(world, replay, info);
+    let by = whatStops(world, replay, info);
+    if (by === 'DEF-06' && replay.owner === 'death' && world.death.proxies && replay.cursor < end) {
+      // D-46 (KI-78): on rotating proxies a pool blocked to the last address just hands him fresh exits: no cut
+      replay.ips = proxyPool(world);
+      replay.ip = replay.ips[0]!;
+      by = whatStops(world, replay, { ...info, ip: replay.ip });
+    }
     if (by === 'DEF-06' && replay.cursor >= end) {
       land(world, library, replay, info); // the tool had already finished; blocking the address changes nothing
       continue;

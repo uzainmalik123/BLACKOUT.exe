@@ -162,6 +162,9 @@ export interface World {
     noRepeat?: MoveId; // D-41: cut by a stopper; not picked again until he has started a different move
     shutDoors: MoveId[]; // D-44: big soul doors shut right now (a stopper holds for every half he may play); refreshed every tick, see doors.ts
     lastPick?: 'story' | 'visit'; // D-42: every second move he starts is a visit to one of his open doors
+    ipCutsInRow: number; // D-46: IP-block cuts on his moves since one last landed or was cut by anything else
+    proxies: boolean; // D-46 (KI-78): he switched to rotating proxies (after config.proxies.afterIpCuts IP cuts in a row)
+    stuckSince?: number; // D-46 (KI-80): since when he has had nothing he could play
     nextId: number; // ids for replays, waves, alerts, sessions, backups
   };
   replays: Replay[];
@@ -214,7 +217,7 @@ export function initialWorld(seed: number, difficulty: Difficulty): World {
     backups: [{ id: 0, takenAt: 0, accounts: accounts.map((a) => ({ ...a })), files: [], defacements: [] }],
     evidence: [],
     comms: { notifiedAt: {} },
-    death: { knowledge: [], forgedToken: false, played: [], nextMoveAt: 0, stageSkips: 0, pacingDelayed: false, skipWait: false, tippedOff: false, resume: {}, shutDoors: [], nextId: 1 },
+    death: { knowledge: [], forgedToken: false, played: [], nextMoveAt: 0, stageSkips: 0, pacingDelayed: false, skipWait: false, tippedOff: false, resume: {}, shutDoors: [], ipCutsInRow: 0, proxies: false, nextId: 1 },
     replays: [],
     waves: [],
     nextWaveAt: { ...config.minions.firstWaveGameMs },
