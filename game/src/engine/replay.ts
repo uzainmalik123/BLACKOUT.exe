@@ -3,8 +3,8 @@
 // a flag, a patch, the plug), so the Director can pick the next variant. Minion waves replay through it too.
 import type { DbEvent, FileEvent, RecEvent } from '../recordings/format';
 import { MINION_BY_ID } from '../rules/minions';
-import { MOVE_BY_ID } from '../rules/moves';
-import type { ActionId, MinionId, MoveId, Stopper } from '../rules/vocabulary';
+import { MOVE_BY_ID, SOUL_DOORS } from '../rules/moves';
+import type { ActionId, Actor, MinionId, MoveId, Stopper } from '../rules/vocabulary';
 import { gameTimeIso } from './clock';
 import { CONFIG } from './config';
 import { stopperHolds, type VariantInfo } from './facts';
@@ -12,24 +12,25 @@ import type { RecordingLibrary, Variant } from './library';
 import { emit } from './log';
 import { nextRandom } from './rng';
 import { SEED_ACCOUNTS } from './seed';
-import { breakInto, steal } from './souls';
+import { breakInto, soulsLeft, steal } from './souls';
 import type { Account, AccessLine, Replay, World } from './state';
 
-const isMove = (id: MoveId | MinionId): id is MoveId => id.startsWith('ATK-');
+const isMove = (id: Actor): id is MoveId => id.startsWith('ATK-');
+const isDoor = (id: Actor): id is MoveId => isMove(id) && SOUL_DOORS.includes(id);
 
 function nextId(world: World): number {
   return world.death.nextId++;
 }
 
 /** One alert per Death move and per minion wave (D-24). Opening or closing one restarts the Director's "quiet" clock. */
-export function openAlert(world: World, about: MoveId | MinionId): void {
+export function openAlert(world: World, about: Actor): void {
   const id = nextId(world);
   world.alerts.push({ id, about, openedAt: world.clock.gameMs });
   world.quietAlertsSince = world.clock.gameMs;
   emit(world, { kind: 'alert-opened', alert: id, about });
 }
 
-export function closeAlert(world: World, about: MoveId | MinionId): void {
+export function closeAlert(world: World, about: Actor): void {
   const alert = world.alerts.find((a) => a.about === about && a.closedAt === undefined);
   if (!alert) return;
   alert.closedAt = world.clock.gameMs;
@@ -57,10 +58,17 @@ export function startReplay(world: World, v: Variant, owner: 'death' | MinionId,
     id: nextId(world), owner, move: v.move, variant: v.variant, ip: v.info.ip, recordedIp: v.recording.attackerIp, startedAt, cursor,
     ...(ips && { ips }), ...(slice && { endCursor: slice.to }),
   };
+  if (owner === 'death' && isDoor(v.move)) {
+    // D-42: a visit takes at most half of the souls left when it starts; an IP-resumed visit keeps its cap and its count.
+    const resumed = cursor > 0 && saved !== undefined && saved.soulCap !== undefined;
+    replay.soulCap = resumed ? saved.soulCap : Math.ceil(soulsLeft(world) * CONFIG[world.difficulty].doors.visitCapFraction);
+    replay.soulsTaken = resumed ? (saved.soulsTaken ?? 0) : 0;
+  }
   if (saved && isMove(v.move)) delete world.death.resume[v.move];
   world.replays.push(replay);
   if (owner === 'death' && isMove(v.move)) {
     if (world.death.noRepeat !== v.move) delete world.death.noRepeat; // D-41: he has started a different move
+    world.death.pacingDelayed = false; // D-43: the next pick may be delayed again
     openAlert(world, v.move);
     emit(world, { kind: 'move-started', move: v.move, variant: v.variant, stage: MOVE_BY_ID[v.move].stage, ip: v.info.ip });
   }
@@ -84,13 +92,26 @@ export function cutReplay(world: World, replay: Replay, by: ActionId): void {
   world.replays = world.replays.filter((r) => r !== replay);
   if (replay.owner !== 'death' || !isMove(replay.move)) return;
   world.death.played.push({ move: replay.move, variant: replay.variant, outcome: 'cut' });
-  if (by === 'DEF-06') world.death.resume[replay.move] = { variant: replay.variant, cursor: replay.cursor };
-  else world.death.noRepeat = replay.move;
+  if (by === 'DEF-06') {
+    world.death.resume[replay.move] = {
+      variant: replay.variant, cursor: replay.cursor,
+      ...(replay.soulCap !== undefined && { soulCap: replay.soulCap, soulsTaken: replay.soulsTaken ?? 0 }),
+    };
+  } else world.death.noRepeat = replay.move;
   emit(world, { kind: 'move-cut', move: replay.move, variant: replay.variant, by });
+  if (isDoor(replay.move) && by !== 'DEF-06' && by !== 'DEF-11') shutDoor(world, replay.move, by); // D-42: the plug only pauses
   closeAlert(world, replay.move);
   const wait = by === 'DEF-06' ? CONFIG[world.difficulty].ipResumeGameMs : breather(world);
   world.death.nextMoveAt = world.clock.gameMs + (world.death.skipWait ? 0 : wait);
   world.death.skipWait = false;
+}
+
+/** D-42: one of a big soul door's own stoppers closed it: he never tries it again. */
+export function shutDoor(world: World, move: MoveId, by: ActionId): void {
+  if (world.death.shutDoors.includes(move)) return;
+  world.death.shutDoors.push(move);
+  delete world.death.resume[move];
+  emit(world, { kind: 'door-shut', move, by });
 }
 
 /** A minion success hands Death a user-session for the account it broke into (MIN-02, D-18). */
@@ -164,7 +185,7 @@ function applyDb(world: World, replay: Replay, recorded: DbEvent, t: number): vo
   }
 }
 
-function applyFile(world: World, by: MoveId | MinionId, e: FileEvent): void {
+function applyFile(world: World, by: Actor, e: FileEvent): void {
   world.files = world.files.filter((f) => f.path !== e.path);
   if (e.op === 'remove') return;
   world.files.push({ path: e.path, size: e.size, sha256: e.sha256, ...(e.contentBase64 !== undefined && { contentBase64: e.contentBase64 }), ...(isMove(by) && { plantedBy: by }) });
@@ -189,7 +210,8 @@ function applyEvent(world: World, replay: Replay, e: RecEvent, t: number): void 
       applyFile(world, by, e);
       return;
     case 'exfil':
-      if (isMove(by)) steal(world, by, e.table, e.keys);
+      if (isMove(by) && replay.soulCap !== undefined) replay.soulsTaken = (replay.soulsTaken ?? 0) + steal(world, by, e.table, e.keys, replay.soulCap - (replay.soulsTaken ?? 0));
+      else if (isMove(by)) steal(world, by, e.table, e.keys);
       else if (e.table === 'Users') for (const key of e.keys) grantMinionSession(world, by, breakInto(world, by, key)); // one recorded success (D-41)
       else steal(world, by, e.table, e.keys);
   }
@@ -243,6 +265,11 @@ export function stepReplays(world: World, library: RecordingLibrary): void {
     while (replay.cursor < end && replay.startedAt + events[replay.cursor]!.t * ratio <= now) {
       applyEvent(world, replay, events[replay.cursor]!, replay.startedAt + events[replay.cursor]!.t * ratio);
       replay.cursor++;
+      if (replay.soulCap !== undefined && (replay.soulsTaken ?? 0) >= replay.soulCap) break; // D-42: the visit took its half
+    }
+    if (replay.soulCap !== undefined && (replay.soulsTaken ?? 0) >= replay.soulCap) {
+      land(world, replay, info);
+      continue;
     }
     const finished = replay.endCursor !== undefined || replay.startedAt + v.recording.durationMs * ratio <= now; // a slice ends at its last event
     if (replay.cursor >= end && finished) land(world, replay, info);

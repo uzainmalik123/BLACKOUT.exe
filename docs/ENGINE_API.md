@@ -39,7 +39,8 @@ const unsubscribe = engine.subscribe((world) => render(world));
 | 🫀 Heartbeat | `heartbeat` | 0–100. 0 = flatline (an ending) |
 | Game clock | `clock.gameMs`, `clock.paused` | |
 | Difficulty | `difficulty` | Decides which helpers the screens show (SCENES.md §0) |
-| Alerts | `alerts` (`about`, `openedAt`, `closedAt?`) | Open = no `closedAt`. `about` is the move or minion it's about; **don't show that id to the player**, it's a spoiler. Show what the logs show |
+| Alerts | `alerts` (`about`, `openedAt`, `closedAt?`) | Open = no `closedAt`. `about` is the move, minion or leaky tap (`TAP-01`…) it's about; **don't show that id to the player**, it's a spoiler. Show what the logs show |
+| Leaky taps | `taps.open` (`id`, `openedAt`) | Small exposures dripping customer data (PRD §4.1, D-42). Each is closed by one WAF path block: `TAP_BY_ID[id].closedBy.rule` in `src/rules/taps.ts` gives the exact `DEF-12` rule a console button should send |
 | Logs | `engine.accessLog()`, `engine.appLog()` | Ready-made text, one line per entry (real nginx `combined` lines and real Juice Shop log lines). Also `world.logs.access` / `.app` as structured lines if you want to colour or filter them |
 | Accounts | `accounts` (`email`, `role`, `lockedAt?`, `createdBy`) | For the Accounts console. `createdBy` is a spoiler too: show `role` and `email` only |
 | Sessions | `sessions` | For the Sessions console (count, kinds) |
@@ -83,6 +84,8 @@ Every button, console and (later) shell command sends one of these. It returns `
 | `souls-stolen` | `count` souls just taken (`stolen`/`total` so far) | Souls meter drains, wisps fly out |
 | `wave-started` / `wave-ended` | A minion wave arrives / leaves (`closedBy` if the player closed it) | Rats skitter in / scatter |
 | `alert-opened` / `alert-closed` | An alert appears / clears | Alert panel |
+| `tap-opened` / `tap-closed` | A leaky tap starts dripping / stops (`by: 'DEF-12'` if the player closed it, no `by` if it ran dry) | A small leak animation, then a seal |
+| `door-shut` | One of Death's soul doors (`move`) is closed for good (`by` the action that did it); he never tries it again | He recoils from it for good. Don't name the move on screen |
 | `tip-off` | The player tipped Death off | He turns toward the player. Subtle |
 | `patch-applied` | A deploy finished | Small "sealed" beat |
 | `banished` | Death has no moves left | The calm before the ending |

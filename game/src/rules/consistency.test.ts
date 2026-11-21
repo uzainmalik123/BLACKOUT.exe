@@ -2,8 +2,10 @@
 import { describe, expect, it } from 'vitest';
 import { ACTIONS, ACTION_BY_ID } from './actions';
 import { MINIONS, MINION_BY_ID } from './minions';
-import { MOVES, MOVE_BY_ID, type Move } from './moves';
-import { FEATURE_DEFAULTS, FOOTHOLDS, type ActionId, type Gain, type Need, type Stopper } from './vocabulary';
+import { SEED_ACCOUNTS } from '../engine/seed';
+import { MOVES, MOVE_BY_ID, SOUL_DOORS, type Move } from './moves';
+import { TAPS } from './taps';
+import { FEATURE_DEFAULTS, FOOTHOLDS, TAP_IDS, type ActionId, type Gain, type Need, type Stopper } from './vocabulary';
 
 const actionIds = new Set<string>(ACTIONS.map((a) => a.id));
 const allGains = new Set<Gain>(MOVES.flatMap((m) => m.gains));
@@ -72,6 +74,15 @@ describe('the PRD tables (SYS-17)', () => {
       expect(mi.closedBy.length, mi.id).toBeGreaterThan(0);
       for (const s of mi.closedBy) expect(actionIds.has(stopperAction(s)), `${mi.id} ← ${s.action}`).toBe(true);
     }
+  });
+
+  it('every leaky tap has one closing DEF that exists and leaks only seed customers (D-42); the soul doors are harvest moves', () => {
+    expect(TAPS.map((t) => t.id)).toEqual([...TAP_IDS]);
+    for (const t of TAPS) {
+      expect(actionIds.has(t.closedBy.action), t.id).toBe(true);
+      if (t.leaks !== 'every-customer') for (const k of t.leaks) expect(SEED_ACCOUNTS.some((a) => a.id === k), `${t.id} leaks ${k}`).toBe(true);
+    }
+    for (const id of SOUL_DOORS) expect(MOVE_BY_ID[id].gains, id).toContain('souls');
   });
 
   it('keeps D-18 and D-19: ATK-15/16 need only map and are stopped by the PUT /api/Products rule; ATK-12 needs user-session; MIN-02 hands Death a user-session', () => {

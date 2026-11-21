@@ -10,6 +10,7 @@ import { endRun } from './log';
 import { stepWaves } from './minions';
 import { stepReplays } from './replay';
 import { soulsLeft } from './souls';
+import { stepTaps } from './taps';
 import type { World } from './state';
 
 /** Souls all taken or heartbeat at 0 end the run (SYS-05, SYS-06). Banishment and the return are the Director's. */
@@ -25,6 +26,7 @@ function step(world: World, library: RecordingLibrary, dt: number): void {
   takeBackupIfDue(world);
   stepReplays(world, library);
   stepWaves(world, library);
+  stepTaps(world);
   integrateHeartbeat(world, dt);
   const config = CONFIG[world.difficulty];
   if (world.clock.gameMs - world.clock.lastDirectorTick >= config.directorPeriodGameMs) {

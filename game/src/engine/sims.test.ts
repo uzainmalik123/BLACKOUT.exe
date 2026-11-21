@@ -3,6 +3,7 @@
 import { describe, expect, it } from 'vitest';
 import { MINION_BY_ID } from '../rules/minions';
 import { MOVE_BY_ID } from '../rules/moves';
+import { TAP_BY_ID } from '../rules/taps';
 import { FOOTHOLDS, type Difficulty, type Feature, type MinionId, type MoveId, type Patch, type PlayerAction, type Stopper } from '../rules/vocabulary';
 import type { GameEvent } from './log';
 import { eventsOfKind } from './log';
@@ -82,10 +83,12 @@ function bringBack(e: GameEvent, act: Act): void {
 }
 
 describe('the playthrough sims (PRD §10, SYS-16)', () => {
-  it('SIM-1: a player who does nothing loses every soul before the 10th real minute', () => {
+  it('SIM-1: a player who does nothing loses (every soul or a flatline), never wins, and has lost at least half the souls before the 10th real minute (D-42)', () => {
     const r = sim(() => []);
-    expect(ending(r)).toBe('souls-lost');
-    expect(r.realMs).toBeLessThan(10 * REAL_MIN);
+    expect(['souls-lost', 'flatline']).toContain(ending(r));
+    expect(kinds(r)).not.toContain('banished');
+    const byTen = eventsOfKind(r.world, 'souls-stolen').filter((e) => e.t <= 10 * REAL_MIN * 30).at(-1)!.stolen;
+    expect(byTen).toBeGreaterThanOrEqual(r.world.souls.total / 2);
     expect(eventsOfKind(r.world, 'souls-stolen').some((e) => e.by.startsWith('ATK-'))).toBe(true);
   });
 
@@ -103,7 +106,7 @@ describe('the playthrough sims (PRD §10, SYS-16)', () => {
     expect(comeback.length).toBeGreaterThanOrEqual(1); // he switched IP and carried on
     expect(comeback[0]!.ip).not.toBe(eventsOfKind(r.world, 'move-started').find((e) => e.move === cut[0]!.move)!.ip);
     expect(eventsOfKind(r.world, 'souls-stolen').some((e) => e.by.startsWith('ATK-'))).toBe(true);
-    expect(ending(r)).toBe('souls-lost');
+    expect(['souls-lost', 'flatline']).toContain(ending(r)); // D-42: he keeps robbing; the shop may flatline before the last soul goes
   });
 
   it('SIM-3: pulling the plug at the first alert and leaving it flatlines', () => {
@@ -185,18 +188,28 @@ describe('the playthrough sims (PRD §10, SYS-16)', () => {
   });
 });
 
-describe('SIM-8: the harvest at its recorded speed (D-31)', () => {
-  /** On Hard, ATK-08.c: does the player turn search off within 60 real s of the first SQLITE_ERROR in the app log? */
+/**
+ * D-42: the harvest sims measure the harvest, so their scripted players also close each leaky tap the moment it opens
+ * (one WAF path block, as any player who reads the alert would).
+ */
+function closingTaps(w: World): PlayerAction[] {
+  return w.taps.open.filter((t) => !w.waf.some((r) => r.kind === 'block-path' && r.path === TAP_BY_ID[t.id].closedBy.rule.path))
+    .map((t) => ({ type: 'DEF-12', rule: TAP_BY_ID[t.id].closedBy.rule }));
+}
+
+describe('SIM-8: the harvest at its recorded speed (D-31, on the halves: D-42)', () => {
+  /** On Hard, ATK-08.f: does the player turn search off within 60 real s of the first SQLITE_ERROR in the app log? */
   function hardHarvest(library: RecordingLibrary, reactAfterRealMs: number | undefined): SimResult {
     let acted = false;
     return runSim({
-      seed: 1, difficulty: 'hard', library, maxRealMs: 20 * REAL_MIN,
+      seed: 1, difficulty: 'hard', library, maxRealMs: 45 * REAL_MIN, // D-42: an idle player loses the rest over many visits
       player: (w, realElapsed) => {
-        if (acted || reactAfterRealMs === undefined) return [];
+        const taps = closingTaps(w);
+        if (acted || reactAfterRealMs === undefined) return taps;
         const first = w.logs.app.find((l) => l.text.includes('SQLITE_ERROR'));
-        if (!first || realElapsed < first.t / 30 + reactAfterRealMs) return [];
+        if (!first || realElapsed < first.t / 30 + reactAfterRealMs) return taps;
         acted = true;
-        return [{ type: 'DEF-10', feature: 'search', enabled: false }];
+        return [...taps, { type: 'DEF-10', feature: 'search', enabled: false }];
       },
     });
   }
@@ -204,29 +217,24 @@ describe('SIM-8: the harvest at its recorded speed (D-31)', () => {
   const harvestOnly = (library: RecordingLibrary) =>
     libraryFrom(['ATK-01', 'ATK-08'].flatMap((m) => library.variantsOf(m as 'ATK-01').map((v) => v.recording)));
 
-  it('a Hard player who turns search off within 60 s of the first SQLITE_ERROR keeps at least 90% of souls (made-up ATK-08.c)', () => {
-    const r = hardHarvest(harvestOnly(FIXTURE_LIBRARY), 60_000);
-    expect(eventsOfKind(r.world, 'move-started').find((e) => e.move === 'ATK-08')?.variant).toBe('c');
-    expect(eventsOfKind(r.world, 'move-cut')).toMatchObject([{ move: 'ATK-08', by: 'DEF-10' }]);
-    expect(kept(r)).toBeGreaterThanOrEqual(0.9);
-  });
-
-  it('a Hard player who does not loses every soul (made-up ATK-08.c)', () => {
-    const r = hardHarvest(harvestOnly(FIXTURE_LIBRARY), undefined);
-    expect(ending(r)).toBe('souls-lost');
-    expect(soulsStolen(r.world)).toBe(r.world.souls.total);
-  });
-
-  const real = committedLibrary();
-  it.runIf(real.variantsOf('ATK-08').some((v) => v.variant === 'c') && real.variantsOf('ATK-01').length > 0)(
-    'the same two outcomes on the committed ATK-01 and ATK-08.c recordings',
-    () => {
-      const lib = harvestOnly(real);
-      expect(kept(hardHarvest(lib, 60_000))).toBeGreaterThanOrEqual(0.9);
-      const idle = hardHarvest(lib, undefined);
-      expect(soulsStolen(idle.world)).toBe(idle.world.souls.total);
-    },
-  );
+  for (const [name, lib] of [['made-up', harvestOnly(FIXTURE_LIBRARY)], ['committed', harvestOnly(committedLibrary())]] as const) {
+    const ready = lib.variantsOf('ATK-08').some((v) => v.variant === 'f') && lib.variantsOf('ATK-01').length > 0;
+    it.runIf(ready)(`a Hard player who turns search off within 60 s of the first SQLITE_ERROR keeps at least 90% of souls, and Death never comes back to search (${name} ATK-08.f)`, () => {
+      const r = hardHarvest(lib, 60_000);
+      expect(eventsOfKind(r.world, 'move-started').filter((e) => e.move === 'ATK-08').map((e) => e.variant)).toEqual(['f']);
+      expect(eventsOfKind(r.world, 'move-cut')).toMatchObject([{ move: 'ATK-08', by: 'DEF-10' }]);
+      expect(eventsOfKind(r.world, 'door-shut')).toMatchObject([{ move: 'ATK-08', by: 'DEF-10' }]);
+      expect(kept(r)).toBeGreaterThanOrEqual(0.9);
+    });
+    it.runIf(ready)(`a Hard player who does not loses every soul over his visits, none taking more than half of what was left (${name})`, () => {
+      const r = hardHarvest(lib, undefined);
+      expect(ending(r)).toBe('souls-lost');
+      expect(soulsStolen(r.world)).toBe(r.world.souls.total);
+      const visits = eventsOfKind(r.world, 'move-started').filter((e) => e.move === 'ATK-08');
+      expect(visits.length).toBeGreaterThanOrEqual(4);
+      expect(new Set(visits.map((e) => e.variant))).toEqual(new Set(['f', 'g'])); // the loud halves on Hard
+    });
+  }
 });
 
 describe('SYS-06 target times in a running game (D-33)', () => {
@@ -267,20 +275,21 @@ describe('SYS-06 target times in a running game (D-33)', () => {
   });
 });
 
-describe('SIM-9: WAF rules against the low-and-slow harvest (D-34)', () => {
+describe('SIM-9: WAF rules against the low-and-slow harvest (D-34, on the halves: D-42)', () => {
   const harvestOnly = (library: RecordingLibrary) =>
     libraryFrom(['ATK-01', 'ATK-08'].flatMap((m) => library.variantsOf(m as 'ATK-01').map((v) => v.recording)));
-  /** On Medium (ATK-08.b), 20 s after the first SQLITE_ERROR the player does `actions` once. */
+  /** On Medium (ATK-08.d), 20 s after the first SQLITE_ERROR the player does `actions` once; taps are closed as they open. */
   function mediumHarvest(library: RecordingLibrary, actions: PlayerAction[]): SimResult {
     let acted = false;
     return runSim({
-      seed: 1, difficulty: 'medium', library, maxRealMs: 20 * REAL_MIN,
+      seed: 1, difficulty: 'medium', library, maxRealMs: 60 * REAL_MIN, // D-42: he takes half of what's left per visit
       player: (w, realElapsed) => {
-        if (acted) return [];
+        const taps = closingTaps(w);
+        if (acted) return taps;
         const first = w.logs.app.find((l) => l.text.includes('SQLITE_ERROR'));
-        if (!first || realElapsed < first.t / 30 + 20_000) return [];
+        if (!first || realElapsed < first.t / 30 + 20_000) return taps;
         acted = true;
-        return actions;
+        return [...taps, ...actions];
       },
     });
   }
@@ -289,16 +298,19 @@ describe('SIM-9: WAF rules against the low-and-slow harvest (D-34)', () => {
   const kept = (r: SimResult) => 1 - soulsStolen(r.world) / r.world.souls.total;
 
   for (const [name, lib] of [['made-up', harvestOnly(FIXTURE_LIBRARY)], ['committed', harvestOnly(committedLibrary())]] as const) {
-    const ready = lib.variantsOf('ATK-08').some((v) => v.variant === 'b') && lib.variantsOf('ATK-01').length > 0;
-    it.runIf(ready)(`a Medium player who only adds WAF rules still loses souls to ATK-08.b (${name})`, () => {
+    const ready = lib.variantsOf('ATK-08').some((v) => v.variant === 'd') && lib.variantsOf('ATK-01').length > 0;
+    it.runIf(ready)(`a Medium player who only adds WAF rules loses every soul to the quiet halves over his visits (${name})`, () => {
       const r = mediumHarvest(lib, wafOnly);
-      expect(eventsOfKind(r.world, 'move-started').find((e) => e.move === 'ATK-08')?.variant).toBe('b');
+      const visits = eventsOfKind(r.world, 'move-started').filter((e) => e.move === 'ATK-08');
+      expect(visits[0]?.variant).toBe('d');
+      expect(new Set(visits.map((e) => e.variant))).toEqual(new Set(['d', 'e']));
       expect(eventsOfKind(r.world, 'move-cut')).toEqual([]);
       expect(soulsStolen(r.world)).toBe(r.world.souls.total);
     });
-    it.runIf(ready)(`one who turns search off instead keeps most of them (${name})`, () => {
+    it.runIf(ready)(`one who turns search off instead keeps most of them, and Death never comes back to search (${name})`, () => {
       const r = mediumHarvest(lib, searchOff);
       expect(eventsOfKind(r.world, 'move-cut')).toMatchObject([{ move: 'ATK-08', by: 'DEF-10' }]);
+      expect(eventsOfKind(r.world, 'move-started').filter((e) => e.move === 'ATK-08')).toHaveLength(1);
       expect(kept(r)).toBeGreaterThanOrEqual(0.9);
     });
   }
@@ -349,8 +361,9 @@ describe('D-41: pacing and fairness, in whole runs', () => {
           if (!next) return;
           checked++;
           expect(next.t - e.t, `${difficulty} seed ${seed}`).toBeGreaterThanOrEqual(min);
-          // Easy may also wait for a wave to end (no combo); Medium/Hard only for the Director's next 3 s tick.
-          if (difficulty !== 'easy') expect(next.t - e.t, `${difficulty} seed ${seed}`).toBeLessThanOrEqual(max + CONFIG[difficulty].directorPeriodGameMs);
+          // Easy may also wait for a wave to end (no combo); Medium/Hard only for the Director's next 3 s tick, plus at most
+          // one pacing delay (D-43: 2 or more open alerts, e.g. a wave and a leaky tap, add one longest breather).
+          if (difficulty !== 'easy') expect(next.t - e.t, `${difficulty} seed ${seed}`).toBeLessThanOrEqual(2 * max + CONFIG[difficulty].directorPeriodGameMs);
         });
       }
       expect(checked, difficulty).toBeGreaterThanOrEqual(10);

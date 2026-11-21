@@ -39,7 +39,9 @@ address the attacker gets in the recording (always inside `203.0.113.0/24`).
 | ATK-08.a | `attacks/ATK-08.a.sh` | 203.0.113.81 | sqlmap UNION dump of Users through search, sqlmap's own user agent, full speed (test-only, D-32) |
 | ATK-08.b | `attacks/ATK-08.b.sh` | 203.0.113.82 | Low and slow, quiet: the same dump with `--random-agent`, `--tamper=randomcase`, `--delay=0.36`, ~2.5 min (D-35) |
 | ATK-08.c | `attacks/ATK-08.c.sh` | 203.0.113.83 | Loud: probing only with `--delay=1.2` (~90 s), then a fast `--dump` from the saved session |
-| ATK-09.a | `attacks/ATK-09.a.sh` | 203.0.113.91 | One `GET /api/Users` with the admin token (setup), responses captured |
+| ATK-08.d / .e | `attacks/ATK-08.d.sh`, `.e.sh` | 203.0.113.85 / .86 | .b's quiet dump of half of Users each (rows 1–163 / 164–325, `--start/--stop`), `--delay=0.7`, 2–3 min (D-63) |
+| ATK-08.f / .g | `attacks/ATK-08.f.sh`, `.g.sh` | 203.0.113.88 / .90 | .c's loud shape (~90 s probing, then a fast dump) for half of Users each (rows 1–163 / 164–325, D-63) |
+| ATK-09.b / .c | `attacks/ATK-09.b.sh`, `.c.sh` | 203.0.113.96 / .97 | `GET /api/Users/<id>` one by one for ids 1–163 / 164–325 with the admin token (setup), 0.9 s apart, responses captured (`lib/scrape-users.sh`, D-63) |
 | ATK-11.a | `attacks/ATK-11.a.sh` | 203.0.113.111 | Staff-looking admin sign-up with the admin token (setup), browser user agent |
 | ATK-13.a | `attacks/ATK-13.a.sh` | 203.0.113.131 | Zipped PHP web shell through `/file-upload` |
 | ATK-15.a | `attacks/ATK-15.a.sh` | 203.0.113.151 | Three product descriptions rewritten, no login |

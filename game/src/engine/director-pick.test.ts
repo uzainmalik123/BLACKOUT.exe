@@ -130,12 +130,15 @@ describe('the Director (SYS-02)', () => {
     const partial = libraryFrom(['ATK-01', 'ATK-03', 'ATK-08'].flatMap((m) => lib.variantsOf(m as 'ATK-01').map((v) => v.recording)));
     const w = initialWorld(1, 'medium');
     for (let t = 0; t < 10 * 60 * REAL_S && !w.ending; t += REAL_S) advance(w, partial, REAL_S);
-    expect(eventsOfKind(w, 'move-started').map((e) => e.move)).toEqual(['ATK-01', 'ATK-03', 'ATK-08']);
-    expect(w.ending).toBe('souls-lost');
+    const started = eventsOfKind(w, 'move-started').map((e) => e.move);
+    expect(started.slice(0, 3)).toEqual(['ATK-01', 'ATK-03', 'ATK-08']);
+    expect(new Set(started.slice(3))).toEqual(new Set(['ATK-08'])); // D-42: then he keeps visiting his open search door
+    expect(w.ending).toBeUndefined(); // half of what's left per visit: still robbing at 10 minutes, no false win
+    expect(w.souls.stolen.length).toBeGreaterThan(w.souls.total / 2);
   });
 });
 
-describe('the harvest variant (D-31)', () => {
+describe('the harvest variant (D-31, D-42: the halves)', () => {
   const harvestLib = libraryFrom(['ATK-01', 'ATK-08'].flatMap((m) => lib.variantsOf(m as 'ATK-01').map((v) => v.recording)));
 
   /** A world where ATK-01 has landed, so ATK-08 is the next candidate (stages 2 and 3 have no recording here). */
@@ -147,24 +150,24 @@ describe('the harvest variant (D-31)', () => {
   }
   const harvest = (w: World) => eventsOfKind(w, 'move-started').find((e) => e.move === 'ATK-08');
 
-  it('picks ATK-08.b on Easy and Medium and ATK-08.c on Hard', () => {
-    for (const [difficulty, variant] of [['easy', 'b'], ['medium', 'b'], ['hard', 'c']] as const) {
+  it('picks the quiet half ATK-08.d on Easy and Medium and the loud ATK-08.f on Hard', () => {
+    for (const [difficulty, variant] of [['easy', 'd'], ['medium', 'd'], ['hard', 'f']] as const) {
       const w = readyToHarvest(difficulty);
       directorTick(w, harvestLib);
       expect(harvest(w)?.variant, difficulty).toBe(variant);
     }
   });
 
-  it('picks ATK-08.c after a tip-off on Easy and Medium', () => {
+  it('picks the loud half ATK-08.f after a tip-off on Easy and Medium', () => {
     for (const difficulty of ['easy', 'medium'] as const) {
       const w = readyToHarvest(difficulty);
       applyAction(w, { type: 'DEF-04', ip: '203.0.113.10', mode: 'active' });
       directorTick(w, harvestLib);
-      expect(harvest(w)?.variant, difficulty).toBe('c');
+      expect(harvest(w)?.variant, difficulty).toBe('f');
     }
   });
 
-  it('never picks ATK-08.a in play, even when b and c have been played or cut', () => {
+  it('never picks ATK-08.a, .b or .c in play, even when the halves have been played or cut', () => {
     for (let seed = 1; seed <= 10; seed++) {
       for (const difficulty of ['easy', 'medium', 'hard'] as const) {
         const w = initialWorld(seed, difficulty);
@@ -172,12 +175,12 @@ describe('the harvest variant (D-31)', () => {
           if (t === 60 * REAL_S) for (const v of lib.variantsOf('ATK-08')) applyAction(w, { type: 'DEF-06', ip: v.info.ip, op: 'add' });
           advance(w, harvestLib, REAL_S);
         }
-        expect(eventsOfKind(w, 'move-started').filter((e) => e.move === 'ATK-08' && e.variant === 'a'), `${difficulty} seed ${seed}`).toEqual([]);
+        expect(eventsOfKind(w, 'move-started').filter((e) => e.move === 'ATK-08' && 'abc'.includes(e.variant)), `${difficulty} seed ${seed}`).toEqual([]);
       }
     }
   });
 
-  it('a stopper on the pinned variant closes ATK-08: on Easy a SQLi rule stops .b and he does not fall back to .a or .c', () => {
+  it('a stopper on the pinned halves closes ATK-08: on Easy a SQLi rule stops .d/.e and he does not fall back to .a, .b, .c or the loud halves', () => {
     const w = readyToHarvest('easy');
     applyAction(w, { type: 'DEF-12', rule: { kind: 'sqli' } });
     directorTick(w, harvestLib);

@@ -58,4 +58,7 @@ export const MOVES: readonly Move[] = [
     stoppedBy: [{ action: 'DEF-17', undo: true }, { action: 'DEF-15', undo: true }, { action: 'DEF-20', undo: true }, { action: 'DEF-10', feature: 'uploads' }, PUT_PRODUCTS], pri: 'M' },
 ];
 
+/** D-42: the big soul doors. Once one has landed it is his door: he keeps coming back to it until it is closed for good. */
+export const SOUL_DOORS: readonly MoveId[] = ['ATK-08', 'ATK-09'];
+
 export const MOVE_BY_ID: Readonly<Record<MoveId, Move>> = Object.fromEntries(MOVES.map((m) => [m.id, m])) as Record<MoveId, Move>;

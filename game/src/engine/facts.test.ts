@@ -217,28 +217,33 @@ describe('stopperHolds', () => {
   });
 });
 
-describe('WAF rules against ATK-08 (D-34)', () => {
+describe('WAF rules against ATK-08 (D-34, on the halves: D-42)', () => {
   const sqli = { action: 'DEF-12', rule: { kind: 'sqli' } } as const;
   const ua = { action: 'DEF-12', rule: { kind: 'block-user-agent', pattern: 'sqlmap' } } as const;
-  const b: VariantInfo = { ip: '203.0.113.82', quiet: false, targets: [], move: 'ATK-08', variant: 'b' };
-  const c: VariantInfo = { ip: '203.0.113.83', quiet: false, targets: [], move: 'ATK-08', variant: 'c' };
+  const half = (variant: string): VariantInfo => ({ ip: '203.0.113.85', quiet: false, targets: [], move: 'ATK-08', variant });
+  const quietHalves = [half('d'), half('e')];
+  const loudHalves = [half('f'), half('g')];
   const withRules = (difficulty: 'easy' | 'medium' | 'hard') => {
     const w = initialWorld(1, difficulty);
     w.waf.push({ kind: 'sqli' }, { kind: 'block-user-agent', pattern: 'sqlmap' });
     return w;
   };
 
-  it('the SQLi rule set stops ATK-08.b on Easy only; on Medium and Hard its tamper scripts leak through', () => {
-    expect(stopperHolds(withRules('easy'), sqli, b)).toBe(true);
-    expect(stopperHolds(withRules('medium'), sqli, b)).toBe(false);
-    expect(stopperHolds(withRules('hard'), sqli, b)).toBe(false);
+  it('the SQLi rule set stops the quiet halves ATK-08.d/.e on Easy only; on Medium and Hard their tamper scripts leak through', () => {
+    for (const q of quietHalves) {
+      expect(stopperHolds(withRules('easy'), sqli, q)).toBe(true);
+      expect(stopperHolds(withRules('medium'), sqli, q)).toBe(false);
+      expect(stopperHolds(withRules('hard'), sqli, q)).toBe(false);
+    }
   });
 
-  it('a sqlmap user-agent rule matches only the loud ATK-08.c, on every level', () => {
+  it('a sqlmap user-agent rule matches only the loud halves ATK-08.f/.g, on every level', () => {
     for (const d of ['easy', 'medium', 'hard'] as const) {
-      expect(stopperHolds(withRules(d), ua, b), d).toBe(false);
-      expect(stopperHolds(withRules(d), ua, c), d).toBe(true);
-      expect(stopperHolds(withRules(d), sqli, c), d).toBe(true);
+      for (const q of quietHalves) expect(stopperHolds(withRules(d), ua, q), d).toBe(false);
+      for (const l of loudHalves) {
+        expect(stopperHolds(withRules(d), ua, l), d).toBe(true);
+        expect(stopperHolds(withRules(d), sqli, l), d).toBe(true);
+      }
     }
   });
 

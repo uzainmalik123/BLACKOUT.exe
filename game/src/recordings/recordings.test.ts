@@ -22,7 +22,7 @@ async function baseline() {
 
 describe('every committed recording', () => {
   it('exists', () => {
-    const moves = ['ATK-01', 'ATK-03', 'ATK-04', 'ATK-06', 'ATK-08', 'ATK-08.b', 'ATK-08.c', 'ATK-09', 'ATK-11', 'ATK-13', 'ATK-15', 'ATK-17', 'MIN-01', 'MIN-02'];
+    const moves = ['ATK-01', 'ATK-03', 'ATK-04', 'ATK-06', 'ATK-08', 'ATK-08.b', 'ATK-08.c', 'ATK-08.d', 'ATK-08.e', 'ATK-08.f', 'ATK-08.g', 'ATK-09.b', 'ATK-09.c', 'ATK-11', 'ATK-13', 'ATK-15', 'ATK-17', 'MIN-01', 'MIN-02'];
     expect(jsonFiles).toEqual(expect.arrayContaining(moves.map((m) => (m.includes('.') ? `${m}.json` : `${m}.a.json`))));
   });
 
@@ -95,6 +95,38 @@ describe('ATK-08.b and ATK-08.c: the paced dumps (D-32, D-35)', () => {
   });
 });
 
+describe('ATK-08.d to .g: the harvest in halves, so no single run takes every customer (D-63)', () => {
+  const stolen = (file: string) => [...new Set(exfilOf(load(file)).flatMap((e) => e.keys))];
+  const allIds = async () => (await baseline()).exec('SELECT id FROM Users')[0]!.values.map((v) => Number(v[0])).sort((x, y) => x - y);
+
+  it.each([['d', 'e'], ['f', 'g']])('ATK-08.%s and .%s each steal about half of Users, together all of it, no row twice', async (first, second) => {
+    const one = stolen(`ATK-08.${first}.json`);
+    const two = stolen(`ATK-08.${second}.json`);
+    for (const half of [one, two]) {
+      expect(half.length).toBeGreaterThanOrEqual(150);
+      expect(half.length).toBeLessThanOrEqual(175);
+    }
+    expect(one.filter((id) => two.includes(id))).toEqual([]);
+    expect([...one, ...two].sort((x, y) => x - y)).toEqual(await allIds());
+  });
+
+  it.each(['d', 'e'])('ATK-08.%s keeps .b\'s quiet shape: browser agent, mixed-case SQL, 2 to 3 minutes', (v) => {
+    const r = load(`ATK-08.${v}.json`);
+    expect(accessOf(r).every((e) => e.userAgent.startsWith('Mozilla/5.0'))).toBe(true);
+    expect(accessOf(r).filter((e) => e.target.includes('UNION%20ALL%20SELECT')).length).toBeLessThanOrEqual(5);
+    expect(r.durationMs).toBeGreaterThanOrEqual(120_000);
+    expect(r.durationMs).toBeLessThanOrEqual(180_000);
+  });
+
+  it.each(['f', 'g'])('ATK-08.%s keeps .c\'s loud shape: sqlmap agent, about 90 s of probing with nothing stolen, then a fast dump', (v) => {
+    const r = load(`ATK-08.${v}.json`);
+    expect(accessOf(r).every((e) => e.userAgent.startsWith('sqlmap/'))).toBe(true);
+    const steals = exfilOf(r).map((e) => e.t);
+    expect(steals[0]!).toBeGreaterThan(80_000);
+    expect(steals.at(-1)! - steals[0]!).toBeLessThan(10_000);
+  });
+});
+
 describe('ATK-01.a: ffuf directory scan', () => {
   const r = load('ATK-01.a.json');
 
@@ -129,16 +161,26 @@ describe('ATK-06.a and ATK-11.a: admins made through sign-up', () => {
   });
 });
 
-describe('ATK-09.a: the user list through the API', () => {
-  const r = load('ATK-09.a.json');
+describe('ATK-09.b and .c: the user list scraped one account at a time, in two halves (D-63)', () => {
+  it.each([
+    ['ATK-09.b.json', 1, 163],
+    ['ATK-09.c.json', 164, 325],
+  ])('%s asks for ids %i to %i one by one, over 2 to 3 minutes, and leaks emails only', (file, first, last) => {
+    const r = load(file);
+    expect(accessOf(r).map((e) => e.target)).toEqual(Array.from({ length: last - first + 1 }, (_, i) => `/api/Users/${first + i}`));
+    expect(r.durationMs).toBeGreaterThanOrEqual(120_000);
+    expect(r.durationMs).toBeLessThanOrEqual(180_000);
+    const leaked = exfilOf(r).flatMap((e) => e.keys);
+    expect(leaked.every((id) => id >= first && id <= last)).toBe(true);
+    expect(exfilOf(r).every((e) => e.columns.join() === 'email')).toBe(true);
+  });
 
-  it('is one request that leaks every live user\'s email, but no password hash', async () => {
-    expect(accessOf(r)).toHaveLength(1);
+  it('the two halves together leak every live user\'s email, and no user twice', async () => {
     const db = await baseline();
     const live = db.exec('SELECT id FROM Users WHERE deletedAt IS NULL')[0]!.values.map((v) => Number(v[0]));
-    const leaked = exfilOf(r).flatMap((e) => e.keys);
-    expect([...leaked].sort()).toEqual([...live].sort());
-    expect(exfilOf(r).every((e) => e.columns.join() === 'email')).toBe(true);
+    const b = exfilOf(load('ATK-09.b.json')).flatMap((e) => e.keys);
+    const c = exfilOf(load('ATK-09.c.json')).flatMap((e) => e.keys);
+    expect([...b, ...c].sort((x, y) => x - y)).toEqual([...live].sort((x, y) => x - y));
   });
 });
 

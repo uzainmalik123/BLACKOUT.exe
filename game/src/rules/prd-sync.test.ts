@@ -5,7 +5,8 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { ACTIONS } from './actions';
 import { MOVES, MOVE_BY_ID } from './moves';
-import { FOOTHOLDS, GAINS, type MoveId, type Need } from './vocabulary';
+import { TAPS, TAP_BY_ID } from './taps';
+import { FOOTHOLDS, GAINS, type MoveId, type Need, type TapId } from './vocabulary';
 
 interface PrdMove { id: MoveId; stage: number; needs: string; gains: string; stoppedBy: string; pri: string }
 
@@ -77,6 +78,24 @@ describe('rules/moves.ts matches PRD §3 (SYS-17)', () => {
       expect([...new Set(move.stoppedBy.map((s) => s.action))].sort(), 'Stopped by').toEqual(stopperIds(row.stoppedBy));
       expect([...move.gains, ...(move.foothold ? [move.foothold] : [])].sort(), 'Gains').toEqual(vocabIn(row.gains));
       expect(gainsNamed(move.needs), 'Needs').toEqual(vocabIn(row.needs));
+    });
+  }
+});
+
+describe('rules/taps.ts matches PRD §4.1 (D-42, SYS-17)', () => {
+  const start = PRD.indexOf('### 4.1 Leaky taps');
+  const rows = PRD.slice(start, PRD.indexOf('\n---', start)).split('\n').filter((l) => l.startsWith('| TAP-'))
+    .map((l) => l.split(/(?<!\\)\|/).slice(1, -1).map((c) => c.trim()));
+
+  it('the PRD table has the same taps, in order', () => {
+    expect(rows.map((r) => r[0])).toEqual(TAPS.map((t) => t.id));
+  });
+
+  for (const row of rows) {
+    it(`${row[0]}: same priority and the same one closing action (a WAF path block on its route)`, () => {
+      const tap = TAP_BY_ID[row[0] as TapId];
+      expect(tap.pri).toBe(row[6]);
+      expect(row[5]).toBe(`DEF-12 (block path \`GET ${tap.closedBy.rule.path}\`)`);
     });
   }
 });

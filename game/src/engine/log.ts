@@ -1,6 +1,6 @@
 // The event log (SYS-10): every Death move, minion wave, player action and Kiro call, in game time.
 // The report (SYS-11) and the sims (SYS-16) read only from world.events.
-import type { ActionId, Ending, Foothold, MinionId, MoveId, Patch, PlayerAction, Stage } from '../rules/vocabulary';
+import type { ActionId, Actor, Ending, Foothold, MinionId, MoveId, Patch, PlayerAction, Stage, TapId } from '../rules/vocabulary';
 import type { World } from './state';
 
 export type GameEventBody =
@@ -11,10 +11,13 @@ export type GameEventBody =
   | { kind: 'wave-ended'; minion: MinionId; wave: number; closedBy?: ActionId }
   | { kind: 'action'; action: PlayerAction; ok: boolean; note?: string }
   | { kind: 'kiro'; call: 'chat' | 'draft' | 'hint' | 'explain' | 'debrief'; credits?: number }
-  | { kind: 'souls-stolen'; by: MoveId | MinionId; count: number; stolen: number; total: number }
+  | { kind: 'souls-stolen'; by: Actor; count: number; stolen: number; total: number }
   | { kind: 'tip-off'; by: ActionId }
-  | { kind: 'alert-opened'; alert: number; about: MoveId | MinionId }
-  | { kind: 'alert-closed'; alert: number; about: MoveId | MinionId }
+  | { kind: 'alert-opened'; alert: number; about: Actor }
+  | { kind: 'alert-closed'; alert: number; about: Actor }
+  | { kind: 'tap-opened'; tap: TapId }
+  | { kind: 'tap-closed'; tap: TapId; by?: ActionId } // no `by`: it ran dry
+  | { kind: 'door-shut'; move: MoveId; by: ActionId }
   | { kind: 'patch-applied'; patch: Patch }
   | { kind: 'banished' }
   | { kind: 'return'; through: Foothold }

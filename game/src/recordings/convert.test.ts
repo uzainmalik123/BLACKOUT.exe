@@ -178,6 +178,14 @@ describe('exfilFromResponses with curl captures', () => {
     ]);
   });
 
+  it('a hash two users share names only the user whose email left too (D-64)', () => {
+    const shared = [...users, { id: 9, email: 'ben.baker@example.net', password: 'a'.repeat(32) }];
+    const body = `{"email":"ava.adams@example.com","password":"${'a'.repeat(32)}"}`;
+    expect(exfilFromResponses([{ n: 1, target: '/api/Users', body }], access, shared)).toEqual([
+      { t: 50, kind: 'exfil', table: 'Users', keys: [7], columns: ['email', 'password'] },
+    ]);
+  });
+
   it('counts both when both appear', () => {
     const body = '[{"email":"java.adams@example.com"},{"email":"ava.adams@example.com"}]';
     expect(exfilFromResponses([{ n: 1, target: '/api/Users', body }], access, users)).toEqual([

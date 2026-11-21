@@ -32,7 +32,8 @@ describe('initialWorld (SYS-04)', () => {
 
   it('is deterministic for a seed and differs between seeds only in seed and rng', () => {
     expect(initialWorld(3, 'easy')).toEqual(initialWorld(3, 'easy'));
-    expect({ ...initialWorld(3, 'easy'), seed: 0, rng: 0 }).toEqual({ ...initialWorld(4, 'easy'), seed: 0, rng: 0 });
+    const blank = { open: [], opened: [], nextAt: 0, rng: 0 }; // D-42: the taps' own stream and first opening follow the seed too
+    expect({ ...initialWorld(3, 'easy'), seed: 0, rng: 0, taps: blank }).toEqual({ ...initialWorld(4, 'easy'), seed: 0, rng: 0, taps: blank });
     expect(initialWorld(3, 'easy').rng).not.toBe(initialWorld(4, 'easy').rng);
   });
 

@@ -40,25 +40,28 @@ const many = (n: number, f: (i: number) => RecEvent): RecEvent[] => Array.from({
  * first 30 s, then one row per request until about 149 s); .c loud (about 90 s of probing, nothing stolen, then
  * every row in under 3 s). The committed ATK-08.b/.c replace these in the sims as soon as they are on main.
  */
-function harvest(ip: string, variant: 'b' | 'c'): RecEvent[] {
-  const [probeMs, dumpMs] = variant === 'b' ? [29_500, 119_000] : [91_400, 2_800];
-  const ua = 'sqlmap/1.10.11#pip (https://sqlmap.org)';
+function harvest(ip: string, variant: 'b' | 'c' | 'd' | 'e' | 'f' | 'g'): RecEvent[] {
+  const quiet = variant === 'b' || variant === 'd' || variant === 'e';
+  const [probeMs, dumpMs] = quiet ? [29_500, 119_000] : [91_400, 2_800];
+  // D-63's halves: .d/.f rows 1–163, .e/.g rows 164–325 (the quiet ones with a browser agent, D-35); .b/.c every row.
+  const [first, count] = variant === 'd' || variant === 'f' ? [1, 163] : variant === 'e' || variant === 'g' ? [164, 162] : [1, 325];
+  const ua = variant === 'd' || variant === 'e' ? 'Mozilla/5.0 (X11; Linux x86_64)' : 'sqlmap/1.10.11#pip (https://sqlmap.org)';
   const errors = Array.from({ length: 62 }, (_, i): RecEvent[] => [
     { ...access(ip, 'GET', `/rest/products/search?q=e${i}`, 500, ua), t: 1 + Math.floor((i * probeMs) / 62) },
     { t: 2 + Math.floor((i * probeMs) / 62), kind: 'app', text: 'Error: SQLITE_ERROR: near "(": syntax error' },
   ]).flat();
-  const rows = Array.from({ length: 325 }, (_, k): RecEvent[] => {
-    const t = probeMs + Math.floor((k * dumpMs) / 325);
+  const rows = Array.from({ length: count }, (_, k): RecEvent[] => {
+    const t = probeMs + Math.floor((k * dumpMs) / count);
     return [
       { ...access(ip, 'GET', `/rest/products/search?q=r${k}`, 200, ua), t },
-      { t: t + 1, kind: 'exfil', table: 'Users', keys: [k + 1], columns: ['email', 'password'] },
+      { t: t + 1, kind: 'exfil', table: 'Users', keys: [first + k], columns: ['email', 'password'] },
     ];
   }).flat();
   return [...errors, ...rows];
 }
 
 function eventsFor(id: MoveId | MinionId, ip: string, quiet: boolean, variant = 'a'): RecEvent[] {
-  if (id === 'ATK-08' && (variant === 'b' || variant === 'c')) return harvest(ip, variant);
+  if (id === 'ATK-08' && 'bcdefg'.includes(variant) && variant.length === 1) return harvest(ip, variant as 'b' | 'c' | 'd' | 'e' | 'f' | 'g');
   const ua = quiet ? 'Mozilla/5.0' : undefined;
   switch (id) {
     case 'ATK-01': return many(60, (i) => access(ip, 'GET', `/w${i}`, 404, ua ?? 'Fuzz Faster U Fool v2.1')); // 6 s: long enough to be cut
@@ -79,10 +82,13 @@ function eventsFor(id: MoveId | MinionId, ip: string, quiet: boolean, variant = 
       ...many(30, (i) => access(ip, 'GET', `/rest/products/search?q=${i}`, i < 20 ? 500 : 200, ua ?? 'sqlmap/1.10')),
       ...many(5, (i) => ({ t: 0, kind: 'exfil', table: 'Users', keys: Array.from({ length: 65 }, (_, k) => k + 1 + 65 * i), columns: ['email', 'password'] }) as RecEvent), // all 325 seed rows
     ];
-    case 'ATK-09': return [ // page by page: one page a second
-      ...many(3, (i) => ({ ...access(ip, 'GET', `/api/Users?page=${i}`, 200, ua ?? 'curl/8.0', 9000), t: i * 1000 + 1 })),
-      ...many(3, (i) => ({ t: i * 1000 + 500, kind: 'exfil', table: 'Users', keys: Array.from({ length: i === 2 ? 105 : 110 }, (_, k) => k + 1 + 110 * i), columns: ['email', 'password'] }) as RecEvent), // all 325 seed rows
-    ];
+    case 'ATK-09': { // one by one, like ATK-09.b/.c (D-63): .a and .b ids 1–163, .c ids 164–325, ten accounts a second
+      const [first, count] = variant === 'c' ? [164, 162] : [1, 163];
+      return Array.from({ length: count }, (_, k): RecEvent[] => [
+        { ...access(ip, 'GET', `/api/Users/${first + k}`, 200, ua ?? 'curl/8.0', 300), t: 1 + k * 100 },
+        { t: 2 + k * 100, kind: 'exfil', table: 'Users', keys: [first + k], columns: ['email'] },
+      ]).flat();
+    }
     case 'ATK-10': return [
       ...many(3, (i) => access(ip, 'GET', `/rest/basket/${i + 1}`, 200, ua ?? 'curl/8.0')),
       { t: 0, kind: 'exfil', table: 'Baskets', keys: [1, 2, 3], columns: ['UserId'] },
@@ -128,9 +134,10 @@ function build(): RecordingLibrary {
   const ids: Array<MoveId | MinionId> = [...MOVES.map((m) => m.id), ...MINION_IDS];
   const recordings: Recording[] = [];
   ids.forEach((id, n) => {
-    (['a', 'b', 'c'] as const).forEach((variant, v) => {
-      const quiet = variant === 'c';
-      const ip = `203.0.113.${10 + n + 70 * v}`; // unique per (move, variant); never a committed recording's IP
+    const variants = id === 'ATK-08' ? ['a', 'b', 'c', 'd', 'e', 'f', 'g'] : ['a', 'b', 'c']; // ATK-08's halves (D-63)
+    variants.forEach((variant, v) => {
+      const quiet = variant === 'c' || variant === 'd' || variant === 'e';
+      const ip = v < 3 ? `203.0.113.${10 + n + 70 * v}` : `203.0.113.${247 + v}`; // unique per (move, variant); never a committed recording's IP
       recordings.push(fakeRecording(id, variant, { ip, quiet, events: eventsFor(id, ip, quiet, variant) }));
     });
   });
