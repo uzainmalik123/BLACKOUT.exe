@@ -43,6 +43,7 @@
 | KI-56 | D-41 rule 3 (no same move right after a non-IP cut) doesn't say what happens when the cut move is the only one he could pick: refusing it would leave Death neither moving nor banished. Read as: he may pick it again after the breather, and SYS-07 still counts it as an open route. The team confirms | Minor | Open |
 | KI-57 | D-41 rule 1 says a wave plays the slice of its recording up to its success, not where the slice starts. Read as: each wave carries on right after the previous wave's last success (wrapping at the end), so successive waves break into different reusers and the 5 % cap can bind; starting every wave from the top would replay the same victim forever. The team confirms | Minor | Open |
 | KI-58 | With one minion wave at a time (D-41) at most two alerts are ever open (Death's move and one wave), so SYS-02's "more than 3 open alerts delays the next move" can't fire. Kept (it now adds the level's longest breather) for when other alerts exist; the team decides whether the threshold drops to 1 or the rule goes | Minor | Open |
+| KI-60 | The logs only ever contain Death's and the minions' traffic: no recording or engine part produces ordinary customer traffic. The briefing's "what normal looks like" (CON-01) describes it, but the player never sees it, so every line in the log is suspicious and spotting the attacker is easier than in a real incident. Ruled: REC-06 + SYS-19 (D-60); closes when both are done | Major | Open |
 
 ### KI-03: Juice Shop facts (v20.4.0, checked 2026-11-17 and 2026-11-20)
 
