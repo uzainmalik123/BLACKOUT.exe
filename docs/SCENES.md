@@ -94,7 +94,7 @@ Where the whole game is played. The busiest screen; the one judges will see most
 
 ## 7. The endings (UI-06)
 
-Four, each its own short sequence, then on to the report:
+Four, each its own short sequence, then on to the report; and a fifth screen for the shift's end:
 
 | Ending | When | Feels |
 |---|---|---|
@@ -102,6 +102,8 @@ Four, each its own short sequence, then on to the report:
 | **Souls lost** | Death took every customer's data | Defeat. He feeds |
 | **Flatline** | The heartbeat hit 0, often from the player's own overreaction | Self-inflicted. The business dies quietly |
 | **The return** | The player "won", but a missed backdoor let him back in | The twist. The biggest scare in the game |
+
+And one more screen, **the shift ends** (D-118), for the three verdicts when the clock runs out (`ending` is `clean-handover`, `rough-handover` or `walked-away`): the next shift takes over and the judge's word is on the screen. One layout, the verdict as its headline: *Clean handover* (relief, tired), *Rough handover* (uneasy: something was left for the next shift), *Walked away* (a loss: the door was open when you left). The report follows and shows the verdict first.
 
 ## 8. The post-incident report (UI-07)
 

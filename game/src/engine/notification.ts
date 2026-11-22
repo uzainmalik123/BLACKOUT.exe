@@ -1,9 +1,21 @@
-// The notification clock (SYS-14, D-112): starts when the player confirms a breach (the first DEF-05 or DEF-19 after
-// souls were taken, actions.ts), runs for config.notification.windowGameMs (GDPR's 72 hours compressed to the run
+// The notification clock (SYS-14, D-112, D-116): starts when the player confirms a breach (an escalation, or a relevant
+// action on a harvest move or on Users, after souls were taken), runs for config.notification.windowGameMs (GDPR's 72 hours compressed to the run
 // length), and shows as a 72-hour countdown. Legal notified (DEF-20) stops it; the window passing logs it overdue.
+import type { ActionId } from '../rules/vocabulary';
 import { CONFIG } from './config';
 import { emit } from './log';
 import type { World } from './state';
+
+/**
+ * SYS-14, D-116: the breach is confirmed, and the 72 h clock starts, when after souls were taken the player escalates
+ * (DEF-19) or makes a relevant action on a harvest move or on Users (the assessor calls this, D-115). A snapshot never
+ * confirms it. Once.
+ */
+export function confirmBreach(world: World, by: ActionId, at = world.clock.gameMs): void {
+  if (world.souls.stolen.length === 0 || world.comms.breachConfirmedAt !== undefined) return;
+  world.comms.breachConfirmedAt = at; // the action's own time: the assessor judges it on the next tick
+  emit(world, { kind: 'breach-confirmed', by });
+}
 
 export interface NotificationClock {
   state: 'idle' | 'running' | 'notified' | 'overdue'; // idle: no breach confirmed yet

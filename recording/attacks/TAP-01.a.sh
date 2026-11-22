@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
-# TAP-01 variant a (PRD §4.1, KI-59): a scraper finds the shop's open access logs. It reads the listing at
+# TAP-01 variant a (PRD §4.1, KI-59, D-135): a scraper finds the shop's open access logs, after a spell of
+# ordinary customers (the setup runs CUST.b's shoppers, forgot-password lookups included). It reads the listing at
 # /support/logs, then fetches today's access log 10 times, 3 s apart, the way a bot polls a file that keeps
 # growing. No login. A python-requests user agent, as a scraper's. Runs inside the rig's tools container only.
 # tool: curl 8.x (lib/capture.sh)
-# label: leaky tap: /support/logs listed, then today's access log fetched 10 times, python-requests user agent
+# label: leaky tap, after customers: /support/logs listed, then today's access log fetched 10 times, python-requests user agent
 set -eu
 . /attacks/lib/capture.sh
 UA='python-requests/2.32.3'

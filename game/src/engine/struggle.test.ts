@@ -2,6 +2,7 @@
 // down by more than 10 % in 2 real min, or the same biggest gap standing for 3 real min unlocks one suggestion per
 // window on Medium and Hard, aimed at the gap; Easy tracks it and unlocks nothing.
 import { describe, expect, it } from 'vitest';
+import type { PlayerAction } from '../rules/vocabulary';
 import { applyAction } from './actions';
 import { advance } from './advance';
 import { stepAssess } from './assess';
@@ -15,7 +16,10 @@ import { WHOLE_RUN_TIMEOUT_MS } from './test-fixtures/timeouts';
 
 const REAL_MIN = 60 * 30_000;
 const { idleGameMs, soulsWindowGameMs, gapGameMs } = CONFIG.medium.struggle;
-const USERS = { type: 'DEF-02', sql: 'SELECT email, role FROM Users' } as const; // always relevant (D-114)
+const HIS_IP = '203.0.113.9';
+/** A relevant look (D-115): it showed a line of his; the world has his address from a move he started. */
+const USERS: PlayerAction = { type: 'DEF-01', query: `grep ${HIS_IP} access.log`, shown: [`${HIS_IP} - - [31/Oct/2026:22:00:05 +0000] "GET /w1 HTTP/1.1" 404 10 "-" "ffuf"`] };
+function knowsHim(w: ReturnType<typeof initialWorld>): void { emit(w, { kind: 'move-started', move: 'ATK-01', variant: 'a', stage: 1, ip: HIS_IP }); }
 
 function steal(w: ReturnType<typeof initialWorld>, count: number): void {
   for (let i = 0; i < count; i++) w.souls.stolen.push({ table: 'Users', key: w.souls.stolen.length + 1 });
@@ -28,8 +32,9 @@ function act(w: ReturnType<typeof initialWorld>, action: Parameters<typeof apply
 }
 
 describe('struggling (SYS-13)', () => {
-  it('idle: no RELEVANT action for 90 real s; a Users query resets the clock, ls/pwd, a refused action or an unfocused read do not', () => {
+  it('idle: no RELEVANT action for 90 real s; a look that shows his line resets the clock, ls/pwd, a refused action or an unfocused read do not', () => {
     const w = initialWorld(1, 'medium');
+    knowsHim(w);
     w.clock.gameMs = idleGameMs - 1;
     expect(struggling(w)).toBeUndefined();
     w.clock.gameMs = idleGameMs;
@@ -48,6 +53,7 @@ describe('struggling (SYS-13)', () => {
 
   it('souls: more than 10 % of the souls gone within the last 2 real minutes, read off the souls-stolen events', () => {
     const w = initialWorld(1, 'medium');
+    knowsHim(w);
     const tenPct = Math.floor(w.souls.total * 0.1); // 32 of 325
     w.clock.gameMs = 10 * 30_000;
     act(w, USERS);
@@ -64,6 +70,7 @@ describe('struggling (SYS-13)', () => {
 
   it('gap: the same biggest gap standing for 3 real minutes (D-114), even while the player keeps acting', () => {
     const w = initialWorld(1, 'medium');
+    knowsHim(w);
     emit(w, { kind: 'move-started', move: 'ATK-08', variant: 'd', stage: 4, ip: '203.0.113.85' }); // a soul door opened, never investigated
     w.clock.gameMs = gapGameMs - 1;
     act(w, USERS); // busy, and relevant
@@ -73,7 +80,7 @@ describe('struggling (SYS-13)', () => {
     act(w, USERS);
     expect(struggling(w)).toBe('gap');
     w.clock.gameMs += CONFIG.medium.assess.everyGameMs; // the snapshot (and its gaps) refreshes once a real second
-    act(w, { type: 'DEF-01', query: 'grep 203.0.113.85 /var/log/nginx/access.log' }); // the look closes that gap
+    act(w, { type: 'DEF-01', query: 'grep 203.0.113.85 /var/log/nginx/access.log', shown: ['203.0.113.85 - - [31/Oct/2026:22:00:05 +0000] "GET /rest/products/search?q=x HTTP/1.1" 500 197 "-" "Mozilla/5.0"'] }); // the look showed the door: that gap closes
     expect(w.assess.gaps.map((g) => g.type)).not.toContain('door-uninvestigated');
     expect(w.assess.gap).toMatchObject({ type: 'door-unpatched', since: 0 }); // the next biggest has stood as long
     expect(struggling(w)).toBe('gap');
@@ -87,7 +94,7 @@ describe('struggling (SYS-13)', () => {
 
   it('unlocks one suggestion per window, aimed at the biggest gap: idle at 90 s, again at 180 s, never twice inside a window; souls and gaps use their own windows', () => {
     const w = initialWorld(1, 'medium');
-    emit(w, { kind: 'move-started', move: 'ATK-01', variant: 'a', stage: 1, ip: '203.0.113.10' });
+    knowsHim(w);
     const tick = () => { w.clock.gameMs += CONFIG.medium.tickGameMs; stepAssess(w); stepStruggle(w); };
     while (w.clock.gameMs < 2 * idleGameMs + CONFIG.medium.tickGameMs) tick();
     expect(eventsOfKind(w, 'suggestion').map((e) => ({ t: e.t, n: e.n, reason: e.reason, gap: e.gap }))).toEqual([

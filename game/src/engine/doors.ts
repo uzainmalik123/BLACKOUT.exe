@@ -15,6 +15,9 @@ export const isDoor = (move: Move): boolean => SOUL_DOORS.includes(move.id);
 
 export const landed = (world: World, move: MoveId): boolean => world.death.played.some((p) => p.move === move && p.outcome === 'landed');
 
+/** D-117: a soul door he has found: one he got into, landed or cut (a paused visit is his too). */
+export const found = (world: World, move: MoveId): boolean => world.death.played.some((p) => p.move === move) || world.replays.some((r) => r.owner === 'death' && r.move === move) || world.death.resume[move] !== undefined;
+
 const SEED_IDS: ReadonlySet<number> = new Set(SEED_ACCOUNTS.map((a) => a.id));
 const soulKeysCache = new WeakMap<Variant['recording'], number[]>();
 
@@ -65,17 +68,16 @@ export function closingStopper(world: World, library: RecordingLibrary, move: Mo
 export const LASTING_FIXES: ReadonlySet<Stopper['action']> = new Set(['DEF-12', 'DEF-13']);
 
 /**
- * SYS-07, D-45: a soul door still open for the win. A landed door (his) is open while a half he may play has rows left
- * and no lasting fix holds for it, even if a containment shuts it or its Needs lapse for now (a revoke). A door he has
- * never entered is open while its Needs hold and a half he may play is not stopped by a lasting fix.
+ * SYS-07, D-45, D-117: a soul door still open for the win. A door he has found (got into, landed or cut) is open until a
+ * lasting fix holds for every half he may play, even once it has nothing left to take (D-117, closes KI-135): containment
+ * that shuts it, a revoke, or an empty door don't count. A door he has never entered is open while its Needs hold and a
+ * half he may play is not stopped by a lasting fix.
  */
 export function doorOpenForWin(world: World, library: RecordingLibrary, move: Move, needsHold: boolean): boolean {
-  const his = landed(world, move.id);
+  const his = found(world, move.id);
   if (!his && !needsHold) return false;
   const lasting = move.stoppedBy.filter((s) => LASTING_FIXES.has(s.action));
-  return doorHalves(world, library, move)
-    .filter((v) => !his || unstolen(world, v) > 0)
-    .some((v) => !lasting.some((s) => stopperHolds(world, s, { ...v.info, ip: 'fresh' })));
+  return doorHalves(world, library, move).some((v) => !lasting.some((s) => stopperHolds(world, s, { ...v.info, ip: 'fresh' })));
 }
 
 /** D-44: brings world.death.shutDoors up to date with the fixes that hold now, logging each door that shuts or reopens. */

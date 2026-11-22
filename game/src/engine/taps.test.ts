@@ -138,17 +138,16 @@ describe('an open tap drips about 1 % a real minute until it is closed (D-42)', 
         if (!opened) continue;
         const drips = w.logs.access.filter((l) => l.by === id && l.t > opened.t).map((l) => l.t);
         drips.forEach((t, i) => expect(t - opened.t, `${level} ${id} drip ${i + 1}`).toBe((i + 1) * CONFIG[level].taps.dripEveryGameMs));
-        const leaks = TAP_BY_ID[id].leaks;
+        const leaks = TAP_BY_ID[id].leaks as readonly number[]; // every tap names the accounts its recording took (D-135)
         for (const e of tapSouls(w, id)) expect(e.count).toBeLessThanOrEqual(size);
-        const keys = w.souls.stolen.slice();
-        if (leaks !== 'every-customer') expect(tapSouls(w, id).reduce((n, e) => n + e.count, 0)).toBeLessThanOrEqual(leaks.length);
-        expect(keys.every((k) => SEED_ACCOUNTS.some((a) => a.id === k.key))).toBe(true);
+        expect(tapSouls(w, id).reduce((n, e) => n + e.count, 0)).toBeLessThanOrEqual(leaks.length);
+        expect(w.souls.stolen.every((k) => SEED_ACCOUNTS.some((a) => a.id === k.key))).toBe(true);
       }
-      // the open logs leak every customer: forgotten for an hour, they keep dripping about 1 % a minute
+      // the open logs leak only the customers whose emails are in them: left open for an hour, they take those and run dry
       const logs = eventsOfKind(w, 'tap-opened').find((e) => e.tap === 'TAP-01');
       if (logs) {
-        const minutes = Math.floor((60 * REAL_MIN - logs.t) / REAL_MIN);
-        expect(tapSouls(w, 'TAP-01').reduce((n, e) => n + e.count, 0), level).toBe(minutes * size);
+        expect(tapSouls(w, 'TAP-01').reduce((n, e) => n + e.count, 0), level).toBe((TAP_BY_ID['TAP-01'].leaks as readonly number[]).length);
+        expect(eventsOfKind(w, 'tap-closed').some((e) => e.tap === 'TAP-01' && !('by' in e)), level).toBe(true); // dry
       }
     }
   });
@@ -199,10 +198,12 @@ describe('an open tap drips about 1 % a real minute until it is closed (D-42)', 
     expect(eventsOfKind(w, 'souls-stolen').length).toBeLessThanOrEqual(1);
   });
 
-  it('in whole idle runs on the committed recordings, taps take souls alongside Death and the minions, and the minions still stay within their 5 %', { timeout: WHOLE_RUN_TIMEOUT_MS }, () => {
+  it('in whole idle runs on the committed recordings, taps take at most the accounts they leak, never 2 open at once, and the minions still stay within their 5 %', { timeout: WHOLE_RUN_TIMEOUT_MS }, () => {
+    // Since D-135 every tap leaks a few named accounts, often taken by the first harvest first (KI-73): a tap may take none.
+    const leakable = new Set(TAPS.flatMap((t) => t.leaks as readonly number[]));
     for (const level of LEVELS) {
       const r = runSim({ seed: 1, difficulty: level, library: committedLibrary(), maxRealMs: 30 * 60_000, player: () => [] });
-      expect(TAP_IDS.some((id) => tapSouls(r.world, id).length > 0), level).toBe(true);
+      expect(TAP_IDS.reduce((n, id) => n + tapSouls(r.world, id).reduce((m, e) => m + e.count, 0), 0), level).toBeLessThanOrEqual(leakable.size);
       expect(mostOpenAtOnce(r.events), level).toBeLessThanOrEqual(2);
       expect(r.world.souls.byMinions, level).toBeLessThanOrEqual(Math.floor(r.world.souls.total * 0.05));
     }

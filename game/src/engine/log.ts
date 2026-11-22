@@ -24,7 +24,7 @@ export type GameEventBody =
   | { kind: 'ticket'; ticket: number; about: RequestClass; status: 403 | 429 | 503 | 'blocked' } // D-65: a customer's first failure this loop: a support ticket
   | { kind: 'customer-lost'; about: RequestClass; max: number } // D-65: a customer gave up (a second failure): the heartbeat's maximum dropped to `max`
   | { kind: 'suggestion'; n: number; reason: 'idle' | 'souls' | 'gap'; gap?: GapType } // SYS-13 (D-113, D-114): the player is struggling; one suggestion unlocked (Medium/Hard), aimed at the biggest gap standing (a type, never a text)
-  | { kind: 'breach-confirmed'; by: 'DEF-05' | 'DEF-19' } // SYS-14: the notification clock starts
+  | { kind: 'breach-confirmed'; by: ActionId } // SYS-14 (D-116): the notification clock starts: DEF-19, or a relevant action on a harvest move or on Users
   | { kind: 'notification-overdue' } // SYS-14: the window passed with legal not notified
   | { kind: 'patch-applied'; patch: Patch }
   | { kind: 'banished' }

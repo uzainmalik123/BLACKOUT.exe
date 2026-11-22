@@ -49,7 +49,7 @@ address the attacker gets in the recording (always inside `203.0.113.0/24`).
 | ATK-17.a | `attacks/ATK-17.a.sh` | 203.0.113.171 | `READ_ME_MORTAL.txt` upload and the first product renamed to the demand |
 | MIN-01.a | `attacks/MIN-01.a.sh` | 203.0.113.201 | 24 PHP/WordPress/config probes, zgrab user agent |
 | MIN-02.a | `attacks/MIN-02.a.sh` | 203.0.113.128 to .250 | Credential stuffing, one botnet address per attempt, responses captured |
-| TAP-01.a | `attacks/TAP-01.a.sh` | 203.0.113.174 | **Leaky tap** (PRD §4.1, D-130): the `/support/logs` listing, then today's access log fetched 10 times, python-requests user agent, responses captured |
+| TAP-01.a | `attacks/TAP-01.a.sh` (+ `.setup.sh`) | 203.0.113.174 | **Leaky tap** (PRD §4.1, D-130, D-135): after CUST.b's shoppers ran in the setup, the `/support/logs` listing, then today's access log fetched 10 times, python-requests user agent, responses captured |
 | TAP-02.a | `attacks/TAP-02.a.sh` | 203.0.113.175 | **Leaky tap:** `GET /rest/memories` polled 10 times, python-requests user agent, responses captured |
 | TAP-03.a | `attacks/TAP-03.a.sh` | 203.0.113.176 | **Leaky tap:** reviews of products 1 to 56 walked, python-requests user agent, responses captured; converted to `game/src/recordings/taps/` (D-130) |
 | MIN-03.a | `attacks/MIN-03.a.sh` | 203.0.113.177 | Scraper wave: `GET /api/Products` 30 times, 2 a second, Scrapy user agent (D-132) |

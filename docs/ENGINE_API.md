@@ -56,7 +56,8 @@ const unsubscribe = engine.subscribe((world) => render(world));
 | Struggle | `struggle.suggestions`, `struggle.lastSuggestionAt` | SYS-13 (D-113, D-114): how many suggestions the rules have unlocked so far (Medium and Hard only; always 0 on Easy, where Kiro helps anyway). The terminal shows that one is available (on Hard too); the Kiro panel's `hint()` answers only while the count is above the hints it has given, aimed at the gap the `suggestion` event names (§2.2) |
 | Comms | `comms`, `tickets` | Escalated / notified times. `tickets`: customers' support tickets (`t`, `ip`, `userAgent`, `about` what they were doing, `status` what they got: `503`, `429`, `403` or `'blocked'`, `text`), newest last; list them in the comms console (D-65) |
 | Customers | `customers.served`, `.failed`, `.lost` | How many customer requests went through, how many the player's actions failed, how many shoppers gave up (for the report) |
-| The ending | `ending` | `'banished'`, `'souls-lost'`, `'flatline'`, `'return'`; undefined while playing |
+| The ending | `ending` | `'banished'`, `'souls-lost'`, `'flatline'`, `'return'`, or the shift's verdict `'clean-handover'`, `'rough-handover'`, `'walked-away'` (D-118); undefined while playing |
+| The shift | `clock.shiftEndsAt` | Game ms when the shift ends (Easy ~20, Medium ~16, Hard ~13 real min): a countdown the dashboard may show; at the limit the run ends with a verdict |
 | Everything that happened | `events` | See §4. The source for animations and the report |
 
 ### 2.1 Detection data (SYS-20, D-110)
@@ -76,7 +77,7 @@ Both selectors are cheap enough to call every frame (the rate is counted increme
 `world.assess` is the engine's live assessment of the player, refreshed once a real second and at the ending (verdicts on actions land the tick they happen). **Never show any of it during the run**: a grade, a status, a gap or its evidence tells the player what they haven't found yet. It exists for the hint/Kiro layer (KIRO-03, CON-03) and for the report, which is its final snapshot.
 
 ```ts
-world.assess.lastRelevantActionAt   // game ms of the last RELEVANT action (a focused look, a Users query, a fix on one of his moves…; ls/pwd/tail are not)
+world.assess.lastRelevantActionAt   // game ms of the last RELEVANT action (D-115: a focused read that showed his lines, or an action that hurt him; ls/pwd/an unfocused cat are not)
 world.assess.gap                    // { type, since }: the biggest gap standing, e.g. 'door-uninvestigated', 'foothold-unqueried', 'eradicated-without-evidence'; undefined when none
 world.assess.gaps                   // every gap standing now, biggest first (the types are GAP_TYPES in engine/assess.ts)
 world.assess.phases                 // per phase (detect, contain, eradicate, recover): { status, evidence: string[] } for Kiro's reasoning, not the screen
@@ -102,6 +103,8 @@ Every button, console and (later) shell command sends one of these. It returns `
 | Comms | `DEF-19` escalate · `DEF-20` notify | `{ type: 'DEF-20', to: 'customers' }` |
 | Terminal (via the shell) | `DEF-01`–`06`, `08`, `11`, `14`, `15`, `18` | The shell sends these for you (§5). On **Easy**, the consoles also get buttons for them |
 
+**What a read showed (D-115, D-122).** A `DEF-01`, `DEF-02` or `DEF-03` may carry `shown: string[]`, the lines the shell or console printed (at most 200: pass the first 200 and set `shownTotal` to the real count; the engine cuts longer lists). The judging engine decides from those lines whether the read was relevant (it showed something of Death's, and was focused): an accidental `tail` that shows his lines counts, a `cat` of the whole log does not. A read with no `shown` is never relevant. Pass the lines exactly as printed (access-log lines in `combined` format, SQL rows as the shell renders them, file names as listed). **The text is never stored:** the logged action keeps only `shownCount`, `shownHis` (lines of his), `shownAbout` and `shownTotal`.
+
 ## 4. Events: what to animate
 
 `world.events` only grows. Keep the index of the last one you've drawn; on each update, react to the new ones.
@@ -121,7 +124,7 @@ Every button, console and (later) shell command sends one of these. It returns `
 | `ticket` | A customer complained (`ticket` is its id in `world.tickets`, `about`, `status`): something the player did failed them (D-65) | A new ticket in the comms console; a phone ringing |
 | `customer-lost` | A customer gave up for good; the heartbeat's maximum is now `max` (D-65) | The top of the heartbeat meter dies a little |
 | `suggestion` | The player is struggling (`reason`: `idle` 90 real s without a relevant action, `souls` down over 10 % in 2 real min, or `gap` the same biggest gap standing 3 real min); suggestion `n` is unlocked, `gap` is the type it should target (SYS-13, D-113, D-114; Medium and Hard only) | The terminal shows that one suggestion is available, on Hard too; the hint's words come from Kiro or CON-03 and never name the move, door or foothold |
-| `breach-confirmed` | The first evidence snapshot or escalation after souls were taken: the notification clock starts (SYS-14, `by`) | The comms console's clock starts counting down from 72:00:00 |
+| `breach-confirmed` | After souls were taken, an escalation or a relevant action on a harvest move or on Users (D-116; `by` is the action kind, never DEF-05): the notification clock starts (SYS-14) | The comms console's clock starts counting down from 72:00:00 |
 | `notification-overdue` | The window passed with legal not notified (SYS-14) | The clock face reads 00:00:00; the report will say late or missing |
 | `tip-off` | The player tipped Death off: a lock (DEF-08), or an active lookup (`ping`/`nmap`/`curl`) of an address he or his proxies have used (D-111; any other address does nothing, and the action's answer never says which) | He turns toward the player. Subtle |
 | `patch-applied` | A deploy finished | Small "sealed" beat |
