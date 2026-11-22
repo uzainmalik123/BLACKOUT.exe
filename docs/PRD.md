@@ -362,4 +362,5 @@ Rows not listed here are `planned`. A PR that moves a row adds or updates its li
 | TAP-02 | building | As TAP-01; TAP-02.a: 27.5 s, 10 requests (6,183 bytes each, the 5 posters' emails and hashes), 2.6 KB. Leaks only 5 of Juice Shop's own users, usually gone to the first harvest visit (KI-73) |
 | TAP-03 | building | As TAP-01; TAP-03.a: 55.9 s, 56 requests (products 1 to 56, the 12 reviewers' emails), 13.5 KB. Leaks only 12 of Juice Shop's own users (KI-73) |
 | CON-01 | done | `game/src/content/briefing/`: system map, admins, normal traffic, playbook; a test checks the admin list and counts against the baseline DB |
+| CON-02 | done | `game/src/content/patches.ts`: for each of the 8 patches the real Juice Shop v20.4.0 lines (file, line range, quoted under its MIT licence) and a fix diff with a one-sentence why; a test checks every `Patch` value has an entry and that each diff's removed lines are the quoted ones (D-150) |
 | CON-04 | done | `game/src/content/taunts.ts`: 3 lines per move plus blocked, tipped off, banished, return; a test checks counts and that no line gives away a defence |
