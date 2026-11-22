@@ -41,6 +41,7 @@ const unsubscribe = engine.subscribe((world) => render(world));
 | Difficulty | `difficulty` | Decides which helpers the screens show (SCENES.md §0) |
 | Alerts | `alerts` (`about`, `openedAt`, `closedAt?`) | Open = no `closedAt`. `about` is the move, minion or leaky tap (`TAP-01`…) it's about; **don't show that id to the player**, it's a spoiler. Show what the logs show |
 | Leaky taps | `taps.open` (`id`, `openedAt`) | Small exposures dripping customer data (PRD §4.1, D-42). Each is closed by one WAF path block: `TAP_BY_ID[id].closedBy.rule` in `src/rules/taps.ts` gives the exact `DEF-12` rule a console button should send |
+| Detection data | `engine.topTalkers(n?)`, `engine.errorRate()`, `statusClass(status)` | SYS-20 (D-110), for the three tools (UI-09): see §2.1 |
 | Logs | `engine.accessLog()`, `engine.appLog()` | Ready-made text, one line per entry (real nginx `combined` lines and real Juice Shop log lines). Also `world.logs.access` / `.app` as structured lines if you want to colour or filter them. Most access lines are ordinary customers (`by: 'CUST'`, SYS-19): **never colour by `by`**, it's a spoiler; what the player did to customers shows as their `503`/`429`/`403` lines |
 | Accounts | `accounts` (`email`, `role`, `lockedAt?`, `createdBy`) | For the Accounts console. `createdBy` is a spoiler too: show `role` and `email` only |
 | Sessions | `sessions` | For the Sessions console (count, kinds) |
@@ -55,6 +56,18 @@ const unsubscribe = engine.subscribe((world) => render(world));
 | Customers | `customers.served`, `.failed`, `.lost` | How many customer requests went through, how many the player's actions failed, how many shoppers gave up (for the report) |
 | The ending | `ending` | `'banished'`, `'souls-lost'`, `'flatline'`, `'return'`; undefined while playing |
 | Everything that happened | `events` | See §4. The source for animations and the report |
+
+### 2.1 Detection data (SYS-20, D-110)
+
+Three read-only selectors over the access log, per real minute, for the dashboard's three tools (UI-09). Every number is counted from the real lines; nothing is invented and nothing says who an address belongs to.
+
+```ts
+engine.topTalkers(n = 10)   // Talker[]: { ip, requests, errors }, the busiest addresses in the LAST REAL MINUTE, busiest first (errors = 4xx + 5xx)
+engine.errorRate()          // ErrorRatePoint[]: one per real minute since the start, { minute, from, to, requests, clientErrors, serverErrors }; the last point is the current, partial minute; quiet minutes are zeros
+statusClass(line.status)    // '1xx' | '2xx' | '3xx' | '4xx' | '5xx', for colouring a line of world.logs.access (import { statusClass } from './engine/engine')
+```
+
+Both selectors are cheap enough to call every frame (the rate is counted incrementally), but once a second is plenty: they change per real minute. The talkers' window and the rate's buckets are real minutes (60 real s = 30 game min). Show them as any log viewer would, on every level: a top-talkers list, a small 4xx/5xx strip, coloured lines. Don't look up who a talker is in `world.logs.access[].by`: that's the spoiler the tools exist to replace.
 
 ## 3. What the player can do: `engine.act(action)`
 

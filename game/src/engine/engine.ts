@@ -5,10 +5,13 @@ import type { Difficulty, PlayerAction } from '../rules/vocabulary';
 import { applyAction, type ActionResult } from './actions';
 import { advance } from './advance';
 import { pause, resume } from './clock';
+import { errorRate, topTalkers, type ErrorRatePoint, type Talker } from './detection';
 import { libraryFrom, type RecordingLibrary } from './library';
 import { renderAccessLog, renderAppLog } from './replay';
 import { openBaseline, syncDb, type GameDb } from './sqldb';
 import { initialWorld, type Evidence, type VFile, type World } from './state';
+
+export { statusClass, type StatusClass } from './detection'; // SYS-20 c: colour a log line by its status
 
 /**
  * Every recording committed in src/recordings/ (REC-02), bundled by Vite (KI-17). Test-only variants such as
@@ -72,6 +75,16 @@ export class Engine {
 
   appLog(): string {
     return renderAppLog(this.world);
+  }
+
+  /** SYS-20 a: the busiest addresses in the last real minute (at most `n`), with request and error counts. */
+  topTalkers(n = 10): Talker[] {
+    return topTalkers(this.world, { n });
+  }
+
+  /** SYS-20 b: requests, 4xx and 5xx per real minute since the start, the last point the current minute. */
+  errorRate(): ErrorRatePoint[] {
+    return errorRate(this.world);
   }
 
   files(): VFile[] {

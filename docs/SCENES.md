@@ -67,6 +67,7 @@ Where the whole game is played. The busiest screen; the one judges will see most
 | Part | What it shows / does | From |
 |---|---|---|
 | Live logs | Web server log and app log, scrolling; filterable; on Easy, suspicious lines highlighted with hover explanations | `engine.accessLog()`, `engine.appLog()` |
+| The three tools (UI-09) | Top talkers (the busiest addresses in the last real minute, with request and error counts), an error-rate strip (requests, 4xx and 5xx per real minute, the last few minutes) and the log lines coloured by status class. Real counts over the real lines, on every level; none of them says who an address is | `engine.topTalkers()`, `engine.errorRate()`, `statusClass(line.status)` (SYS-20, D-110) |
 | Alerts | Open alerts, newest first; closing when the cause is dealt with | `world.alerts` |
 | 💀 Souls meter | Customers' data left / taken | `world.souls` |
 | 🫀 Heartbeat meter | The business's health, 0–100; should *feel* like a heartbeat (faster and weaker as it drops) | `world.heartbeat` |
