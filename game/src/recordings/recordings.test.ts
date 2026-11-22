@@ -358,8 +358,10 @@ describe('the leaky taps, each scraped for real (PRD §4.1, KI-59, D-130)', () =
     }
   });
 
-  it.each(TAPS.filter((t) => t.leaks !== 'every-customer').map((t) => t.id))('%s leaks exactly the accounts its PRD row names', (id) => {
-    expect(leaked(tap(id))).toEqual([...(TAP_BY_ID[id].leaks as readonly number[])].sort((x, y) => x - y));
+  it.each(TAPS.map((t) => t.id))('%s leaks exactly the accounts its rule names, the ones its recording really took (D-135)', (id) => {
+    const rule = TAP_BY_ID[id].leaks;
+    expect(rule).not.toBe('every-customer');
+    expect(leaked(tap(id))).toEqual([...(rule as readonly number[])].sort((x, y) => x - y));
   });
 
   it('TAP-02 hands over each poster\'s password hash with their email; TAP-03 only emails', () => {
@@ -367,13 +369,14 @@ describe('the leaky taps, each scraped for real (PRD §4.1, KI-59, D-130)', () =
     expect(exfilOf(tap('TAP-03')).every((e) => e.columns.join() === 'email')).toBe(true);
   });
 
-  it('TAP-01: the listing, then the access log, growing; on a fresh shop it carries no customer row (KI-74)', () => {
+  it('TAP-01: the listing, then the access log, growing; it carries the emails of the customers who looked up a security question (D-135)', () => {
     const [listing, ...fetches] = accessOf(tap('TAP-01'));
     expect(listing!.target).toBe('/support/logs');
     expect(fetches.length).toBeGreaterThanOrEqual(5);
     for (const e of fetches) expect(e.target).toMatch(/^\/support\/logs\/access\.log\.\d{4}-\d\d-\d\d$/);
     for (let i = 1; i < fetches.length; i++) expect(fetches[i]!.bytes).toBeGreaterThan(fetches[i - 1]!.bytes);
-    expect(leaked(tap('TAP-01'))).toEqual([]);
+    expect(leaked(tap('TAP-01')).length).toBe(5); // CUST.b's five resetters, run first in the same rig session
+    expect(exfilOf(tap('TAP-01')).every((e) => e.columns.join() === 'email')).toBe(true);
   });
 });
 

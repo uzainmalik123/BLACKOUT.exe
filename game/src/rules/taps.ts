@@ -19,7 +19,9 @@ export interface TapRow {
 const block = (path: string): TapRow['closedBy'] => ({ action: 'DEF-12', rule: { kind: 'block-path', method: 'GET', path } });
 
 export const TAPS: readonly TapRow[] = [
-  { id: 'TAP-01', name: 'Open logs', exposure: "The shop's access logs, listed and served at /support/logs", leaks: 'every-customer',
+  // The customers whose emails really appear in the logs (D-135): the forgot-password page puts the email in the URL, and
+  // TAP-01.a's scrape, after CUST.b's shoppers, took xena.ender, quinn.okafor, jack.novak, gus.quist and lena.carter
+  { id: 'TAP-01', name: 'Open logs', exposure: "The shop's access logs, listed and served at /support/logs", leaks: [37, 45, 166, 199, 229],
     closedBy: block('/support/logs'), line: (_n, date) => ({ target: `/support/logs/access.log.${date}`, bytes: 48_213 }), pri: 'M' },
   // bjoern.kimminich@gmail.com, bjoern@owasp.org, john, emma, ethereum: the memories Juice Shop seeds (config/default.yml)
   { id: 'TAP-02', name: 'Photo wall', exposure: "GET /rest/memories returns each poster's whole Users row", leaks: [4, 13, 18, 19, 21],
