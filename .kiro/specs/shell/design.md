@@ -213,9 +213,9 @@ The lexer is one pass over characters with three modes: unquoted, single-quoted,
 - Syntax errors (exit code 2, no command runs, R3.6, R3.7, R2.7): unterminated quote; leading, trailing or doubled `|`; `>` with no target or with extra words after the target; `;`, `&`, `&&`, `||` (which is an empty stage), `>>`, `<`, `2>`, `$` outside quotes, a backtick outside quotes, `(` and `)` outside quotes. The messages are fixed strings, for example `sh: syntax error: unterminated quote`.
 - Globs and `~` are left in `Word.text` untouched (R3.13). An empty line parses to `{ stages: [] }` and is handled by `run` before parsing (R1.5).
 
-The printer (R3.8) writes a word unquoted only if it is non-empty, not `literal`, and made only of characters from the safe set `A-Z a-z 0-9 _ @ % + = : , . / ~ * -`. Otherwise it wraps the word in single quotes and writes each embedded `'` as `"'"` (so `a'b` prints `'a'"'"'b'`). Stages are joined with ` | `, the redirect is ` > <target>`.
+The printer (R3.8) writes a word unquoted only if it is non-empty, not `literal`, and either made only of characters from the safe set `A-Z a-z 0-9 _ @ % + = : , . / ~ * -`, or a word containing `*` or starting with `~` that holds no whitespace and none of `| > & ; < $ ` ( ) ' "`. Otherwise it wraps the word in single quotes and writes each embedded `'` as `"'"` (so `a'b` prints `'a'"'"'b'`). Stages are joined with ` | `, the redirect is ` > <target>`.
 
-Round trip (R3.9): for every `Pipeline` produced by the generator, `parseLine(printLine(p))` equals `{ ok: true, pipeline: p }`, and for every string `s` that parses, `parseLine(printLine(parse(s)))` equals `parse(s)`. The generator constrains unquoted words to the safe set, so `literal: false` words never need quotes.
+Round trip (R3.9): for every `Pipeline` produced by the generator, `parseLine(printLine(p))` equals `{ ok: true, pipeline: p }`, and for every string `s` that parses, `parseLine(printLine(parse(s)))` equals `parse(s)`. The generator constrains `literal: false` words to the safe set, or to a word with `*` or a leading `~` free of whitespace and of `| > & ; < $ ` ( ) ' "`, so those words never need quotes.
 
 ### Expansion (`expand.ts`)
 

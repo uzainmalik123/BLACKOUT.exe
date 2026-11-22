@@ -389,7 +389,7 @@
 ### D-91: DEF-04 from the shell
 - **Context:** (2026-11-21) PRD DEF-04 says active lookups of an attacker tip Death off, but the shell can't tell an attacker's address from any other.
 - **Decision:** `whois <ip>` sends DEF-04 `passive`. `ping`, `nmap` and `curl` with an IPv4 target always send DEF-04 `active`; the Engine decides whether it is a tip-off. A hostname target (e.g. `localhost`) prints realistic tool output and sends no action.
-- **Consequences:** The shell holds no list of attacker addresses. The Engine currently tips Death off on any active lookup (`actions.ts`), so pinging a harmless address does too (KI-90).
+- **Consequences:** The shell holds no list of attacker addresses. The Engine currently tips Death off on any active lookup (`actions.ts`), so pinging a harmless address does too (KI-90). (Found in the build, 2026-11-22: `ping`, `nmap` and `curl` exit 0 even when the Engine refuses DEF-04; the refusal message goes to stderr and the tool output still prints.)
 
 ### D-92: SQL in the shell
 - **Context:** (2026-11-21) DEF-02, DEF-08 and DEF-14 are the only SQL uses in the PRD; the shell needed a rule for everything else.
@@ -399,7 +399,7 @@
 ### D-93: Shell syntax beyond pipes and `>`
 - **Context:** (2026-11-21) SYS-09 said "pipes and `>`" only, but `rm uploads/*` and `cd ~` are what a responder types.
 - **Decision:** Added: `*` globs (one path segment, not dotfiles, sorted, left as typed when nothing matches, not expanded inside quotes) and a leading `~` (the start directory `/srv/juice-shop`). Still syntax errors: `;`, `&&`, `>>`, `<`, `2>`, `$VAR`, `$(…)`, backticks. SYS-09 and the steering file are edited to match.
-- **Consequences:** The parser keeps globs and `~` unexpanded in its structure and expands them when it runs a command.
+- **Consequences:** The parser keeps globs and `~` unexpanded in its structure and expands them when it runs a command. (Found in the build, 2026-11-22: a redirect target's `~` always resolves under `/srv/juice-shop`, which is outside the Writable_Area (D-90), so `> ~/x` is always `Permission denied`.)
 
 ### D-94: Shell session
 - **Context:** (2026-11-21) The shell spec had open questions on the start directory, `complete` and the unknown-command text.
@@ -415,7 +415,7 @@
 
 - **Context:** (2026-11-21) Real awk is large; the shell needs only what the DEF-01 log searches use.
 - **Decision:** `awk [-F<sep>] '[/regex/] {print <expr>[, <expr>…]}'` where each `<expr>` is `$0`, `$N`, `$NF` or `NR`; several expressions are joined by one space. Anything else prints `awk: unsupported program`. (Amended 2026-11-21 by the team: the first version allowed a single expression.)
-- **Consequences:** `{print $1, $7}` works; `{c[$1]++}`, `BEGIN`/`END` and arithmetic don't. If the scenes need more, change this decision first.
+- **Consequences:** `{print $1, $7}` works; `{c[$1]++}`, `BEGIN`/`END` and arithmetic don't. If the scenes need more, change this decision first. (Found in the build, 2026-11-22: `-F` takes a single character; a longer separator such as `-F'::'` prints `awk: unsupported program`, as `cut -d` also takes one character.)
 
 ### D-97: `systemctl` details
 - **Context:** (2026-11-21) D-22 made `restart` a stop then a start; two cases were open.
@@ -456,7 +456,7 @@
 ### D-104: Quoting
 - **Context:** (2026-11-22) R3 lists the syntax errors but not what quotes do.
 - **Decision:** No backslash escapes. Inside single and double quotes every character is literal, `$` included (D-93 forbids `$` only outside quotes). Adjacent quoted and unquoted pieces join into one word. A word quoted anywhere is never glob-expanded. A redirect target gets `~` expansion only. Outside quotes `&`, `(`, `)` and a lone `$` are syntax errors.
-- **Consequences:** The pretty-printer drops quotes that carry no meaning, so the parse → print → parse round trip holds.
+- **Consequences:** The pretty-printer drops quotes that carry no meaning, so the parse → print → parse round trip holds. (Found by Property 1, 2026-11-22: quoting a word that holds `*` or starts with `~` would mark it literal and change its meaning, so the printer leaves such a word bare unless the lexer would misread it, e.g. `~é` or `*#`.)
 
 ### D-105: Regex dialect and guard
 - **Context:** (2026-11-22) `grep` and `awk` take patterns from the player, and a catastrophic pattern would freeze the page.
