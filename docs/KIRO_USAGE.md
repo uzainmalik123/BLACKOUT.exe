@@ -4,6 +4,8 @@ Every Kiro session goes here (AGENTS.md, D-13). The hackathon write-up (PRD SUB-
 
 Credit budget: about 1500 for development, 2500 for in-game use, judges and the demo (PRD §12).
 
+**Credits used so far (account total, 2026-11-22): 540 of 4000.** The Kiro test on 2026-11-20 used about 1; the shell spec and its build (the rows below marked "not measured") used the other ≈ 539 together; the account doesn't split them per session. Left: ≈ 960 of the development budget, all 2500 of the in-game budget.
+
 | Date | Kiro app (IDE / CLI) | Feature (spec, hook, steering, MCP, custom agent, PBT, power, chat) | What it built or did | PRD rows | Credits |
 |---|---|---|---|---|---|
 | 2026-11-09 | — | Steering | `.kiro/steering/project.md` and `game-shell.md` written (by Claude, not yet loaded in Kiro) | KDEV-01 | 0 |
