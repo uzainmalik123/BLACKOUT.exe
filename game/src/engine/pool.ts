@@ -15,6 +15,20 @@ export function customerAddresses(world: World): Set<string> {
   return new Set(Object.values(world.customers.addresses));
 }
 
+/**
+ * D-111 (KI-90): every address Death or his proxies use or have used this run: the address of each move he started
+ * (a recorded start, a fresh one after an IP block: D-24), every address one of his access lines came from (the
+ * proxies he rotated through, D-46) and the pool his move holds right now. A minion's, a customer's or the shop's own
+ * address is never his, so an active lookup of it (DEF-04) tips nobody off.
+ */
+export function deathAddresses(world: World): Set<string> {
+  const used = new Set<string>();
+  for (const r of world.replays) if (r.owner === 'death') for (const ip of r.ips ?? [r.ip]) used.add(ip);
+  for (const e of world.events) if (e.kind === 'move-started') used.add(e.ip);
+  for (const l of world.logs.access) if (l.by.startsWith('ATK-')) used.add(l.ip);
+  return used;
+}
+
 /** The addresses Death's replays and the minions' waves hold right now. */
 export function attackerAddresses(world: World): Set<string> {
   const held = new Set<string>();

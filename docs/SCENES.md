@@ -13,7 +13,7 @@
 1. **Readable data stays crisp text.** Logs, alerts, the terminal, consoles and the report are real text in a mono font. The dot-matrix effect is for the atmosphere (Death, minions, the room, charts), never for text the player has to read (GAME_PLAN §11.4).
 2. **The dot world bleeds into the screens.** Death's hand reaching over a panel, a panel glitching when a move lands: the room and the data should feel like one place, not panels pasted on a background.
 3. **Desktop only**, 1024 px wide and up; keyboard first. The terminal must always be one keypress away.
-4. **No spoilers on screen.** Never show internal ids (`ATK-08`, `MIN-02`) or which move an alert is "about". The player only learns what a real defender would see: logs, alerts, meters.
+4. **No spoilers on screen.** Never show internal ids (`ATK-08`, `MIN-02`) or which move an alert is "about". The player only learns what a real defender would see: logs, alerts, meters. The engine's live assessment (`world.assess`: grades, phase statuses, gaps; SYS-21, D-114) is **never shown as a score or a checklist during the run**: it feeds Kiro's hints and the report at the end, nothing else.
 5. **Our own or free-licence assets only** (images, fonts, sounds). The demo video can't contain copyrighted material (SUB-03).
 6. **Flashes:** impact frames and glitches flash at most 3 times per second (photosensitive seizure safety, WCAG 2.3.1).
 7. **Difficulty changes what the screens help with, never what's true:**
@@ -22,7 +22,7 @@
 |---|---|---|---|
 | Suspicious log lines | Highlighted; hover = plain-words explanation | Highlighted | Raw, no highlight |
 | Terminal actions | Also available as console buttons | Terminal | Terminal |
-| Kiro | Explains alerts, suggests a next move, "Kiro, apply it" button | Hints after you're stuck a while | Silent unless asked |
+| Kiro | Explains alerts, suggests a next move, "Kiro, apply it" button | Hints after you're stuck a while | Silent unless asked, except one suggestion in the terminal when you're struggling (SYS-13, D-114) |
 | Pause | Allowed | No | No |
 
 ---
@@ -67,12 +67,13 @@ Where the whole game is played. The busiest screen; the one judges will see most
 | Part | What it shows / does | From |
 |---|---|---|
 | Live logs | Web server log and app log, scrolling; filterable; on Easy, suspicious lines highlighted with hover explanations | `engine.accessLog()`, `engine.appLog()` |
+| The three tools (UI-09) | Top talkers (the busiest addresses in the last real minute, with request and error counts), an error-rate strip (requests, 4xx and 5xx per real minute, the last few minutes) and the log lines coloured by status class. Real counts over the real lines, on every level; none of them says who an address is | `engine.topTalkers()`, `engine.errorRate()`, `statusClass(line.status)` (SYS-20, D-110) |
 | Alerts | Open alerts, newest first; closing when the cause is dealt with | `world.alerts` |
 | 💀 Souls meter | Customers' data left / taken | `world.souls` |
 | 🫀 Heartbeat meter | The business's health, 0–100; should *feel* like a heartbeat (faster and weaker as it drops) | `world.heartbeat` |
 | Game clock | In-game time of the incident | `world.clock.gameMs` |
 | Terminal | Where the player types real commands (`grep`, `iptables`, `sqlite3`, …). It renders the shell's `output` as text, never as HTML (D-106): file content and typed arguments can hold `<`; it empties the screen when `clear` is true and may ignore `exitCode` (D-95) | Shell interface, ENGINE_API §5 |
-| Consoles | **WAF** (rules, rate limits) · **Feature flags** (search, registration, password reset, uploads, `/ftp`, feedback CAPTCHA) · **Accounts** (lock, delete, force reset) · **Sessions** (revoke all) · **Deploy** (review the vulnerable code and its fix, then deploy; shows progress) · **Backups** (list by time, restore) · **Comms** (escalate, notify legal / customers) · the **big red button** (pull the plug / bring it back) | `engine.act(...)`, ENGINE_API §3 |
+| Consoles | **WAF** (rules, rate limits) · **Feature flags** (search, registration, password reset, uploads, `/ftp`, feedback CAPTCHA) · **Accounts** (lock, delete, force reset) · **Sessions** (revoke all) · **Deploy** (review the vulnerable code and its fix, then deploy; shows progress) · **Backups** (list by time, restore) · **Comms** (escalate, notify legal / customers, the breach-notification countdown from `engine.notificationClock()`, SYS-14) · the **big red button** (pull the plug / bring it back) | `engine.act(...)`, ENGINE_API §3 |
 | Kiro panel | Chat, hints, "explain this line", drafted commands the player copies into the terminal; a visible "Kiro is reading the logs…" wait while the game keeps running; "Kiro (offline)" label when offline | Kiro interface, ENGINE_API §5 |
 | Briefing files | Reachable at any time | CON-01 |
 | Death and minions | Present in the scene, reacting to events (scene 6) | `world.events` |

@@ -3,12 +3,16 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import initSqlJs from 'sql.js';
 import { describe, expect, it } from 'vitest';
+import { TAP_BY_ID, TAPS } from '../rules/taps';
 import { isTestNet3, validateRecording, type AccessEvent, type DbEvent, type ExfilEvent, type FileEvent, type Recording } from './format';
 
 const dir = new URL('./', import.meta.url);
 const jsonFiles = readdirSync(dir).filter((f) => f.endsWith('.json'));
 // Customer traffic (REC-06) sits one folder down so it's never loaded as a move (D-62).
 const trafficFiles = readdirSync(new URL('traffic/', dir)).filter((f) => f.endsWith('.json')).map((f) => `traffic/${f}`);
+// The leaky taps (PRD §4.1) too: not moves, read by the taps engine only (D-130).
+const tapFiles = readdirSync(new URL('taps/', dir)).filter((f) => f.endsWith('.json')).map((f) => `taps/${f}`);
+const folderOf = (move: string) => (move === 'CUST' ? 'traffic/' : /^TAP-\d\d$/.test(move) ? 'taps/' : '');
 const raw = (file: string) => readFileSync(new URL(file, dir), 'utf8');
 const load = (file: string) => JSON.parse(raw(file)) as Recording;
 const accessOf = (r: Recording) => r.events.filter((e): e is AccessEvent => e.kind === 'access');
@@ -22,14 +26,14 @@ async function baseline() {
 
 describe('every committed recording', () => {
   it('exists', () => {
-    const moves = ['ATK-01', 'ATK-03', 'ATK-04', 'ATK-06', 'ATK-08', 'ATK-08.b', 'ATK-08.c', 'ATK-08.d', 'ATK-08.e', 'ATK-08.f', 'ATK-08.g', 'ATK-09.b', 'ATK-09.c', 'ATK-11', 'ATK-13', 'ATK-15', 'ATK-17', 'MIN-01', 'MIN-02'];
+    const moves = ['ATK-01', 'ATK-03', 'ATK-04', 'ATK-06', 'ATK-08', 'ATK-08.b', 'ATK-08.c', 'ATK-08.d', 'ATK-08.e', 'ATK-08.f', 'ATK-08.g', 'ATK-09.b', 'ATK-09.c', 'ATK-11', 'ATK-13', 'ATK-15', 'ATK-17', 'MIN-01', 'MIN-02', 'MIN-03', 'MIN-04'];
     expect(jsonFiles).toEqual(expect.arrayContaining(moves.map((m) => (m.includes('.') ? `${m}.json` : `${m}.a.json`))));
   });
 
-  it.each([...jsonFiles, ...trafficFiles])('%s is valid D-15, named after its move and variant, with no rig address left', (file) => {
+  it.each([...jsonFiles, ...trafficFiles, ...tapFiles])('%s is valid D-15, named after its move and variant, with no rig address left', (file) => {
     const r = load(file);
     expect(validateRecording(r)).toEqual([]);
-    expect(file).toBe(`${r.move === 'CUST' ? 'traffic/' : ''}${r.move}.${r.variant}.json`);
+    expect(file).toBe(`${folderOf(r.move)}${r.move}.${r.variant}.json`);
     expect(raw(file)).not.toMatch(/\b10\.66\.\d+\.\d+\b/);
     expect(accessOf(r).every((e) => isTestNet3(e.ip))).toBe(true);
   });
@@ -231,6 +235,33 @@ describe('MIN-02.a: credential stuffing wave', () => {
   });
 });
 
+describe('MIN-03.a and MIN-04.a: the should minions, one wave each (REC-05, D-132)', () => {
+  const WAVE_MS = 20_000; // a wave lasts 20 real s (config.ts) and replays a recorded second per real second
+
+  it('MIN-03.a is a scraper hammering the catalogue: GET /api/Products only, about 2 a second, a Scrapy agent, inside one wave', () => {
+    const r = load('MIN-03.a.json');
+    const access = accessOf(r);
+    expect(access.length).toBeGreaterThanOrEqual(20);
+    expect(access.every((e) => e.method === 'GET' && e.target === '/api/Products' && e.status === 200 && e.userAgent.startsWith('Scrapy/'))).toBe(true);
+    expect(access.every((e) => e.bytes > 10_000)).toBe(true); // the whole catalogue each time
+    expect(r.durationMs).toBeLessThanOrEqual(WAVE_MS);
+    expect(new Set(access.map((e) => e.ip)).size).toBe(1);
+  });
+
+  it('MIN-04.a is a spam bot: each post fetches a CAPTCHA first, every post is accepted, and the spam lands in Feedbacks, inside one wave', () => {
+    const r = load('MIN-04.a.json');
+    const access = accessOf(r);
+    const posts = access.filter((e) => e.method === 'POST' && e.target === '/api/Feedbacks/');
+    expect(posts.length).toBe(10);
+    expect(posts.every((e) => e.status === 201)).toBe(true);
+    access.forEach((e, i) => expect(e.target).toBe(i % 2 === 0 ? '/rest/captcha/' : '/api/Feedbacks/'));
+    const spam = dbOf(r).filter((e) => e.table === 'Feedbacks' && e.op === 'insert');
+    expect(spam).toHaveLength(10);
+    expect(spam.every((e) => /www\.example\.(com|net|org)/.test(String(e.after?.comment)))).toBe(true);
+    expect(r.durationMs).toBeLessThanOrEqual(WAVE_MS);
+  });
+});
+
 describe('CUST.a: ordinary customer traffic (REC-06, D-61)', () => {
   const r = load('traffic/CUST.a.json');
   const access = accessOf(r);
@@ -266,6 +297,83 @@ describe('CUST.a: ordinary customer traffic (REC-06, D-61)', () => {
     expect(access.filter((e) => /union|select|%27|'|<script|\.\.\/|\.php/i.test(e.target))).toEqual([]);
     const admins = dbOf(r).filter((e) => e.table === 'Users' && e.op === 'insert' && e.after?.role !== 'customer');
     expect(admins).toEqual([]);
+  });
+});
+
+describe('CUST.b: shoppers who reset a password and open /ftp (KI-82, D-131)', () => {
+  const r = load('traffic/CUST.b.json');
+  const access = accessOf(r);
+  const count = (method: string, target: RegExp, status: number) => access.filter((e) => e.method === method && target.test(e.target) && e.status === status).length;
+
+  it('is short, from 15 to 30 addresses, none a Death or minion address, all with browser user agents', () => {
+    expect(r.durationMs).toBeGreaterThan(150_000);
+    expect(r.durationMs).toBeLessThan(300_000);
+    const ips = new Set(access.map((e) => e.ip));
+    expect(ips.size).toBeGreaterThanOrEqual(15);
+    expect(ips.size).toBeLessThanOrEqual(30);
+    const attackers = new Set(readdirSync(dir).filter((f) => f.endsWith('.json')).flatMap((f) => accessOf(load(f)).map((e) => e.ip)));
+    expect([...ips].filter((ip) => attackers.has(ip))).toEqual([]);
+    expect(access.every((e) => e.userAgent.startsWith('Mozilla/5.0'))).toBe(true);
+  });
+
+  it('has forgot-password flows: the question looked up, a mistyped answer refused, then reset, and a login with the new password', () => {
+    expect(count('GET', /^\/rest\/user\/security-question\?email=[^&]+@example\.(com|net|org)$/, 200)).toBeGreaterThanOrEqual(4);
+    expect(count('POST', /^\/rest\/user\/reset-password$/, 401)).toBeGreaterThanOrEqual(4);
+    expect(count('POST', /^\/rest\/user\/reset-password$/, 200)).toBeGreaterThanOrEqual(3);
+    const resets = access.filter((e) => e.target === '/rest/user/reset-password' && e.status === 200);
+    for (const reset of resets) {
+      expect(access.some((e) => e.ip === reset.ip && e.t > reset.t && e.target === '/rest/user/login' && e.status === 200)).toBe(true);
+    }
+  });
+
+  it('has shoppers reading /ftp/legal.md from the About page, and one opening /ftp itself', () => {
+    expect(count('GET', /^\/ftp\/legal\.md$/, 200)).toBeGreaterThanOrEqual(4);
+    expect(count('GET', /^\/ftp$/, 200)).toBeGreaterThanOrEqual(1);
+    expect(count('GET', /^\/api\/Feedbacks\/$/, 200)).toBeGreaterThanOrEqual(4); // the About page's carousel
+  });
+
+  it('is otherwise ordinary: searches, logins, baskets, nothing broken and no attack payloads', () => {
+    expect(count('GET', /^\/rest\/products\/search\?q=[a-z]/, 200)).toBeGreaterThan(10);
+    expect(count('POST', /^\/api\/BasketItems\/$/, 200)).toBeGreaterThanOrEqual(1);
+    expect(access.filter((e) => e.status >= 500)).toEqual([]);
+    expect(access.filter((e) => /union|select|%27|'|<script|\.\.\/|\.php/i.test(e.target))).toEqual([]);
+    expect(access.filter((e) => /^\/ftp\/./.test(e.target) && e.target !== '/ftp/legal.md')).toEqual([]); // no confidential file opened
+  });
+});
+
+describe('the leaky taps, each scraped for real (PRD §4.1, KI-59, D-130)', () => {
+  const tap = (id: string) => load(`taps/${id}.a.json`);
+  const leaked = (r: Recording) => [...new Set(exfilOf(r).flatMap((e) => e.keys))].sort((x, y) => x - y);
+
+  it('every tap is recorded, and no tap sits among the moves', () => {
+    expect(tapFiles).toEqual(TAPS.map((t) => `taps/${t.id}.a.json`));
+    expect(jsonFiles.filter((f) => f.startsWith('TAP-'))).toEqual([]);
+  });
+
+  it.each(TAPS.map((t) => t.id))('%s is GET 200s on the exposed route only, with no login and a scraper user agent', (id) => {
+    const route = TAP_BY_ID[id].closedBy.rule.path.replace('*', '\\d+');
+    for (const e of accessOf(tap(id))) {
+      expect(e).toMatchObject({ method: 'GET', status: 200, userAgent: 'python-requests/2.32.3' });
+      expect(e.target).toMatch(new RegExp(`^${route}(/|$)`));
+    }
+  });
+
+  it.each(TAPS.filter((t) => t.leaks !== 'every-customer').map((t) => t.id))('%s leaks exactly the accounts its PRD row names', (id) => {
+    expect(leaked(tap(id))).toEqual([...(TAP_BY_ID[id].leaks as readonly number[])].sort((x, y) => x - y));
+  });
+
+  it('TAP-02 hands over each poster\'s password hash with their email; TAP-03 only emails', () => {
+    expect(exfilOf(tap('TAP-02')).every((e) => e.columns.includes('password'))).toBe(true);
+    expect(exfilOf(tap('TAP-03')).every((e) => e.columns.join() === 'email')).toBe(true);
+  });
+
+  it('TAP-01: the listing, then the access log, growing; on a fresh shop it carries no customer row (KI-74)', () => {
+    const [listing, ...fetches] = accessOf(tap('TAP-01'));
+    expect(listing!.target).toBe('/support/logs');
+    expect(fetches.length).toBeGreaterThanOrEqual(5);
+    for (const e of fetches) expect(e.target).toMatch(/^\/support\/logs\/access\.log\.\d{4}-\d\d-\d\d$/);
+    for (let i = 1; i < fetches.length; i++) expect(fetches[i]!.bytes).toBeGreaterThan(fetches[i - 1]!.bytes);
+    expect(leaked(tap('TAP-01'))).toEqual([]);
   });
 });
 

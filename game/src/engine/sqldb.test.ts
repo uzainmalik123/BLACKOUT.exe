@@ -44,6 +44,21 @@ describe('the sql.js side of the replay (SYS-03)', () => {
     expect(one(g, "SELECT count(*) FROM Users WHERE email='bender@juice-sh.op'")).toEqual([[0]]);
   });
 
+  it("a lock's deletedAt is the lock's game time in the shop's own format, never the real clock (KI-91, D-111)", async () => {
+    const g = await openBaseline(bytes());
+    const w = initialWorld(1, 'medium');
+    w.clock.gameMs = 3_723_456; // 01:02:03.456 into the scenario (starts 2026-10-31T22:00:00Z, D-24)
+    applyAction(w, { type: 'DEF-08', email: 'jim@juice-sh.op' });
+    syncDb(g, w);
+    expect(one(g, "SELECT deletedAt FROM Users WHERE email='jim@juice-sh.op'")).toEqual([['2026-10-31 23:02:03.456 +00:00']]);
+    expect(one(g, 'SELECT deletedAt FROM Users WHERE id=14')).toEqual([['2026-11-20 05:29:57.921 +00:00']]); // the baseline's own soft-delete keeps its stamp
+    // a made-up insert's missing NOT NULL timestamps get the change's game time, so two runs print the same rows
+    w.logs.dbChanges.push({ t: 60_000, op: 'insert', table: 'Users', key: { id: 326 }, after: { id: 326, email: 'death@juice-sh.op', role: 'admin' } });
+    w.accounts.push({ id: 326, email: 'death@juice-sh.op', role: 'admin', createdBy: 'ATK-06' });
+    syncDb(g, w);
+    expect(one(g, "SELECT createdAt, updatedAt FROM Users WHERE id=326")).toEqual([['2026-10-31 22:01:00.000 +00:00', '2026-10-31 22:01:00.000 +00:00']]);
+  });
+
   it('syncDb is idempotent and a restore brings a deleted seed account back', async () => {
     const g = await openBaseline(bytes());
     const w = initialWorld(1, 'medium');
