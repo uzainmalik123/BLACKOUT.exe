@@ -174,7 +174,8 @@ export interface World {
   patches: { applied: Patch[]; pending: Array<{ patch: Patch; readyAt: number }> };
   backups: Backup[];
   evidence: Evidence[];
-  comms: { escalatedAt?: number; notifiedAt: { legal?: number; customers?: number }; breachConfirmedAt?: number };
+  comms: { escalatedAt?: number; notifiedAt: { legal?: number; customers?: number }; breachConfirmedAt?: number; notificationOverdue?: boolean }; // SYS-14: the clock runs from breachConfirmedAt for config.notification.windowGameMs
+  struggle: { lastUsefulActionAt: number; lastSuggestionAt?: number; suggestions: number }; // SYS-13 (D-113): the struggle detector's state; `suggestions` is how many it has unlocked
   death: {
     knowledge: Array<'map' | 'secrets-leaked' | 'admin-password'>;
     forgedToken: boolean;
@@ -253,6 +254,7 @@ export function initialWorld(seed: number, difficulty: Difficulty): World {
     backups: [{ id: 0, takenAt: 0, accounts: accounts.map((a) => ({ ...a })), files: [], defacements: [] }],
     evidence: [],
     comms: { notifiedAt: {} },
+    struggle: { lastUsefulActionAt: 0, suggestions: 0 },
     death: { knowledge: [], forgedToken: false, played: [], nextMoveAt: 0, stageSkips: 0, pacingDelayed: false, skipWait: false, tippedOff: false, resume: {}, shutDoors: [], ipCutsInRow: 0, proxies: false, nextId: 1 },
     replays: [],
     waves: [],

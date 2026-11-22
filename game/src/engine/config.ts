@@ -54,6 +54,7 @@ export interface EngineConfig {
     dripFraction: number; // D-42: each drip takes this share of the total souls (rounded, at least 1)
   };
   notification: { windowGameMs: number }; // SYS-14 (D-112): the breach-notification window after confirmation, GDPR's 72 h compressed to the run length
+  struggle: { idleGameMs: number; soulsWindowGameMs: number; soulsFraction: number; unlocks: boolean }; // SYS-13 (D-113): struggling = no useful action for idleGameMs, or souls down by soulsFraction within soulsWindowGameMs; unlocks a suggestion on Medium/Hard only
   backupEveryGameMs: number; // DEF-17: hourly snapshots
   scenarioStartIso: string; // D-24
   /** SYS-08, D-31, D-42: the only variants Death may play of these moves, normally and once tipped off. Other variants stay for reference. */
@@ -100,6 +101,7 @@ const MEDIUM: EngineConfig = {
   stuckBreathers: 2,
   taps: { everyGameMs: { min: 180 * REAL_S, max: 240 * REAL_S }, maxOpen: 2, dripEveryGameMs: 60 * REAL_S, dripFraction: 0.01 },
   notification: { windowGameMs: 6 * 60 * GAME_MIN }, // D-112: a run is about 6 game hours (PRD §1), so the 72 h clock runs 12× game time
+  struggle: { idleGameMs: 90 * REAL_S, soulsWindowGameMs: 120 * REAL_S, soulsFraction: 0.1, unlocks: true }, // SYS-13
   backupEveryGameMs: 60 * GAME_MIN,
   scenarioStartIso: '2026-10-31T22:00:00Z',
   pinnedVariants: { 'ATK-08': { normal: ['d', 'e'], tippedOff: ['f', 'g'] } }, // D-42: the halves (D-63); .b/.c retired, .a test-only
@@ -112,6 +114,7 @@ export const CONFIG: Readonly<Record<Difficulty, EngineConfig>> = {
     ...MEDIUM, pausable: true, breatherGameMs: { min: 45 * REAL_S, max: 60 * REAL_S }, leakyWaf: false,
     minions: { ...MEDIUM.minions, alongsideDeath: false }, customers: { ...MEDIUM.customers, share: 0.2 }, wafEvasion: { 'ATK-01': { a: [], b: ['block-user-agent'] }, 'ATK-08': { d: EASY_LEAKS, e: EASY_LEAKS, f: [], g: [] } },
     taps: { ...MEDIUM.taps, everyGameMs: { min: 240 * REAL_S, max: 300 * REAL_S } },
+    struggle: { ...MEDIUM.struggle, unlocks: false }, // SYS-13: on Easy Kiro helps anyway (KIRO-03); nothing to unlock
   },
   medium: MEDIUM,
   hard: {

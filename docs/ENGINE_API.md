@@ -52,6 +52,8 @@ const unsubscribe = engine.subscribe((world) => render(world));
 | Backups | `backups` (`id`, `takenAt`) | For the Backups console |
 | Evidence | `engine.evidence()` | Snapshots taken |
 | Uploads | `engine.files()` | Files in `uploads/`, incl. planted ones |
+| Notification clock | `engine.notificationClock()` | SYS-14 (D-113), for the comms console: `state` (`idle` until a breach is confirmed, `running`, `notified`, `overdue`), `label` a 72-hour face counting down (`HH:MM:SS`, `--:--:--` while idle), `deadline` and `remainingGameMs` |
+| Struggle | `struggle.suggestions`, `struggle.lastSuggestionAt` | SYS-13 (D-113): how many suggestions the rules have unlocked so far (Medium and Hard only; always 0 on Easy, where Kiro helps anyway). The Kiro panel's `hint()` answers only while the count is above the hints it has given; on Hard it shows nothing unasked |
 | Comms | `comms`, `tickets` | Escalated / notified times. `tickets`: customers' support tickets (`t`, `ip`, `userAgent`, `about` what they were doing, `status` what they got: `503`, `429`, `403` or `'blocked'`, `text`), newest last; list them in the comms console (D-65) |
 | Customers | `customers.served`, `.failed`, `.lost` | How many customer requests went through, how many the player's actions failed, how many shoppers gave up (for the report) |
 | The ending | `ending` | `'banished'`, `'souls-lost'`, `'flatline'`, `'return'`; undefined while playing |
@@ -104,6 +106,9 @@ Every button, console and (later) shell command sends one of these. It returns `
 | `proxies` | After three IP blocks in a row Death plays from rotating proxies for the rest of the run: blocking addresses no longer cuts him (D-46) | He splits into many shadows |
 | `ticket` | A customer complained (`ticket` is its id in `world.tickets`, `about`, `status`): something the player did failed them (D-65) | A new ticket in the comms console; a phone ringing |
 | `customer-lost` | A customer gave up for good; the heartbeat's maximum is now `max` (D-65) | The top of the heartbeat meter dies a little |
+| `suggestion` | The player is struggling (`reason`: `idle` 90 real s without an accepted action, or `souls` down over 10 % in 2 real min); suggestion `n` is unlocked (SYS-13, D-113; Medium and Hard only) | The terminal or the Kiro panel shows that a hint is available; nothing on Hard unless asked |
+| `breach-confirmed` | The first evidence snapshot or escalation after souls were taken: the notification clock starts (SYS-14, `by`) | The comms console's clock starts counting down from 72:00:00 |
+| `notification-overdue` | The window passed with legal not notified (SYS-14) | The clock face reads 00:00:00; the report will say late or missing |
 | `tip-off` | The player tipped Death off: a lock (DEF-08), or an active lookup (`ping`/`nmap`/`curl`) of an address he or his proxies have used (D-111; any other address does nothing, and the action's answer never says which) | He turns toward the player. Subtle |
 | `patch-applied` | A deploy finished | Small "sealed" beat |
 | `banished` | Every door is closed (soul doors by their real fix, taps included) and no foothold is left, or provisionally with a foothold left (D-44, D-45) | The calm before the ending |

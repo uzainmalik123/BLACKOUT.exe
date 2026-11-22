@@ -7,6 +7,7 @@ import { advance } from './advance';
 import { pause, resume } from './clock';
 import { errorRate, topTalkers, type ErrorRatePoint, type Talker } from './detection';
 import { libraryFrom, type RecordingLibrary } from './library';
+import { notificationClock, type NotificationClock } from './notification';
 import { renderAccessLog, renderAppLog } from './replay';
 import { openBaseline, syncDb, type GameDb } from './sqldb';
 import { initialWorld, type Evidence, type VFile, type World } from './state';
@@ -85,6 +86,11 @@ export class Engine {
   /** SYS-20 b: requests, 4xx and 5xx per real minute since the start, the last point the current minute. */
   errorRate(): ErrorRatePoint[] {
     return errorRate(this.world);
+  }
+
+  /** SYS-14: the breach-notification clock for the comms console (idle until a breach is confirmed). */
+  notificationClock(): NotificationClock {
+    return notificationClock(this.world);
   }
 
   files(): VFile[] {

@@ -31,8 +31,11 @@ function tipOff(world: World, by: ActionId): void {
   world.death.tippedOff = true;
 }
 
-function confirmBreach(world: World): void {
-  if (world.souls.stolen.length > 0 && world.comms.breachConfirmedAt === undefined) world.comms.breachConfirmedAt = world.clock.gameMs;
+/** SYS-14: the notification clock starts at the first DEF-05 or DEF-19 after souls were taken. */
+function confirmBreach(world: World, by: 'DEF-05' | 'DEF-19'): void {
+  if (world.souls.stolen.length === 0 || world.comms.breachConfirmedAt !== undefined) return;
+  world.comms.breachConfirmedAt = world.clock.gameMs;
+  emit(world, { kind: 'breach-confirmed', by });
 }
 
 function costOf(world: World, id: ActionId): void {
@@ -55,7 +58,7 @@ function run(world: World, action: PlayerAction): ActionResult {
     case 'DEF-05': {
       if (world.evidence.some((e) => e.name === action.name)) return no(`Evidence ${action.name} already exists`);
       world.evidence.push({ name: action.name, takenAt: now, accessLines: world.logs.access.length, appLines: world.logs.app.length });
-      confirmBreach(world);
+      confirmBreach(world, 'DEF-05');
       return ok(`Evidence ${action.name} preserved`);
     }
     case 'DEF-06': {
@@ -151,7 +154,7 @@ function run(world: World, action: PlayerAction): ActionResult {
     case 'DEF-19':
       if (world.comms.escalatedAt !== undefined) return no('The incident lead already knows');
       world.comms.escalatedAt = now;
-      confirmBreach(world);
+      confirmBreach(world, 'DEF-19');
       return ok('The incident lead acknowledges');
     case 'DEF-20':
       if (world.comms.notifiedAt[action.to] !== undefined) return no(`${action.to} already notified`);
@@ -171,6 +174,7 @@ function restore(world: World, b: Backup): void {
 export function applyAction(world: World, action: PlayerAction): ActionResult {
   const result = world.ending ? no(`The incident is over: ${world.ending}`) : run(world, action);
   emit(world, { kind: 'action', action, ok: result.ok, note: result.message });
+  if (result.ok) world.struggle.lastUsefulActionAt = world.clock.gameMs; // SYS-13: an action that took is a useful one; a refused one isn't
   return result;
 }
 

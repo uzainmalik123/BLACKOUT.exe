@@ -12,6 +12,8 @@ import { endRun } from './log';
 import { stepWaves } from './minions';
 import { stepReplays } from './replay';
 import { soulsLeft } from './souls';
+import { stepStruggle } from './struggle';
+import { stepNotificationClock } from './notification';
 import { stepTaps } from './taps';
 import type { World } from './state';
 
@@ -32,6 +34,8 @@ function step(world: World, library: RecordingLibrary, dt: number): void {
   stepCustomers(world, library); // SYS-19: after Death and the minions, so their addresses are known (D-65)
   refreshDoors(world, library); // D-44: a door is shut only while its fix holds
   integrateHeartbeat(world, dt);
+  stepStruggle(world); // SYS-13
+  stepNotificationClock(world); // SYS-14
   const config = CONFIG[world.difficulty];
   if (world.clock.gameMs - world.clock.lastDirectorTick >= config.directorPeriodGameMs) {
     world.clock.lastDirectorTick = world.clock.gameMs;

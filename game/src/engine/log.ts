@@ -22,6 +22,9 @@ export type GameEventBody =
   | { kind: 'proxies' } // D-46 (KI-78): after three IP blocks in a row he plays from rotating proxies for the rest of the run
   | { kind: 'ticket'; ticket: number; about: RequestClass; status: 403 | 429 | 503 | 'blocked' } // D-65: a customer's first failure this loop: a support ticket
   | { kind: 'customer-lost'; about: RequestClass; max: number } // D-65: a customer gave up (a second failure): the heartbeat's maximum dropped to `max`
+  | { kind: 'suggestion'; n: number; reason: 'idle' | 'souls' } // SYS-13 (D-113): the player is struggling; one suggestion unlocked (Medium/Hard)
+  | { kind: 'breach-confirmed'; by: 'DEF-05' | 'DEF-19' } // SYS-14: the notification clock starts
+  | { kind: 'notification-overdue' } // SYS-14: the window passed with legal not notified
   | { kind: 'patch-applied'; patch: Patch }
   | { kind: 'banished' }
   | { kind: 'return'; through: Foothold }
