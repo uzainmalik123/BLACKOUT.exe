@@ -327,12 +327,13 @@ describe('the committed customers (REC-06) in whole runs', { timeout: WHOLE_RUN_
   const real = committedLibrary();
   const idle = (difficulty: Difficulty, seed = 1) => runSim({ seed, difficulty, library: real, maxRealMs: 20 * REAL_MIN, player: () => [] });
 
-  it('an idle Medium run: customers write at least 60% of the lines outside the scan, about 2 a second; Easy about 1, Hard about 4 (SYS-19)', () => {
+  it('an idle Medium run: customers write at least 60% of the lines outside the scan and the minions\' waves, about 2 a second; Easy about 1, Hard about 4 (SYS-19, D-134)', () => {
     const r = idle('medium');
     const lines = r.world.logs.access;
     const cust = lines.filter((l) => l.by === 'CUST').length;
-    const scan = lines.filter((l) => l.by === 'ATK-01').length;
-    expect(cust / (lines.length - scan)).toBeGreaterThanOrEqual(0.6);
+    const bursts = lines.filter((l) => l.by === 'ATK-01' || l.by?.startsWith('MIN-')).length; // Death's scan and the waves: bursts by nature
+    expect(lines.some((l) => l.by?.startsWith('MIN-'))).toBe(true);
+    expect(cust / (lines.length - bursts)).toBeGreaterThanOrEqual(0.6);
     expect(cust / (r.realMs / 1000)).toBeGreaterThan(1.5);
     expect(cust / (r.realMs / 1000)).toBeLessThan(2.8);
     expect(r.world.customers.failed).toBe(0); // nobody did anything to them

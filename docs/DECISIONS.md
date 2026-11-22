@@ -393,3 +393,14 @@
   - Both play through the existing minion engine (every committed recording is loaded, D-40); no engine change.
 - **Recorded 2026-11-22:** MIN-03.a 15.8 s, 30 requests, 7.0 KB; MIN-04.a 12.3 s, 20 requests, 9.7 KB.
 - **Consequences:** REC-05 done. Idle Medium runs now carry MIN-03 and MIN-04 lines (seed 1: about 120 and 60 in 17 real minutes) and customers keep at least 60 % of the lines outside the scan. New issues: KI-132, KI-133.
+
+### D-133: The feedback CAPTCHA is a proper challenge; MIN-04's stoppers (closes KI-133)
+- **Context:** (2026-11-22) MIN-04.a (D-132) showed that Juice Shop's own CAPTCHA returns its answer (KI-133), so "turn the feedback CAPTCHA on" (DEF-10) stopped nothing real.
+- **Decision** (team ruling): turning the feedback CAPTCHA on means deploying a proper challenge that does not return its own answer. It stops every spam bot (every MIN-04 wave, whatever its address; no per-address CAPTCHA limit) and never Death (none of his moves posts feedback). MIN-04's stoppers are DEF-10 feedback CAPTCHA on, or DEF-12 a rate limit on `POST /api/Feedbacks`. The real flaw goes into KI-03 as the lesson.
+- **Engine:** the CAPTCHA already closes MIN-04 (`DEF-10 feedback-captcha` is its stopper, off by default, and holds once switched on), and no Death move names it, so nothing changes there. The rate-limit stopper needs `rules/minions.ts`, outside this work's files: KI-134 for the engine session. Customers solve the proper CAPTCHA as before (D-65: the CAPTCHA on fails nobody).
+- **Consequences:** PRD MIN-04 row and §4 updated; KI-03 has the CAPTCHA fact; KI-133 closed; new KI-134.
+
+### D-134: SYS-19's customer share leaves out the minions' waves too (closes KI-132, amends D-65 rule 7)
+- **Context:** (2026-11-22) A scraper that really hammers (KI-132) pushed customers below 60 % of the idle log outside Death's scan.
+- **Decision** (team ruling): SYS-19's 60 % is counted on the access-log lines outside Death's scan (ATK-01) and the minions' waves (any `MIN-` line): both are bursts by nature, as D-65 rule 7 already said of the scan. The test also checks that waves played in that run.
+- **Consequences:** a heavier MIN-03 variant no longer breaks SYS-19; the committed MIN-03.a stays as recorded (D-132). PRD SYS-19 row updated; KI-132 closed.
