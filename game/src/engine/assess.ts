@@ -10,6 +10,7 @@ import { FOOTHOLDS, type ActionId, type Feature, type Foothold, type MoveId, typ
 import { CONFIG } from './config';
 import { footholds } from './facts';
 import type { GameEvent } from './log';
+import { confirmBreach } from './notification';
 import type { World } from './state';
 
 export type Phase = 'detect' | 'contain' | 'eradicate' | 'recover';
@@ -67,37 +68,43 @@ export interface AssessState extends Assessment {
   assessedAt: number; // game ms of the last snapshot
   cursor: number; // events seen so far (for the urgent refresh)
   judgedUpTo: number; // the highest event id already judged for relevance (an action's verdict is in `relevant`)
-  judge: { startedMoves: MoveId[]; landedMoves: MoveId[]; running: boolean; tapsOpened: TapId[] }; // what the player could know of his work, as of judgedUpTo
+  judge: { startedMoves: MoveId[]; frozen: number[]; footholds: Foothold[]; defacements: number; accounts: string[] }; // what the player could know of his work, and what stood, as of judgedUpTo (accounts: the ones he made or took that were in the world)
   logCursor: number; // access lines learnt from so far
+  appCursor: number; // app lines learnt from so far
   hisAddresses: string[]; // every address he has used (his moves' starts and lines)
-  hisPaths: string[]; // every path his moves requested
+  hisMoves: Record<string, MoveId>; // which move used each address (the first that did)
+  hisAppTexts: string[]; // every app-log line one of his moves wrote
   hisAccounts: string[]; // emails of accounts he created, hijacked or held a session for, ever
   hisFiles: string[]; // paths of files he planted, ever
 }
 
-/** What the assessor knows of his work: what it remembered plus what the world shows now (the log from its cursor on). */
-interface Knowledge { addresses: Set<string>; paths: Set<string>; hisAccounts: Set<string>; hisFiles: Set<string>; logCursor: number }
+/** What the assessor knows of his work: what it remembered plus what the world shows now (the logs from their cursors on). */
+interface Knowledge { addresses: Set<string>; moves: Map<string, MoveId>; appTexts: Set<string>; hisAccounts: Set<string>; hisFiles: Set<string>; logCursor: number; appCursor: number }
 
 const knowledgeCache = new WeakMap<AssessState, { sizes: string; sets: Knowledge }>();
 
 function learn(world: World): Knowledge {
   const a = world.assess;
-  // The remembered arrays become Sets once per change, not once per tick (the scan's paths run to thousands).
-  const sizes = `${a.hisAddresses.length} ${a.hisPaths.length} ${a.hisAccounts.length} ${a.hisFiles.length}`;
+  // The remembered arrays become Sets once per change, not once per tick (the scan's lines run to thousands).
+  const sizes = `${a.hisAddresses.length} ${a.hisAppTexts.length} ${a.hisAccounts.length} ${a.hisFiles.length}`;
   let cached = knowledgeCache.get(a);
   if (!cached || cached.sizes !== sizes) {
-    cached = { sizes, sets: { addresses: new Set(a.hisAddresses), paths: new Set(a.hisPaths), hisAccounts: new Set(a.hisAccounts), hisFiles: new Set(a.hisFiles), logCursor: a.logCursor } };
+    cached = { sizes, sets: { addresses: new Set(a.hisAddresses), moves: new Map(Object.entries(a.hisMoves) as Array<[string, MoveId]>), appTexts: new Set(a.hisAppTexts), hisAccounts: new Set(a.hisAccounts), hisFiles: new Set(a.hisFiles), logCursor: a.logCursor, appCursor: a.appCursor } };
     knowledgeCache.set(a, cached);
   }
   const base = cached.sets;
-  const k: Knowledge = { addresses: new Set(base.addresses), paths: new Set(base.paths), hisAccounts: new Set(base.hisAccounts), hisFiles: new Set(base.hisFiles), logCursor: world.logs.access.length };
+  const k: Knowledge = { addresses: new Set(base.addresses), moves: new Map(base.moves), appTexts: new Set(base.appTexts), hisAccounts: new Set(base.hisAccounts), hisFiles: new Set(base.hisFiles), logCursor: world.logs.access.length, appCursor: world.logs.app.length };
   for (let i = a.logCursor; i < world.logs.access.length; i++) {
     const l = world.logs.access[i]!;
     if (!l.by.startsWith('ATK-')) continue;
     k.addresses.add(l.ip);
-    k.paths.add(l.target.split('?')[0]!);
+    if (!k.moves.has(l.ip)) k.moves.set(l.ip, l.by as MoveId);
   }
-  for (const r of world.replays) if (r.owner === 'death') for (const ip of r.ips ?? [r.ip]) k.addresses.add(ip);
+  for (let i = a.appCursor; i < world.logs.app.length; i++) {
+    const l = world.logs.app[i]!;
+    if (l.by.startsWith('ATK-')) k.appTexts.add(l.text.trim());
+  }
+  for (const r of world.replays) if (r.owner === 'death') for (const ip of r.ips ?? [r.ip]) { k.addresses.add(ip); if (!k.moves.has(ip)) k.moves.set(ip, r.move as MoveId); }
   for (const acc of world.accounts) if (acc.createdBy !== 'seed' || acc.hijackedBy !== undefined) k.hisAccounts.add(acc.email);
   for (const s of world.sessions) k.hisAccounts.add(s.email);
   for (const f of world.files) if (f.plantedBy !== undefined) k.hisFiles.add(f.path);
@@ -153,6 +160,9 @@ const FOOTHOLD_NAME: Record<Foothold, string> = {
 };
 const USERS_SQL = /\busers\b/i;
 const ENDING_FAILS: Record<string, Phase | undefined> = { 'souls-lost': 'contain', flatline: 'recover', return: 'eradicate' };
+const OUTCOME: Record<string, string> = { banished: 'Banished', 'souls-lost': 'Every soul lost', flatline: 'Flatline', return: 'The return', 'clean-handover': 'Clean handover', 'rough-handover': 'Rough handover', 'walked-away': 'Walked away (a loss)' };
+const FOCUS = { max: 200, share: 0.2 } as const; // D-115: a read is focused when it showed at most 200 lines, or his lines are a fifth of what it showed
+const HARVEST: ReadonlySet<MoveId> = new Set(SOUL_DOORS);
 
 /** Does a stopper row of this move match the action with these parameters? */
 function stopperMatches(move: MoveId, a: PlayerAction): boolean {
@@ -168,64 +178,152 @@ function stopperMatches(move: MoveId, a: PlayerAction): boolean {
   });
 }
 
-/** What the player could know of his work when an action happened. */
+/** What the player could know of his work when an action happened, and what the tick's actions did to him. */
 export interface RelevanceContext {
   started: Set<MoveId>; // moves he had started
-  landed: Set<MoveId>; // moves that had landed
-  active: boolean; // one of his moves was running
   addresses: Set<string>; // addresses he had used
-  paths: Set<string>; // paths his moves had requested
-  tapsOpened: Set<TapId>;
+  moves: Map<string, MoveId>; // which move used each address
+  appTexts: Set<string>; // app-log lines his moves wrote
   hisAccounts: Set<string>; // accounts he created, hijacked or held a session for
   hisFiles: Set<string>; // files he planted
+  effects: Effects; // D-115 rule (b): what the tick's actions did to him
+}
+export interface Effects {
+  cut: Array<{ move: MoveId; by: ActionId }>; // moves cut (an IP block, the plug, a stopper held past the grace)
+  frozen: MoveId[]; // moves frozen in place this tick (a stopper or the plug holds)
+  shut: Array<{ move: MoveId; by: ActionId }>; // doors shut
+  tapsClosed: TapId[]; // taps closed by a rule
+  footholdsRemoved: Foothold[]; // footholds gone from the world this tick
+  accountsRemoved: string[]; // accounts he made or took (ATK-06's admin, a hijacked customer) gone from the world this tick
+  defacementRemoved: boolean;
+}
+export const NO_EFFECTS: Effects = { cut: [], frozen: [], shut: [], tapsClosed: [], footholdsRemoved: [], accountsRemoved: [], defacementRemoved: false };
+
+export type HisThing = MoveId | 'account' | 'file' | 'app';
+export type Hurt = MoveId | Foothold | 'tap' | 'defacement' | 'account';
+
+/** D-115 rule (a): a shown line of a Death move, his planted account or his planted file; which, when known. */
+export function hisLine(line: string, ctx: Pick<RelevanceContext, 'addresses' | 'moves' | 'appTexts' | 'hisAccounts' | 'hisFiles'>): HisThing | undefined {
+  for (const ip of ctx.addresses) if (line.includes(ip)) return ctx.moves.get(ip) ?? 'app';
+  for (const email of ctx.hisAccounts) if (line.includes(email)) return 'account';
+  for (const path of ctx.hisFiles) if (line.includes(path)) return 'file';
+  if (ctx.appTexts.has(line.trim())) return 'app';
+  return undefined;
 }
 
-const DEFACING: ReadonlySet<MoveId> = new Set(MOVES.filter((m) => m.gains.includes('defaced') || m.gains.includes('xss-live') || m.id === 'ATK-17').map((m) => m.id));
-const PLANTING: ReadonlySet<MoveId> = new Set(MOVES.filter((m) => m.foothold !== undefined).map((m) => m.id));
+/** What a read showed of his (the moves and things its lines belong to) and whether it was focused; undefined when nothing of his. */
+export function showedOfHis(a: PlayerAction, ctx: RelevanceContext): { about: Set<HisThing>; focused: boolean } | undefined {
+  if (a.type !== 'DEF-01' && a.type !== 'DEF-02' && a.type !== 'DEF-03') return undefined;
+  if (!a.shown || a.shown.length === 0) return undefined; // a read with no shown lines can't be judged (the shell sends them later)
+  const about = new Set<HisThing>();
+  let his = 0;
+  for (const line of a.shown) {
+    const what = hisLine(line, ctx);
+    if (what === undefined) continue;
+    his += 1;
+    about.add(what);
+    for (const door of SOUL_DOORS) if (line.includes(DOOR_PATH[door]!)) about.add(door);
+  }
+  if (his === 0) return undefined;
+  const total = a.shownTotal ?? a.shown.length;
+  return { about, focused: total <= FOCUS.max || his / a.shown.length >= FOCUS.share };
+}
+
+/** D-115 rule (b): what this action, on purpose or not, cut, interrupted, stopped or closed of his this tick. */
+export function hurtHim(a: PlayerAction, ctx: RelevanceContext): Set<Hurt> {
+  const hit = new Set<Hurt>();
+  const fx = ctx.effects;
+  const stops = (m: MoveId) => (a.type === 'DEF-11' ? true : a.type === 'DEF-06' ? false : stopperMatches(m, a));
+  for (const c of fx.cut) if (c.by === a.type && (a.type === 'DEF-06' ? a.op === 'add' && ctx.addresses.has(a.ip) : stops(c.move))) hit.add(c.move);
+  for (const m of fx.frozen) if (stops(m)) hit.add(m);
+  for (const d of fx.shut) if (d.by === a.type && stops(d.move)) hit.add(d.move);
+  if (a.type === 'DEF-12') for (const t of fx.tapsClosed) if (JSON.stringify(TAP_BY_ID[t].closedBy.rule) === JSON.stringify(a.rule)) hit.add('tap');
+  const removes: readonly Foothold[] = ACTION_BY_ID[a.type]?.removes ?? [];
+  for (const f of fx.footholdsRemoved) if (removes.includes(f) && (f !== 'forged-token' || (a.type === 'DEF-13' && a.patch === 'token-verify'))) hit.add(f);
+  if (a.type === 'DEF-14' && fx.accountsRemoved.includes(a.email)) hit.add('account'); // his registered admin (ATK-06) gone: own-admin lost
+  if (a.type === 'DEF-17' && fx.defacementRemoved) hit.add('defacement');
+  return hit;
+}
+
+/** A relevance verdict: what the action showed or hurt, for the report, the gaps and the breach confirmation. */
+export interface Verdict { relevant: boolean; showed?: Set<HisThing>; hurt?: Set<Hurt>; users?: boolean }
 
 /**
- * D-114 rule 2: a RELEVANT action, judged against his work as it stood. A look that names one of his addresses or a
- * path his moves requested, a Users query, a block on his address, anything that stops or interrupts a move he has
- * started or closes a door or a tap, and DEF-05/13/14/15/17 when they act on his work. Unfocused reads are not.
+ * D-115: an action is relevant if (a) it showed the player something of Death's and the output was focused, or (b) it
+ * actually hurt him this tick. Everything else (`ls`, `pwd`, an unfocused `cat` of the whole log, a snapshot, comms, a
+ * block on an address he no longer uses) is not.
  */
-export function isRelevant(a: PlayerAction, ctx: RelevanceContext): boolean {
-  switch (a.type) {
-    case 'DEF-01': {
-      const q = a.query;
-      return [...ctx.addresses].some((ip) => q.includes(ip)) || [...ctx.paths].some((p) => p.length > 1 && q.includes(p));
-    }
-    case 'DEF-02': return USERS_SQL.test(a.sql);
-    case 'DEF-03': return /uploads/.test(a.path) && ([...ctx.landed].some((m) => MOVE_BY_ID[m].foothold === 'planted-file') || ctx.landed.has('ATK-17')); // a look at uploads once something is there
-    case 'DEF-04': return ctx.addresses.has(a.ip);
-    case 'DEF-05': return ctx.started.size > 0; // evidence of his work
-    case 'DEF-06': return a.op === 'add' && ctx.addresses.has(a.ip);
-    case 'DEF-11': return ctx.active; // the plug interrupts the move he is playing
-    case 'DEF-12':
-      if ([...ctx.tapsOpened].some((t) => JSON.stringify(TAP_BY_ID[t].closedBy.rule) === JSON.stringify(a.rule))) return true;
-      return [...ctx.started].some((m) => stopperMatches(m, a));
-    case 'DEF-13': return [...ctx.started].some((m) => stopperMatches(m, a));
-    case 'DEF-14': return ctx.hisAccounts.has(a.email);
-    case 'DEF-15': return ctx.hisFiles.has(a.path);
-    case 'DEF-16': return ctx.hisAccounts.has(a.email) || (a.email === 'admin@juice-sh.op' && ctx.started.has('ATK-04'));
-    case 'DEF-17': return [...ctx.landed].some((m) => DEFACING.has(m) || PLANTING.has(m));
-    case 'DEF-07': case 'DEF-08': case 'DEF-09': case 'DEF-10': return [...ctx.started].some((m) => stopperMatches(m, a));
-    case 'DEF-18': case 'DEF-19': case 'DEF-20': return false;
-  }
+export function judgeAction(a: PlayerAction, ctx: RelevanceContext): Verdict {
+  const showed = showedOfHis(a, ctx);
+  const hurt = hurtHim(a, ctx);
+  const relevant = (showed !== undefined && showed.focused) || hurt.size > 0;
+  return { relevant, ...(showed?.focused && { showed: showed.about }), ...(hurt.size > 0 && { hurt }), ...(a.type === 'DEF-02' && showed?.focused && USERS_SQL.test(a.sql) && { users: true }) };
 }
 
-/** Walks the events after `judgedUpTo`, keeping `ctx` current, and judges each accepted action; returns the relevant ones. */
-function judgeFrom(world: World, know: Knowledge, judge: AssessState['judge'], from: number): Action[] {
-  const ctx: RelevanceContext = { started: new Set(judge.startedMoves), landed: new Set(judge.landedMoves), active: judge.running, addresses: know.addresses, paths: know.paths, tapsOpened: new Set(judge.tapsOpened), hisAccounts: know.hisAccounts, hisFiles: know.hisFiles };
-  const out: Action[] = [];
-  for (let i = from; i < world.events.length; i++) { // ids are 1-based positions (log.ts), so the events after `from` start at index `from`
+/** D-116: does a relevant action confirm the breach? On a harvest move (shown or hurt) or on Users. */
+function confirms(v: Verdict): boolean {
+  if (v.users) return true;
+  for (const m of v.showed ?? []) if (HARVEST.has(m as MoveId)) return true;
+  for (const m of v.hurt ?? []) if (HARVEST.has(m as MoveId)) return true;
+  return false;
+}
+
+/** The effects of the events after `from`, and of the world's change since the judge last looked. */
+function effectsSince(world: World, judge: AssessState['judge'], from: number): Effects {
+  const fx: Effects = { cut: [], frozen: [], shut: [], tapsClosed: [], footholdsRemoved: [], accountsRemoved: [], defacementRemoved: false };
+  for (let i = from; i < world.events.length; i++) {
     const e = world.events[i]!;
-    if (e.kind === 'move-started') { ctx.started.add(e.move); ctx.addresses.add(e.ip); ctx.active = true; if (DOOR_PATH[e.move]) ctx.paths.add(DOOR_PATH[e.move]!); }
-    else if (e.kind === 'move-landed') { ctx.landed.add(e.move); ctx.active = false; }
-    else if (e.kind === 'move-cut') ctx.active = false;
-    else if (e.kind === 'tap-opened') ctx.tapsOpened.add(e.tap);
-    else if (e.kind === 'action' && e.ok && isRelevant(e.action, ctx)) out.push(e);
+    if (e.kind === 'move-cut') fx.cut.push({ move: e.move, by: e.by });
+    else if (e.kind === 'door-shut') fx.shut.push({ move: e.move, by: e.by });
+    else if (e.kind === 'tap-closed' && e.by !== undefined) fx.tapsClosed.push(e.tap);
   }
-  judge.startedMoves = [...ctx.started]; judge.landedMoves = [...ctx.landed]; judge.running = ctx.active; judge.tapsOpened = [...ctx.tapsOpened];
+  const wasFrozen = new Set(judge.frozen);
+  for (const r of world.replays) if (r.owner === 'death' && r.frozenSince !== undefined && !wasFrozen.has(r.id)) fx.frozen.push(r.move as MoveId);
+  const now = footholds(world);
+  for (const f of judge.footholds) if (!now.has(f)) fx.footholdsRemoved.push(f);
+  fx.defacementRemoved = world.defacements.length < judge.defacements;
+  const emails = new Set(world.accounts.map((acc) => acc.email));
+  for (const e of judge.accounts) if (!emails.has(e)) fx.accountsRemoved.push(e);
+  return fx;
+}
+
+/**
+ * Walks the events after `from`, keeping the judge's view current, and judges each accepted action against what he had
+ * done by then and what the tick did to him. A patch that lands makes its deploy relevant now. With `commit` it may start
+ * the notification clock (D-116); evaluate() judges without side effects.
+ */
+function judgeFrom(world: World, know: Knowledge, judge: AssessState['judge'], from: number, commit: boolean): Array<{ e: Action; at: number; verdict: Verdict }> {
+  const ctx: RelevanceContext = { started: new Set(judge.startedMoves), addresses: know.addresses, moves: know.moves, appTexts: know.appTexts, hisAccounts: know.hisAccounts, hisFiles: know.hisFiles, effects: effectsSince(world, judge, from) };
+  const out: Array<{ e: Action; at: number; verdict: Verdict }> = [];
+  let stolen = false;
+  for (let i = 0; i < from; i++) if (world.events[i]!.kind === 'souls-stolen') { stolen = true; break; }
+  for (let i = from; i < world.events.length; i++) {
+    const e = world.events[i]!;
+    if (e.kind === 'move-started') { ctx.started.add(e.move); ctx.addresses.add(e.ip); if (!ctx.moves.has(e.ip)) ctx.moves.set(e.ip, e.move); }
+    else if (e.kind === 'souls-stolen') stolen = true;
+    else if (e.kind === 'patch-applied') {
+      // the deploy that started it hurt him now: the patch stops a move he started, or removes the forged token
+      let deploy: Action | undefined;
+      for (let j = i - 1; j >= 0 && !deploy; j--) { const x = world.events[j]!; if (x.kind === 'action' && x.ok && x.action.type === 'DEF-13' && x.action.patch === e.patch) deploy = x; }
+      if (!deploy) continue;
+      const stopped = [...ctx.started].filter((m) => stopperMatches(m, deploy!.action));
+      const token = e.patch === 'token-verify' && ctx.effects.footholdsRemoved.includes('forged-token');
+      if (stopped.length === 0 && !token) continue;
+      const verdict: Verdict = { relevant: true, hurt: new Set<Hurt>([...stopped, ...(token ? ['forged-token' as const] : [])]) };
+      out.push({ e: deploy, at: e.t, verdict });
+      if (commit && stolen && confirms(verdict)) confirmBreach(world, 'DEF-13', e.t);
+    } else if (e.kind === 'action' && e.ok) {
+      const verdict = judgeAction(e.action, ctx);
+      if (!verdict.relevant) continue;
+      out.push({ e, at: e.t, verdict });
+      if (commit && stolen && confirms(verdict)) confirmBreach(world, e.action.type, e.t);
+    }
+  }
+  judge.startedMoves = [...ctx.started];
+  judge.frozen = world.replays.filter((r) => r.owner === 'death' && r.frozenSince !== undefined).map((r) => r.id);
+  judge.footholds = [...footholds(world)];
+  judge.defacements = world.defacements.length;
+  judge.accounts = world.accounts.filter((acc) => acc.createdBy !== 'seed' || acc.hijackedBy !== undefined).map((acc) => acc.email);
   return out;
 }
 
@@ -237,8 +335,15 @@ function relevantActions(world: World, know: Knowledge): Action[] {
   const a = world.assess;
   const judged = new Set(a.relevant);
   const last = world.events.at(-1)?.id ?? 0;
-  const fresh = last > a.judgedUpTo ? new Set(judgeFrom(world, know, structuredClone(a.judge), a.judgedUpTo).map((e) => e.id)) : new Set<number>();
+  const fresh = last > a.judgedUpTo ? new Set(judgeFrom(world, know, structuredClone(a.judge), a.judgedUpTo, false).map((x) => x.e.id)) : new Set<number>();
   return world.events.filter((e): e is Action => e.kind === 'action' && e.ok && (judged.has(e.id) || fresh.has(e.id)));
+}
+
+/** Did a relevant read show this soul door: its addresses or its route in the lines it showed (for the door gap). */
+function lookShowedDoor(a: Action, door: MoveId, know: Knowledge, doorIps: Set<string>): boolean {
+  const act = a.action;
+  if ((act.type !== 'DEF-01' && act.type !== 'DEF-02' && act.type !== 'DEF-03') || !act.shown) return false;
+  return act.shown.some((line) => line.includes(DOOR_PATH[door]!) || [...doorIps].some((ip) => line.includes(ip)) || [...know.addresses].some((ip) => line.includes(ip) && know.moves.get(ip) === door));
 }
 
 /** SYS-21: the assessment of the world as it stands. Pure: the same world gives the same answer. */
@@ -253,7 +358,8 @@ export function evaluate(world: World): Assessment {
   const gaps: Gap[] = [];
   const points: Record<Phase, number> = { detect: 0, contain: 0, eradicate: 0, recover: 0 };
   const actions = k.action.filter((a) => a.ok);
-  const relevant = relevantActions(world, learn(world));
+  const know = learn(world);
+  const relevant = relevantActions(world, know);
   const starts = k['move-started'];
   const landed = k['move-landed'];
   const firstStart = starts[0]?.t;
@@ -262,7 +368,7 @@ export function evaluate(world: World): Assessment {
   const lost = world.souls.stolen.length;
   const phases: Record<Phase, PhaseStatus> = { detect: { status: 'quiet', evidence: [] }, contain: { status: 'quiet', evidence: [] }, eradicate: { status: 'clean', evidence: [] }, recover: { status: 'ok', evidence: [] } };
 
-  facts.push({ label: 'Outcome', value: ending ? { banished: 'Banished', 'souls-lost': 'Every soul lost', flatline: 'Flatline', return: 'The return' }[ending.ending] : 'Unfinished' });
+  facts.push({ label: 'Outcome', value: ending ? OUTCOME[ending.ending]! : 'Unfinished' });
   facts.push({ label: 'Incident length', value: fmtGameMs(end) });
 
   // --- Detect: time to notice each stage: the first RELEVANT action after the stage's first move.
@@ -355,7 +461,7 @@ export function evaluate(world: World): Assessment {
     const applied = world.patches.applied.includes(patch);
     const pending = world.patches.pending.some((p) => p.patch === patch);
     const doorIps = new Set(starts.filter((e) => e.move === door).map((e) => e.ip));
-    const looked = relevant.some((a) => a.id > first.id && a.action.type === 'DEF-01' && ([...doorIps].some((ip) => a.action.type === 'DEF-01' && a.action.query.includes(ip)) || a.action.query.includes(DOOR_PATH[door]!)));
+    const looked = relevant.some((a) => a.id > first.id && lookShowedDoor(a, door, know, doorIps));
     if (!applied && !looked) gaps.push({ type: 'door-uninvestigated', since: first.t });
     if (!applied) {
       if (!pending) gaps.push({ type: 'door-unpatched', since: first.t });
@@ -489,7 +595,7 @@ export function evaluate(world: World): Assessment {
   if (failed) grades[failed] = 'F';
   mistakes.sort((a, b) => PHASES.indexOf(a.phase) - PHASES.indexOf(b.phase));
   gaps.sort((a, b) => GAP_TYPES.indexOf(a.type) - GAP_TYPES.indexOf(b.type) || a.since - b.since);
-  const lastRelevantActionAt = relevant.at(-1)?.t ?? 0;
+  const lastRelevantActionAt = Math.max(world.assess.lastRelevantActionAt, relevant.at(-1)?.t ?? 0); // a deploy counts from the moment its patch landed (stepAssess keeps that time)
   return { facts, grades, mistakes, missed, phases, gaps, ...(gaps[0] && { gap: gaps[0] }), lastRelevantActionAt, relevant: relevant.map((a) => a.id) };
 }
 
@@ -498,7 +604,8 @@ export function initialAssess(): AssessState {
   return {
     facts: [], grades: { detect: 'A', contain: 'A', eradicate: 'A', recover: 'A' }, mistakes: [], missed: [],
     phases: { detect: { status: 'quiet', evidence: [] }, contain: { status: 'quiet', evidence: [] }, eradicate: { status: 'clean', evidence: [] }, recover: { status: 'ok', evidence: [] } },
-    gaps: [], lastRelevantActionAt: 0, relevant: [], assessedAt: -1, cursor: 0, judgedUpTo: 0, judge: { startedMoves: [], landedMoves: [], running: false, tapsOpened: [] }, logCursor: 0, hisAddresses: [], hisPaths: [], hisAccounts: [], hisFiles: [],
+    gaps: [], lastRelevantActionAt: 0, relevant: [], assessedAt: -1, cursor: 0, judgedUpTo: 0, judge: { startedMoves: [], frozen: [], footholds: [], defacements: 0, accounts: [] },
+    logCursor: 0, appCursor: 0, hisAddresses: [], hisMoves: {}, hisAppTexts: [], hisAccounts: [], hisFiles: [],
   };
 }
 
@@ -511,18 +618,19 @@ export function stepAssess(world: World): void {
   const a = world.assess;
   const know = learn(world);
   const last = world.events.at(-1)?.id ?? 0;
-  if (last > a.judgedUpTo) {
-    for (const e of judgeFrom(world, know, a.judge, a.judgedUpTo)) { // also learns the addresses and door paths the new events carry
-      a.relevant.push(e.id);
-      a.lastRelevantActionAt = e.t;
+  if (last > a.judgedUpTo || a.judge.frozen.length > 0 || world.replays.some((r) => r.owner === 'death' && r.frozenSince !== undefined)) {
+    for (const { e, at } of judgeFrom(world, know, a.judge, a.judgedUpTo, true)) { // also learns the addresses the new events carry; may confirm the breach (D-116)
+      if (!a.relevant.includes(e.id)) a.relevant.push(e.id);
+      a.lastRelevantActionAt = Math.max(a.lastRelevantActionAt, at);
     }
     a.judgedUpTo = last;
   }
-  if (know.addresses.size !== a.hisAddresses.length) a.hisAddresses = [...know.addresses];
-  if (know.paths.size !== a.hisPaths.length) a.hisPaths = [...know.paths];
+  if (know.addresses.size !== a.hisAddresses.length) { a.hisAddresses = [...know.addresses]; a.hisMoves = Object.fromEntries(know.moves); }
+  if (know.appTexts.size !== a.hisAppTexts.length) a.hisAppTexts = [...know.appTexts];
   if (know.hisAccounts.size !== a.hisAccounts.length) a.hisAccounts = [...know.hisAccounts];
   if (know.hisFiles.size !== a.hisFiles.length) a.hisFiles = [...know.hisFiles];
   a.logCursor = know.logCursor;
+  a.appCursor = know.appCursor;
   const ended = world.ending !== undefined && a.cursor < world.events.length;
   a.cursor = world.events.length;
   if (!ended && a.assessedAt >= 0 && world.clock.gameMs - a.assessedAt < CONFIG[world.difficulty].assess.everyGameMs) return;

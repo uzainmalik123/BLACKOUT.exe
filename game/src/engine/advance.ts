@@ -12,17 +12,19 @@ import { directorTick } from './director';
 import { endRun } from './log';
 import { stepWaves } from './minions';
 import { stepReplays } from './replay';
+import { shiftOver, shiftVerdict } from './shift';
 import { soulsLeft } from './souls';
 import { stepStruggle } from './struggle';
 import { stepNotificationClock } from './notification';
 import { stepTaps } from './taps';
 import type { World } from './state';
 
-/** Souls all taken or heartbeat at 0 end the run (SYS-05, SYS-06). Banishment and the return are the Director's. */
-export function checkEndings(world: World): void {
+/** Souls all taken, heartbeat at 0, or the shift over end the run (SYS-05, SYS-06, D-118). Banishment and the return are the Director's. */
+export function checkEndings(world: World, library: RecordingLibrary): void {
   if (world.ending) return;
   if (soulsLeft(world) === 0) endRun(world, 'souls-lost');
   else if (world.heartbeat <= 0) endRun(world, 'flatline');
+  else if (shiftOver(world)) endRun(world, shiftVerdict(world, library));
 }
 
 function step(world: World, library: RecordingLibrary, dt: number): void {
@@ -41,7 +43,7 @@ function step(world: World, library: RecordingLibrary, dt: number): void {
     world.clock.lastDirectorTick = world.clock.gameMs;
     directorTick(world, library);
   }
-  checkEndings(world);
+  checkEndings(world, library);
   stepAssess(world); // SYS-21: last, so the snapshot sees everything this step did, the ending included
   stepStruggle(world); // SYS-13: reads the assessor's verdicts and its biggest gap
 }

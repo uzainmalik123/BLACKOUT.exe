@@ -19,7 +19,8 @@ export interface Report {
 export const OFFLINE_DEBRIEF = 'Kiro (offline). The facts and grades above were computed by the rules; the debrief will be written around them when Kiro is reachable.';
 
 export function renderMarkdown(g: Pick<Assessment, 'facts' | 'grades' | 'missed'> & { mistakes: Array<{ title: string; why: string }> }, debrief: Report['debrief']): string {
-  const lines: string[] = ['# Post-incident report', ''];
+  const outcome = g.facts.find((f) => f.label === 'Outcome')?.value;
+  const lines: string[] = [`# Post-incident report${outcome ? `: ${outcome}` : ''}`, ''];
   lines.push('## Facts', '', ...g.facts.map((f) => `- **${f.label}:** ${f.value}`), '');
   lines.push('## Grades', '', '| Phase | Grade |', '|---|---|', ...PHASES.map((p) => `| ${p[0]!.toUpperCase()}${p.slice(1)} | ${g.grades[p]} |`), '');
   lines.push('## Mistakes', '', ...(g.mistakes.length === 0 ? ['None.'] : g.mistakes.map((m) => `- **${m.title}.** ${m.why}`)), '');

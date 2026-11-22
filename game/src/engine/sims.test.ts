@@ -19,7 +19,10 @@ import { stepWaves } from './minions';
 import { stepReplays } from './replay';
 import { initialWorld, type World } from './state';
 import { FIXTURE_LIBRARY, fakeRecording } from './test-fixtures/recordings';
+import { noShift } from './shift';
 import { WHOLE_RUN_TIMEOUT_MS } from './test-fixtures/timeouts';
+
+const SHIFT_VERDICTS: ReadonlySet<string> = new Set(['clean-handover', 'rough-handover', 'walked-away']);
 
 const REAL_MIN = 60_000;
 const sim = (player: ScriptedPlayer, maxRealMs = 20 * REAL_MIN, seed = 1): SimResult => runSim({ seed, player, library: FIXTURE_LIBRARY, maxRealMs });
@@ -138,7 +141,7 @@ describe('the playthrough sims (PRD §10, SYS-16)', { timeout: WHOLE_RUN_TIMEOUT
       bringBack(e, act);
     }), 20 * REAL_MIN, seed));
     // Runs that stall after the finale with a route he will never play (ATK-02's /ftp, never seen) are KI-80's.
-    const planted = runs.filter((r) => eventsOfKind(r.world, 'move-landed').some((e) => e.move === 'ATK-11') && r.world.ending !== undefined);
+    const planted = runs.filter((r) => eventsOfKind(r.world, 'move-landed').some((e) => e.move === 'ATK-11') && r.world.ending !== undefined && !SHIFT_VERDICTS.has(r.world.ending)); // a seed that stalls now ends with the shift (D-118), not the return
     expect(planted.length).toBeGreaterThanOrEqual(2);
     for (const r of planted) {
       expect(kinds(r), `seed ${r.world.seed}`).toContain('banished');
@@ -221,7 +224,7 @@ describe('SIM-8: the harvest at its recorded speed (D-31, on the halves: D-42)',
   function hardHarvest(library: RecordingLibrary, reactAfterRealMs: number | undefined): SimResult {
     let acted = false;
     return runSim({
-      seed: 1, difficulty: 'hard', library, maxRealMs: 45 * REAL_MIN, // D-42: an idle player loses the rest over many visits
+      setup: noShift, seed: 1, difficulty: 'hard', library, maxRealMs: 45 * REAL_MIN, // D-42: an idle player loses the rest over many visits; the lab run outlasts a shift (D-118)
       player: (w, realElapsed) => {
         const taps = closingTaps(w);
         if (acted || reactAfterRealMs === undefined) return taps;
@@ -275,7 +278,7 @@ describe('SYS-06 target times in a running game (D-33)', { timeout: WHOLE_RUN_TI
   });
 
   it('one open door alone takes about half an hour to flatline the shop', () => {
-    const r = runSim({ seed: 1, player: once(closeAllMinions), library: slowScan, maxRealMs: 45 * REAL_MIN });
+    const r = runSim({ setup: noShift, seed: 1, player: once(closeAllMinions), library: slowScan, maxRealMs: 45 * REAL_MIN }); // a 30-minute drain outlasts a shift (D-118)
     expect(ending(r)).toBe('flatline');
     const perMinute = cfg.drainPerRealMin.openDoor; // D-65: the CAPTCHA on costs nothing (no shopper fails it)
     expect(r.realMs).toBeGreaterThan(30 * REAL_MIN);
@@ -301,7 +304,7 @@ describe('SIM-9: WAF rules against the low-and-slow harvest (D-34, on the halves
   function mediumHarvest(library: RecordingLibrary, actions: PlayerAction[]): SimResult {
     let acted = false;
     return runSim({
-      seed: 1, difficulty: 'medium', library, maxRealMs: 60 * REAL_MIN, // D-42: he takes half of what's left per visit
+      setup: noShift, seed: 1, difficulty: 'medium', library, maxRealMs: 60 * REAL_MIN, // D-42: he takes half of what's left per visit; the lab run outlasts a shift (D-118)
       player: (w, realElapsed) => {
         const taps = closingTaps(w);
         if (acted) return taps;

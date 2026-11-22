@@ -54,6 +54,7 @@ export interface EngineConfig {
     dripFraction: number; // D-42: each drip takes this share of the total souls (rounded, at least 1)
   };
   assess: { everyGameMs: number }; // SYS-21 (D-114): the assessor refreshes its snapshot this often (and at once on an action or the ending)
+  shiftGameMs: number; // D-118: the shift ends here (Easy ~20, Medium ~16, Hard ~13 real min); the judge then picks a handover verdict
   notification: { windowGameMs: number }; // SYS-14 (D-112): the breach-notification window after confirmation, GDPR's 72 h compressed to the run length
   struggle: { idleGameMs: number; soulsWindowGameMs: number; soulsFraction: number; gapGameMs: number; unlocks: boolean }; // SYS-13 (D-113, D-114): struggling = no RELEVANT action for idleGameMs, souls down by soulsFraction within soulsWindowGameMs, or the same biggest gap standing for gapGameMs; unlocks (and shows) a suggestion on Medium/Hard only
   backupEveryGameMs: number; // DEF-17: hourly snapshots
@@ -102,6 +103,7 @@ const MEDIUM: EngineConfig = {
   stuckBreathers: 2,
   taps: { everyGameMs: { min: 180 * REAL_S, max: 240 * REAL_S }, maxOpen: 2, dripEveryGameMs: 60 * REAL_S, dripFraction: 0.01 },
   assess: { everyGameMs: 1 * REAL_S },
+  shiftGameMs: 16 * 60 * REAL_S, // D-118 (tune): idle Medium runs flatline at 14–15.3 real min on seeds 1–5
   notification: { windowGameMs: 6 * 60 * GAME_MIN }, // D-112: a run is about 6 game hours (PRD §1), so the 72 h clock runs 12× game time
   struggle: { idleGameMs: 90 * REAL_S, soulsWindowGameMs: 120 * REAL_S, soulsFraction: 0.1, gapGameMs: 180 * REAL_S, unlocks: true }, // SYS-13
   backupEveryGameMs: 60 * GAME_MIN,
@@ -117,11 +119,13 @@ export const CONFIG: Readonly<Record<Difficulty, EngineConfig>> = {
     minions: { ...MEDIUM.minions, alongsideDeath: false }, customers: { ...MEDIUM.customers, share: 0.2 }, wafEvasion: { 'ATK-01': { a: [], b: ['block-user-agent'] }, 'ATK-08': { d: EASY_LEAKS, e: EASY_LEAKS, f: [], g: [] } },
     taps: { ...MEDIUM.taps, everyGameMs: { min: 240 * REAL_S, max: 300 * REAL_S } },
     struggle: { ...MEDIUM.struggle, unlocks: false }, // SYS-13: on Easy Kiro helps anyway (KIRO-03); nothing to unlock
+    shiftGameMs: 20 * 60 * REAL_S, // D-118: idle Easy runs flatline at 16.5–18 real min
   },
   medium: MEDIUM,
   hard: {
     ...MEDIUM, breatherGameMs: { min: 20 * REAL_S, max: 35 * REAL_S }, minions: { ...MEDIUM.minions, successesPerWave: 2 }, customers: { ...MEDIUM.customers, share: 0.8 },
     pinnedVariants: { 'ATK-08': { normal: ['f', 'g'], tippedOff: ['f', 'g'] } },
+    shiftGameMs: 13 * 60 * REAL_S, // D-118: idle Hard runs flatline at 11.7–12.8 real min
     taps: { ...MEDIUM.taps, everyGameMs: { min: 120 * REAL_S, max: 180 * REAL_S } },
   },
 };

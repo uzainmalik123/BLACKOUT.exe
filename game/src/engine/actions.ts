@@ -1,10 +1,11 @@
 // The player's actions (PRD §5): every DEF row's effect on the world. Pure, in place, never throws:
 // an action on something that isn't there answers ok:false and leaves the world as it was.
 import { ACTION_BY_ID } from '../rules/actions';
-import { FEATURE_DEFAULTS, type ActionId, type Patch, type PlayerAction, type WafRule } from '../rules/vocabulary';
+import { FEATURE_DEFAULTS, SHOWN_LINES_MAX, type ActionId, type Patch, type PlayerAction, type WafRule } from '../rules/vocabulary';
 import { CONFIG } from './config';
 import { dip } from './heartbeat';
 import { emit } from './log';
+import { confirmBreach } from './notification';
 import { deathAddresses } from './pool';
 import type { Backup, World } from './state';
 
@@ -31,13 +32,6 @@ function tipOff(world: World, by: ActionId): void {
   world.death.tippedOff = true;
 }
 
-/** SYS-14: the notification clock starts at the first DEF-05 or DEF-19 after souls were taken. */
-function confirmBreach(world: World, by: 'DEF-05' | 'DEF-19'): void {
-  if (world.souls.stolen.length === 0 || world.comms.breachConfirmedAt !== undefined) return;
-  world.comms.breachConfirmedAt = world.clock.gameMs;
-  emit(world, { kind: 'breach-confirmed', by });
-}
-
 function costOf(world: World, id: ActionId): void {
   dip(world, CONFIG[world.difficulty].heartbeat.dip[id] ?? 0);
 }
@@ -58,8 +52,7 @@ function run(world: World, action: PlayerAction): ActionResult {
     case 'DEF-05': {
       if (world.evidence.some((e) => e.name === action.name)) return no(`Evidence ${action.name} already exists`);
       world.evidence.push({ name: action.name, takenAt: now, accessLines: world.logs.access.length, appLines: world.logs.app.length });
-      confirmBreach(world, 'DEF-05');
-      return ok(`Evidence ${action.name} preserved`);
+      return ok(`Evidence ${action.name} preserved`); // D-116: a snapshot never confirms the breach
     }
     case 'DEF-06': {
       if (!IPV4.test(action.ip)) return no(`${action.ip} is not an IPv4 address`);
@@ -154,7 +147,7 @@ function run(world: World, action: PlayerAction): ActionResult {
     case 'DEF-19':
       if (world.comms.escalatedAt !== undefined) return no('The incident lead already knows');
       world.comms.escalatedAt = now;
-      confirmBreach(world, 'DEF-19');
+      confirmBreach(world, 'DEF-19'); // SYS-14, D-116: escalating confirms the breach once souls are gone
       return ok('The incident lead acknowledges');
     case 'DEF-20':
       if (world.comms.notifiedAt[action.to] !== undefined) return no(`${action.to} already notified`);
@@ -173,6 +166,9 @@ function restore(world: World, b: Backup): void {
 /** Applies one player action and logs it (SYS-10). After an ending every action is refused. */
 export function applyAction(world: World, action: PlayerAction): ActionResult {
   const result = world.ending ? no(`The incident is over: ${world.ending}`) : run(world, action);
+  if ('shown' in action && action.shown !== undefined && action.shown.length > SHOWN_LINES_MAX) { // D-115: at most 200 lines reach the log
+    action = { ...action, shownTotal: action.shownTotal ?? action.shown.length, shown: action.shown.slice(0, SHOWN_LINES_MAX) };
+  }
   emit(world, { kind: 'action', action, ok: result.ok, note: result.message });
   return result;
 }

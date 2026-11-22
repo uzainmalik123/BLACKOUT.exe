@@ -87,7 +87,7 @@ describe('applyAction: every DEF row', () => {
     expect(w.death.tippedOff).toBe(true);
   });
 
-  it('DEF-05 snapshots the logs, confirms a breach once souls are gone, and refuses a duplicate name', () => {
+  it('DEF-05 snapshots the logs, never confirms a breach (D-116), and refuses a duplicate name', () => {
     const w = fresh();
     w.logs.access.push({ t: 1, ip: '203.0.113.23', method: 'GET', target: '/', protocol: 'HTTP/1.1', status: 200, bytes: 1, referer: '', userAgent: '', by: 'ATK-01' });
     expect(applyAction(w, { type: 'DEF-05', name: 'first' }).ok).toBe(true);
@@ -96,7 +96,7 @@ describe('applyAction: every DEF row', () => {
     w.souls.stolen.push({ table: 'Users', key: 1 });
     w.clock.gameMs = 77;
     expect(applyAction(w, { type: 'DEF-05', name: 'second' }).ok).toBe(true);
-    expect(w.comms.breachConfirmedAt).toBe(77);
+    expect(w.comms.breachConfirmedAt).toBeUndefined(); // D-116: a snapshot never starts the clock
     expect(applyAction(w, { type: 'DEF-05', name: 'second' }).ok).toBe(false);
   });
 

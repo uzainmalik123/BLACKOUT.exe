@@ -23,7 +23,7 @@ describe('buildReport (ENGINE_API §5)', () => {
     for (const m of r.mistakes) expect(Object.keys(m).sort()).toEqual(['title', 'why']);
     for (const f of r.facts) expect(Object.keys(f).sort()).toEqual(['label', 'value']);
     expect(r.grades).toEqual({ detect: 'F', contain: 'D', eradicate: 'A', recover: 'B' }); // noticed never; the first fix (banishment) 9 real min after his move
-    expect(r.markdown).toMatch(/^# Post-incident report\n/);
+    expect(r.markdown).toMatch(/^# Post-incident report: Banished\n/); // D-118: the verdict first
     for (const f of r.facts) expect(r.markdown).toContain(`**${f.label}:** ${f.value}`);
     expect(r.markdown).toContain('| Recover | B |');
     expect(r.markdown).toContain('**Still leaking at the end: open logs.**');
