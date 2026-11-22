@@ -19,7 +19,7 @@ function cell(v: string | number | null): SqlValue {
 
 export async function openBaseline(bytes: Uint8Array): Promise<GameDb> {
   const SQL = await initSqlJs();
-  const db = new SQL.Database(bytes);
+  const db = new SQL.Database(new Uint8Array(bytes)); // a copy: sql.js writes into the array it is given, which would corrupt a baseline shared by several Engines
   const seedUsers = new Map<number, Record<string, SqlValue>>();
   const res = db.exec('SELECT * FROM Users')[0];
   if (res) for (const values of res.values) seedUsers.set(Number(values[res.columns.indexOf('id')]), Object.fromEntries(res.columns.map((c, i) => [c, values[i]!])));
