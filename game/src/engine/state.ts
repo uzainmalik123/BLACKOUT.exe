@@ -159,7 +159,7 @@ export interface World {
   seed: number;
   rng: number;
   difficulty: Difficulty;
-  clock: { gameMs: number; paused: boolean; lastDirectorTick: number; lastBackupAt: number };
+  clock: { gameMs: number; paused: boolean; lastDirectorTick: number; lastBackupAt: number; shiftEndsAt: number }; // shiftEndsAt: D-118, the shift's end in game ms (config.shiftGameMs; a lab sim may push it out)
   souls: { total: number; stolen: Array<{ table: string; key: number }>; byMinions: number }; // byMinions: D-41's 5 % cap
   heartbeat: number;
   heartbeatMax: number; // D-65: churn lowers it for good; the heartbeat never rises above it
@@ -239,7 +239,7 @@ export function initialWorld(seed: number, difficulty: Difficulty): World {
     seed,
     rng: seed >>> 0,
     difficulty,
-    clock: { gameMs: 0, paused: false, lastDirectorTick: 0, lastBackupAt: 0 },
+    clock: { gameMs: 0, paused: false, lastDirectorTick: 0, lastBackupAt: 0, shiftEndsAt: config.shiftGameMs },
     souls: { total: SEED_ACCOUNTS.length, stolen: [], byMinions: 0 },
     heartbeat: 100,
     heartbeatMax: 100,

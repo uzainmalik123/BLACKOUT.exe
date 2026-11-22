@@ -70,7 +70,8 @@ export const FEATURE_DEFAULTS: Readonly<Record<Feature, boolean>> = {
 /** A soul is one row of these tables (D-24, KI-15). */
 export const SOUL_TABLES = ['Users'] as const;
 
-export type Ending = 'banished' | 'souls-lost' | 'flatline' | 'return';
+/** How a run ends: the four endings of UI-06, and the shift's three verdicts when the clock runs out (D-118). */
+export type Ending = 'banished' | 'souls-lost' | 'flatline' | 'return' | 'clean-handover' | 'rough-handover' | 'walked-away';
 
 /** What Death comes back with through each foothold (SYS-07, D-24). */
 export const RETURN_GRANTS: Readonly<Record<Foothold, Gain>> = {
@@ -89,10 +90,19 @@ export const TAP_IDS: readonly TapId[] = ['TAP-01', 'TAP-02', 'TAP-03'];
 export const REQUEST_CLASSES: readonly RequestClass[] = ['page', 'search', 'login', 'signup', 'basket', 'checkout', 'feedback', 'complaint', 'password-reset', 'ftp'];
 
 /** One player action, as the shell, the consoles and the sims send it to the engine (PRD §5). */
+/**
+ * What a read showed the player (D-115, D-122): the shell or a console passes at most SHOWN_LINES_MAX lines of its
+ * output in `shown`, and `shownTotal` when it cut them. The engine never stores the text: before logging the action it
+ * keeps only what the judge needs: `shownCount` (lines passed), `shownHis` (of them, lines of Death's), `shownAbout`
+ * (which moves or things those lines belonged to) and `shownTotal`.
+ */
+export interface Shown { shown?: string[]; shownTotal?: number; shownCount?: number; shownHis?: number; shownAbout?: string[] }
+export const SHOWN_LINES_MAX = 200;
+
 export type PlayerAction =
-  | { type: 'DEF-01'; query: string }
-  | { type: 'DEF-02'; sql: string }
-  | { type: 'DEF-03'; path: string }
+  | ({ type: 'DEF-01'; query: string } & Shown)
+  | ({ type: 'DEF-02'; sql: string } & Shown)
+  | ({ type: 'DEF-03'; path: string } & Shown)
   | { type: 'DEF-04'; ip: string; mode: 'passive' | 'active' }
   | { type: 'DEF-05'; name: string }
   | { type: 'DEF-06'; ip: string; op: 'add' | 'delete' }

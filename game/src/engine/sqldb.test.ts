@@ -10,6 +10,15 @@ const bytes = () => readFileSync(new URL('../recordings/juiceshop.sqlite', impor
 const one = (g: Awaited<ReturnType<typeof openBaseline>>, sql: string) => g.db.exec(sql)[0]?.values ?? [];
 
 describe('the sql.js side of the replay (SYS-03)', () => {
+  it('a write never reaches the baseline bytes, so one baseline can back several databases', async () => {
+    const shared = bytes(); // a Node Buffer, as the tests and the app pass it
+    const before = Buffer.from(shared);
+    const g = await openBaseline(shared);
+    g.db.run("UPDATE Users SET deletedAt = datetime('now') WHERE id = 2");
+    expect(Buffer.from(shared).equals(before)).toBe(true);
+    expect(one(await openBaseline(shared), 'SELECT deletedAt IS NULL FROM Users WHERE id = 2')).toEqual([[1]]);
+  });
+
   it('applies an insert, an update and a delete from a DbChange to the real tables', async () => {
     const g = await openBaseline(bytes());
     applyDbChange(g, { t: 1, op: 'insert', table: 'Users', key: { id: 326 }, after: { id: 326, email: 'death@juice-sh.op', role: 'admin', password: 'x' } });

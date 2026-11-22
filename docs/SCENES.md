@@ -72,7 +72,7 @@ Where the whole game is played. The busiest screen; the one judges will see most
 | 💀 Souls meter | Customers' data left / taken | `world.souls` |
 | 🫀 Heartbeat meter | The business's health, 0–100; should *feel* like a heartbeat (faster and weaker as it drops) | `world.heartbeat` |
 | Game clock | In-game time of the incident | `world.clock.gameMs` |
-| Terminal | Where the player types real commands (`grep`, `iptables`, `sqlite3`, …) | Shell interface, ENGINE_API §5 |
+| Terminal | Where the player types real commands (`grep`, `iptables`, `sqlite3`, …). It renders the shell's `output` as text, never as HTML (D-106): file content and typed arguments can hold `<`; it empties the screen when `clear` is true and may ignore `exitCode` (D-95) | Shell interface, ENGINE_API §5 |
 | Consoles | **WAF** (rules, rate limits) · **Feature flags** (search, registration, password reset, uploads, `/ftp`, feedback CAPTCHA) · **Accounts** (lock, delete, force reset) · **Sessions** (revoke all) · **Deploy** (review the vulnerable code and its fix, then deploy; shows progress) · **Backups** (list by time, restore) · **Comms** (escalate, notify legal / customers, the breach-notification countdown from `engine.notificationClock()`, SYS-14) · the **big red button** (pull the plug / bring it back) | `engine.act(...)`, ENGINE_API §3 |
 | Kiro panel | Chat, hints, "explain this line", drafted commands the player copies into the terminal; a visible "Kiro is reading the logs…" wait while the game keeps running; "Kiro (offline)" label when offline | Kiro interface, ENGINE_API §5 |
 | Briefing files | Reachable at any time | CON-01 |
@@ -94,7 +94,7 @@ Where the whole game is played. The busiest screen; the one judges will see most
 
 ## 7. The endings (UI-06)
 
-Four, each its own short sequence, then on to the report:
+Four, each its own short sequence, then on to the report; and a fifth screen for the shift's end:
 
 | Ending | When | Feels |
 |---|---|---|
@@ -102,6 +102,8 @@ Four, each its own short sequence, then on to the report:
 | **Souls lost** | Death took every customer's data | Defeat. He feeds |
 | **Flatline** | The heartbeat hit 0, often from the player's own overreaction | Self-inflicted. The business dies quietly |
 | **The return** | The player "won", but a missed backdoor let him back in | The twist. The biggest scare in the game |
+
+And one more screen, **the shift ends** (D-118), for the three verdicts when the clock runs out (`ending` is `clean-handover`, `rough-handover` or `walked-away`): the next shift takes over and the judge's word is on the screen. One layout, the verdict as its headline: *Clean handover* (relief, tired), *Rough handover* (uneasy: something was left for the next shift), *Walked away* (a loss: the door was open when you left). The report follows and shows the verdict first.
 
 ## 8. The post-incident report (UI-07)
 

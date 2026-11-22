@@ -51,11 +51,39 @@
 | D-63 | The harvests in halves: ATK-08.d/.e (quiet) and .f/.g (loud) over rows 1–163 / 164–325, ATK-09.b/.c one-by-one scraping of the same id halves; .b/.c of ATK-08 stay committed until the engine retires them | Accepted |
 | D-64 | A password hash shared by several users counts only for the users whose email left in that response or earlier (amends D-25) | Accepted |
 | D-65 | Customers in the game (SYS-19) and the backlash model: REC-06 loops under every run from the shared three-range pool; a flag, a rate limit, a WAF rule or an IP block costs what customers' failed requests cost (per-class prices, tickets, angry feedback, churn lowering the heartbeat's maximum), replacing D-46's interim feature weights; customers' DB changes are never applied and customers are never souls | Accepted |
+| D-90 | Shell file rules: only `/tmp` and `/evidence` are writable; `uploads/` allows `rm` and nothing else; `tar` may write an archive into `/tmp` (no DEF-05) | Accepted |
+| D-91 | Shell lookups: `ping`/`nmap`/`curl` on any IPv4 send DEF-04 `active` and the Engine decides the tip-off; hostnames get realistic output and no action | Accepted |
+| D-92 | Shell SQL: only `UPDATE Users SET deletedAt…` and `DELETE FROM Users…` write (as DEF-08 / DEF-14), other writes are read-only errors; `.tables`, `.schema [table]` and `-header` are supported | Accepted |
+| D-93 | Shell syntax: `*` globs and `~` are added; `;` `>>` `<` `2>` `$VAR` stay syntax errors | Accepted |
+| D-94 | Shell session: starts in `/srv/juice-shop`; `complete` exists on Easy only; an unknown command prints `<name>: command not found` | Accepted |
+| D-95 | The shell's result gains optional `exitCode` and `clear` fields (amends ENGINE_API §5) | Accepted |
+| D-96 | Shell `awk` is `{print <expr>[, <expr>…]}` with `$0`, `$N`, `$NF`, `NR`, plus `-F` and `/regex/`, nothing else | Accepted |
+| D-97 | Shell `systemctl`: `restart` always attempts the start; only the `nginx` unit exists | Accepted |
+| D-98 | Shell commands take no game time, but a command line that reads logs, the database or uploads sends DEF-01/02/03 once per kind of resource so the report can grade time-to-notice | Accepted |
+| D-99 | Shell spec corrections: DEF-06 removal is `op: 'delete'`; the robustness property uses strings up to 500 characters and 200 cases; no artificial delay instead of a 100 ms limit | Accepted |
+| D-100 | DEF-15 from the shell sends the path relative to `uploads/` (as the Engine matches it); DEF-03 keeps the absolute path; a file with no recorded bytes lists, hashes by its recorded sha256 and fails to read with `Input/output error` | Accepted |
+| D-101 | Shell evidence: `/evidence/<name>.tgz` is the only archive form; Engine evidence entries are immutable (`Operation not permitted`) and readable with synthesized content | Accepted |
+| D-102 | Shell: the `.sqlite` file is a read-only file whose bytes are `db.export()` on demand; raw reads send no DEF-02 | Accepted |
+| D-103 | Shell SQL execution: `;`-separated statements stop at the first error; reads are `SELECT`/`WITH`/`VALUES`/a few `PRAGMA`s; writes only in the two exact forms; an UPDATE that would set `deletedAt` to NULL or `''` is refused | Accepted |
+| D-104 | Shell quoting: no backslash escapes, quotes are literal (including `$`), adjacent pieces join, a quoted word is never globbed, redirect targets get `~` only | Accepted |
+| D-105 | Shell regex: `grep` basic and `-E`/`awk` extended dialects as JavaScript regexes, with a pattern-safety guard (length, back-references, nested quantifiers, repeat counts) | Accepted |
+| D-106 | Shell output: no markup added, control characters shown in caret notation, file content otherwise untouched; the terminal window renders output as text, never HTML (amends R1.4) | Accepted |
+| D-107 | Shell flags for the commands whose PRD row lists none: `ping -c`, `nmap -p -sV`, `curl -I -s`, `ss -t -l -n`, `rm -r`, `mkdir -p`; none for `cp`, `whois`, `date`, `history`, `help`, `file`, `sha256sum` | Accepted |
+| D-108 | Shell `rm -r` on an uploads directory sends one DEF-15 per file below it, in path order; several `rm` operands run left to right and end non-zero if any failed | Accepted |
+| D-109 | Shell archives: a deterministic byte string (gzip magic, then a canonical listing), `tar tzf` lists sources and descendants, `file` reports gzip data | Accepted |
 | D-110 | Detection tools (SYS-20, UI-09): the engine exposes, per real minute, top talkers, the 4xx/5xx error rate as a series and a status class per access line, read-only, counted from the real lines; the dashboard shows them as the three tools on every level | Accepted |
 | D-111 | DEF-04: an active lookup tips Death off only on an address he or his proxies use or have used this run; any other address does nothing (KI-90). A lock's `deletedAt` and the engine's own DB stamps use game time (KI-91) | Accepted |
 | D-112 | Report grading (SYS-11): the rules over the event log, their thresholds and the grade per phase; the notification window (SYS-14) is 6 game hours after confirmation, GDPR's 72 h compressed to the run length; the debrief is an offline placeholder until Kiro (KIRO-06) | Accepted |
 | D-113 | The struggle detector (SYS-13) and the notification clock (SYS-14) in the engine: a useful action is one the engine accepted; one `suggestion` event per window of the condition that fired (idle 90 real s, souls 2 real min), on Medium and Hard only; the clock starts at `breach-confirmed`, shows a 72-hour face over the 6-hour window, stops at the legal notification and logs `notification-overdue` once. Rulings 1 and 3's "useful action" and Hard's silence are superseded by D-114 | Accepted |
 | D-114 | The judging engine (SYS-21): one rule-based assessor updated inside `advance()`, reading the world and its events, holding the last RELEVANT action, a status with evidence per playbook phase, the mistakes so far and the biggest gap standing; SYS-11's report is its final snapshot and SYS-13 reads it (a relevant action replaces "any accepted action"; a gap standing 3 real min is struggling; Hard shows one suggestion when struggling); nothing of it is a live score | Accepted |
+| D-115 | Relevance by outcome (SYS-21, closes KI-112): an action is relevant if it showed the player something of Death's in a focused read (`shown` lines on DEF-01/02/03, at most 200, with `shownTotal`), or it actually hurt him (cut, interrupted, stopped or closed one of his moves, doors or footholds); everything else is not; the same rule for the report and the struggle detector | Accepted |
+| D-116 | The breach is confirmed (the 72 h clock starts) when, after souls were taken, the player escalates (DEF-19) or makes a relevant action on a harvest move or on Users; a snapshot (DEF-05) never starts it | Accepted |
+| D-117 | Winning requires the real fix (patch or WAF) on every soul door Death has found, even one with nothing left to take (closes KI-135) | Accepted |
+| D-118 | End of shift: Easy ~20, Medium ~16, Hard ~13 real min (tune); at the limit the judge picks clean-handover, rough-handover or walked-away (a loss); the report shows the verdict first; three new endings | Accepted |
+| D-119 | Taps stay real and small (D-135): any tap that leaked counts toward the notification duty, and an open tap at the end is a report mistake | Accepted |
+| D-120 | A soul door Death "got into" is one he started a harvest visit through, even if it was cut short; every such door needs its real fix for banished and for clean-handover (refines D-117) | Accepted |
+| D-121 | The idle check is "a do-nothing player never wins" on every level and seed (every soul lost, a flatline or walked away at the shift's end all pass), not "loses before the shift ends" (amends D-118) | Accepted |
+| D-122 | The event log keeps only what the judge needs of a read's `shown` lines (how many were passed, how many were Death's, what they were about, and `shownTotal`), never the text (amends D-115) | Accepted |
 | D-170 | Parked ideas get their limits fixed when they're parked (PRD §14.1): log rotation (PARK-01) and Death flooding the logs (PARK-02: one paced move, once per run, ≤ 60 s, Hard or after a tip-off, visible and stoppable) | Accepted |
 
 ### D-01: Pivot to an incident-response game
@@ -367,6 +395,108 @@
 - **Tests:** `customers.test.ts` (unit tests on a made-up traffic fixture, then the committed CUST.a): the loop restarts, each loop plays its share from fresh pool addresses in all three ranges, never an attacker's, never one Death or a wave holds, and Death's fresh address never a customer's; every class of PR #73's list is classed; search off answers `503` to searches and nothing else, registration off to sign-ups, uploads off to `/file-upload` only; a rate limit `429`s the third login in 15 s; a user-agent rule `403`s every browser it names and a path rule the paths it covers; a blocked address writes no line; the plug writes no line and costs nothing; a failure costs its class, files one ticket per shopper per loop, a second failure churns (max drops, the rest of the visit is gone, the feedback line and row appear) and recovery waits a minute; the DB changes are never applied and the souls never move; the idle Medium run's customers are ≥ 60 % of the lines outside the scan at about 2 lines a second (Easy about 1, Hard about 4). `heartbeat.test.ts`: the feature weights are gone, `backlash` costs and churns, the maximum caps recovery. `exploits.test.ts`, customer-aware cheaters on the committed recordings with customers: everything off (a flatline in 7–10.5 min, with `503`s, tickets and churn as the cause), search off with every other patch (9–16), search off alone on the search door (12–16), toggling every 5 s (a loss), the search flip on the search door with customers (a loss, search tickets), blocking every new address as it appears, customers included (he goes to proxies, the shop flatlines inside 10 minutes, the blocked customers' tickets name blocked addresses), a user-agent rule for `Mozilla` (every customer request `403`, none served, a flatline inside 8 minutes: no win), a path rule over `GET /rest/*` (no win, `403`s, POSTs still through), and DEF-07 (a few `429`s on the login only, nobody lost). The engine's WAF stoppers stay symbolic (D-24: a rule pattern names the PRD's rule), so a `Mozilla` rule stops no Death move while the customers are matched literally (KI-85). The cheap-actions property runs with customers on too (the made-up traffic), as does the engine-invariants property. `pool.ts` unit tests: `drawAddress` and `bump`. Changed expectations: the SYS-06 sims' feature-weight terms are gone; the ATK-03 access-log line sits among customers' lines; `initialWorld` differs between seeds in the customers' stream too.
 - **Consequences:** KI-60 and KI-61 closed; KI-79's interim weights gone (D-46 ruling 4 superseded). Flags, rate limits and WAF rules are honest containment with a bill that follows usage; blocking addresses blocks the customers who share the pool. Idle runs keep their endings and their seeded stories. CUST.a (1.05 MB) is now bundled with the game (KI-19's size question grows by it). New issues: KI-82, KI-83, KI-84, KI-85.
 
+### D-90: Where the shell may write
+- **Context:** (2026-11-21) SYS-09 says `/tmp` is writable (D-22) but not what else the player may change; the shell spec (`.kiro/specs/shell/`) needed the rule for `mkdir`, `cp`, `>`, `rm` and `tar`.
+- **Decision:** The writable area is `/tmp` and `/evidence`. `/srv/juice-shop/uploads/` accepts `rm` only (DEF-15); `mkdir`, `cp` and `>` into it are `Permission denied`. Logs and the database file can't be removed or written. `tar czf` into `/evidence/<name>.tgz` is DEF-05; `tar czf` into `/tmp/…` is allowed and sends no action, so it doesn't count as evidence.
+- **Consequences:** A test shows an archive in `/tmp` never reaches DEF-05. The report's "evidence preserved" (SYS-11) counts only `/evidence` archives.
+
+### D-91: DEF-04 from the shell
+- **Context:** (2026-11-21) PRD DEF-04 says active lookups of an attacker tip Death off, but the shell can't tell an attacker's address from any other.
+- **Decision:** `whois <ip>` sends DEF-04 `passive`. `ping`, `nmap` and `curl` with an IPv4 target always send DEF-04 `active`; the Engine decides whether it is a tip-off. A hostname target (e.g. `localhost`) prints realistic tool output and sends no action.
+- **Consequences:** The shell holds no list of attacker addresses. The Engine currently tips Death off on any active lookup (`actions.ts`), so pinging a harmless address does too (KI-90). (Found in the build, 2026-11-22: `ping`, `nmap` and `curl` exit 0 even when the Engine refuses DEF-04; the refusal message goes to stderr and the tool output still prints.)
+
+### D-92: SQL in the shell
+- **Context:** (2026-11-21) DEF-02, DEF-08 and DEF-14 are the only SQL uses in the PRD; the shell needed a rule for everything else.
+- **Decision:** `sqlite3 <db> "<sql>"` runs on the Engine's copy. `UPDATE Users SET deletedAt…` sends DEF-08 and `DELETE FROM Users…` sends DEF-14, once per matched account. Any other write is a read-only error and changes nothing. Also supported: `-header`, the dot-command `.tables` and `.schema [table]`.
+- **Consequences:** The shell finds the matched accounts by running the statement's WHERE clause as a SELECT first. Interactive `sqlite3` (no SQL argument) stays unsupported.
+
+### D-93: Shell syntax beyond pipes and `>`
+- **Context:** (2026-11-21) SYS-09 said "pipes and `>`" only, but `rm uploads/*` and `cd ~` are what a responder types.
+- **Decision:** Added: `*` globs (one path segment, not dotfiles, sorted, left as typed when nothing matches, not expanded inside quotes) and a leading `~` (the start directory `/srv/juice-shop`). Still syntax errors: `;`, `&&`, `>>`, `<`, `2>`, `$VAR`, `$(…)`, backticks. SYS-09 and the steering file are edited to match.
+- **Consequences:** The parser keeps globs and `~` unexpanded in its structure and expands them when it runs a command. (Found in the build, 2026-11-22: a redirect target's `~` always resolves under `/srv/juice-shop`, which is outside the Writable_Area (D-90), so `> ~/x` is always `Permission denied`.)
+
+### D-94: Shell session
+- **Context:** (2026-11-21) The shell spec had open questions on the start directory, `complete` and the unknown-command text.
+- **Decision:** The shell starts in `/srv/juice-shop`. `complete` exists on Easy only and is absent (undefined) on Medium and Hard. An unknown command prints `<name>: command not found`.
+- **Consequences:** ENGINE_API §5 says the same.
+
+### D-95: `run()` result: `exitCode` and `clear`
+- **Context:** (2026-11-21) `{ output }` can neither clear the screen nor tell success from failure, which the shell spec's error cases and the terminal window both need.
+- **Decision:** `run` resolves `{ output: string; exitCode?: number; clear?: true }`. `clear` is `true` only for the `clear` command, with an empty `output`. `exitCode` is 0 on success, 1 for a failed command (and `grep` with no match), 2 for a syntax error, 127 for `command not found`; omitted counts as 0. ENGINE_API §5 is edited; screens may ignore both fields.
+- **Consequences:** The terminal window clears when `clear` is true. Nothing else depends on `exitCode` yet.
+
+### D-96: The `awk` subset
+
+- **Context:** (2026-11-21) Real awk is large; the shell needs only what the DEF-01 log searches use.
+- **Decision:** `awk [-F<sep>] '[/regex/] {print <expr>[, <expr>…]}'` where each `<expr>` is `$0`, `$N`, `$NF` or `NR`; several expressions are joined by one space. Anything else prints `awk: unsupported program`. (Amended 2026-11-21 by the team: the first version allowed a single expression.)
+- **Consequences:** `{print $1, $7}` works; `{c[$1]++}`, `BEGIN`/`END` and arithmetic don't. If the scenes need more, change this decision first. (Found in the build, 2026-11-22: `-F` takes a single character; a longer separator such as `-F'::'` prints `awk: unsupported program`, as `cut -d` also takes one character.)
+
+### D-97: `systemctl` details
+- **Context:** (2026-11-21) D-22 made `restart` a stop then a start; two cases were open.
+- **Decision:** `restart` always attempts the stop and then the start, even when the stop is refused (nginx already stopped). Only the `nginx` unit exists; any other unit prints `Unit <name>.service could not be found.`.
+- **Consequences:** None.
+
+### D-98: Terminal commands and game time
+
+- **Context:** (2026-11-21) DEF-01 to DEF-03 are "Game time" actions in the PRD, but the Engine had no way to see that the player read the logs, the database or an upload. The report (SYS-11) grades time-to-notice.
+- **Decision:** A command takes no game time of its own. A command line that reads a log, the database (`sqlite3` SELECT, `.tables`, `.schema`) or `uploads/` sends one action per **kind of resource read**, each at most once per line, whatever the number of commands in a pipeline: DEF-01 for a log (`query` = the whole command line), DEF-02 for the database (`sql` = the first SQL text read), DEF-03 for uploads (`path` = the first uploads path read, absolute). A pipeline therefore sends at most three. A line that fails before reading anything sends nothing; `tar czf` sends DEF-05 only (its source reads send nothing); `cp` from uploads sends DEF-03. (Amended 2026-11-21 by the team: the first version sent one per reading command.)
+- **Consequences:** The event log gains up to three `action` events per line, so tests that compare worlds must allow for them. The shell sends DEF-04 `active` as D-91 says; KI-90 (the Engine tipping off on any address) stays open for the Engine team.
+
+### D-99: Shell spec corrections
+- **Context:** (2026-11-21) Review of the first requirements draft.
+- **Decision:** (1) Removing a firewall rule sends `{ type: 'DEF-06', op: 'delete', ip }`, the `PlayerAction` type's value, not `remove`. (2) The never-throws property uses strings of up to 500 characters and 200 cases. (3) "Resolves within 100 ms" becomes "adds no artificial delay", since the wait for `Engine.db()` isn't ours.
+- **Consequences:** None.
+
+### D-100: DEF-15's path from the shell
+- **Context:** (2026-11-22) `applyAction` matches `world.files` by a path relative to `uploads/` (`complaints/rip.php`), while the shell spec's R11.1 asked for the absolute path, which the Engine always answers with `No such file`.
+- **Decision:** The shell shows and accepts absolute paths and sends DEF-15 with the path relative to `/srv/juice-shop/uploads/`. DEF-03 keeps the absolute path, because the Engine only logs it. A file whose recorded bytes are missing (`contentBase64` absent) lists with its size, prints its recorded `sha256` for `sha256sum`, and fails to read with `Input/output error`.
+- **Consequences:** R11.1 and R11.5 are reworded. A test sends `rm` on every uploaded file of a committed scenario and checks each is removed.
+
+### D-101: Shell evidence files
+- **Context:** (2026-11-22) DEF-05 stores the name it is given; the shell shows `<name>.tgz`; `rm` of an evidence file would leave the Engine's record in place.
+- **Decision:** `/evidence/<name>.tgz` is the only archive form under `/evidence`; other extensions and nested paths are an invalid archive name (R8.10). Every Engine evidence entry is immutable: `rm`, `cp` onto it and `>` onto it print `Operation not permitted`. Evidence made elsewhere (the Easy console) is listed, readable and hashable with content synthesized from the first `accessLines` and `appLines` lines of the logs, but `tar tzf` on it says it isn't an archive the shell created.
+- **Consequences:** The report's "evidence preserved" can't be undone from the terminal.
+
+### D-102: The database file as a file
+- **Context:** (2026-11-22) The spec lists `juiceshop.sqlite` in the file system without saying what `cat`, `cp`, `tar`, `sha256sum` and `ls -l` do with it.
+- **Decision:** It is a read-only file whose bytes are `(await engine.db()).db.export()`, taken when needed. Raw reads send no DEF-02 (that action is for SQL). `cat`, `head`, `tail` and `grep` on it print the bytes decoded and sanitized (D-106). `rm`, `cp` onto it and `>` onto it are `Permission denied`.
+- **Consequences:** `export()` closes and re-opens the sql.js database, so the shell always fetches `Engine.db()` afresh and never caches it.
+
+### D-103: SQL execution rules
+- **Context:** (2026-11-22) D-92 fixed which writes exist but not how statements are split, which reads are allowed or what the errors say.
+- **Decision:** (1) The argument is split on `;` outside quotes and parentheses; statements run in order and the first error stops the rest. (2) Reads: `SELECT`, `WITH` without a write keyword, `VALUES`, and `PRAGMA table_info|table_xinfo|index_list|foreign_key_list|database_list`. (3) A write is recognised only as `UPDATE Users SET deletedAt = <expr> [WHERE <w>]` or `DELETE FROM Users [WHERE <w>]`; `OR`, `RETURNING`, `ORDER BY`, `LIMIT`, `FROM`, a second assigned column or an alias make it a read-only error. (4) The `<expr>` is evaluated while finding the matched rows; if it gives NULL or `''` the statement is a read-only error, since no action unlocks an account. (5) Messages: `Error: attempt to write a readonly database` for refused writes, `Error: <SQLite message>` for invalid SQL, `Error: database is unavailable` when `Engine.db()` rejects.
+- **Consequences:** The WHERE clause is run as a SELECT on the Engine's database to find the emails for DEF-08 / DEF-14.
+
+### D-104: Quoting
+- **Context:** (2026-11-22) R3 lists the syntax errors but not what quotes do.
+- **Decision:** No backslash escapes. Inside single and double quotes every character is literal, `$` included (D-93 forbids `$` only outside quotes). Adjacent quoted and unquoted pieces join into one word. A word quoted anywhere is never glob-expanded. A redirect target gets `~` expansion only. Outside quotes `&`, `(`, `)` and a lone `$` are syntax errors.
+- **Consequences:** The pretty-printer drops quotes that carry no meaning, so the parse → print → parse round trip holds. (Found by Property 1, 2026-11-22: quoting a word that holds `*` or starts with `~` would mark it literal and change its meaning, so the printer leaves such a word bare unless the lexer would misread it, e.g. `~é` or `*#`.)
+
+### D-105: Regex dialect and guard
+- **Context:** (2026-11-22) `grep` and `awk` take patterns from the player, and a catastrophic pattern would freeze the page.
+- **Decision:** `grep` without `-E` is a basic regex: `. * ^ $ [ ]` are special, `+ ? | ( ) { }` literal. With `-E`, and in `awk /re/`, the extended operators are special (a JavaScript `RegExp`). A pattern longer than 256 characters, with a back-reference, with a quantified group that itself holds a quantifier (`(a+)+`), or with a counted repeat above 255 prints `grep: unsupported pattern` (`awk: unsupported program`).
+- **Consequences:** No timer is needed to keep `run` inside the 5 s bound of the robustness property.
+
+### D-106: Output text, never markup (amends R1.4)
+- **Context:** (2026-11-22) "No HTML tags" can't hold for echoed arguments or file content: an uploaded file may contain `<script>`.
+- **Decision:** The shell adds no markup. Every character below U+0020 except newline and tab, and U+007F, is shown in caret notation (`^[` for ESC), as `cat -v` does. Other content is unchanged. The terminal window renders `output` as text, never as HTML (added to `docs/SCENES.md`).
+- **Consequences:** The R1.4 test checks the control-character rule and that lines the shell writes itself hold no `<`.
+
+### D-107: Flags for commands with none in the PRD
+- **Context:** (2026-11-22) Requirement 16 needs a defined flag list for every command.
+- **Decision:** `ping -c <count>` (default 4, 1 to 20); `nmap -p <ports>` and `-sV`; `curl -I` and `-s`; `ss -t -l -n` and their bundles; `rm -r` only (no `-f`, no `-R`); `mkdir -p`. None for `cp`, `whois`, `date`, `history`, `help`, `file`, `sha256sum`. Any other flag is the unsupported-flag error.
+- **Consequences:** The registry holds these; `man` prints them.
+
+### D-108: `rm -r` in uploads, and several operands
+- **Context:** (2026-11-22) DEF-15 removes one file.
+- **Decision:** `rm -r <dir in uploads>` sends one DEF-15 per file below it, in ascending path order, and goes on after a refusal. `rm` with several operands (a glob included) handles them left to right, one action per uploaded file, and ends with exit code 1 if any failed. The directory disappears by itself when its last file is removed.
+- **Consequences:** None.
+
+### D-109: Archives
+- **Context:** (2026-11-22) `tar czf` needs bytes to hash and a listing to print, without real compression.
+- **Decision:** An archive is a deterministic byte string: the gzip magic `1f 8b 08 00`, then a canonical listing of entries (path, type, length, bytes). `sha256sum` hashes those bytes. `tar tzf` prints each source path in the order given, each followed by its descendants in ascending order, directories with a trailing `/` and the leading `/` removed, as real tar does. `file` reports `gzip compressed data`. A missing source prints `tar: <path>: No such file or directory`.
+- **Consequences:** Same content, same digest, on every run.
+
 ### D-130: The leaky taps recorded (closes KI-59, amends D-42 rule 4)
 - **Context:** (2026-11-22) D-42 let the taps play without a recording: each opening and drip wrote an access line the engine built, with estimated byte counts (KI-59), the one exception to "every line shown is recorded".
 - **Decision:**
@@ -460,6 +590,68 @@
   6. **Never a live score.** No assessor output is shown to the player during the run: grades, statuses, gaps and evidence would spoil what the player has to find. ENGINE_API §2.2 exposes `world.assess` read-only for the hint/Kiro layer, and SCENES.md says so.
 - **Tests:** `assess.test.ts`: SYS-11's rules one by one (the crafted runs set world state where a rule reads it), every relevance rule, every gap type, the phase statuses with evidence, the biggest gap first with its `since`, the judging and refresh inside `advance()`, JSON-plain state, and a player spamming `ls`/`pwd` for eight real minutes: no relevant action, every stage unseen, detect D or F. `report.test.ts`: the shape, and the report equals the live snapshot at the ending. `sims.test.ts`: SIM-2 and SIM-5 read the assessor (SIM-5 still grades A in all four). The struggle side (the `gap` reason, Hard, the spammer's suggestion) is in `struggle.test.ts` (#87).
 - **Consequences:** SYS-21 done on the engine side, SYS-11 and SYS-13 read from it; KI-110 closed; D-113's Hard reading overridden. Cost: the assessor adds about 10 % to an idle run; the cheaters that act every tick pay the per-tick judging. The scan's thousands of paths make "a path his moves requested" broad: a grep for `/api` after ATK-01 is relevant (KI-112).
+
+### D-115: Relevance by outcome (replaces D-114 rule 2, closes KI-112)
+- **Context:** (2026-11-22) D-114 judged a look relevant by what the player typed (an address or a path his moves requested), which was broad after the scan (KI-112) and blind to what the output actually showed. The team ruled: judge by outcome.
+- **Decision** (`game/src/engine/assess.ts`, `rules/vocabulary.ts`):
+  1. **`shown` on reads.** `PlayerAction` DEF-01/02/03 gain an optional `shown: string[]` (the lines the shell or a console printed, at most `SHOWN_LINES_MAX` = 200; the engine cuts longer lists and fills `shownTotal`) and `shownTotal` (how many lines the output really had). The shell (Kiro, in progress) fills them later; until then a read with no `shown` is judged as not relevant unless it hurt him (rule b).
+  2. **Relevant (a): it showed something of his.** At least one shown line is a line of a Death move (it carries one of his addresses, or is an app-log line his move wrote), his planted account (its email) or his planted file (its path), AND the output was focused: `shownTotal` ≤ 200, or his lines are at least 20 % of the shown lines. An accidental `tail` that shows his lines counts; a `cat` of the whole 9,000-line log with one of his lines in it does not.
+  3. **Relevant (b): it actually hurt him**, on purpose or not: in the same tick it cut one of his moves (a `move-cut` by that action's kind, an IP block on his address included), froze it (a stopper or the plug holds), shut a door (`door-shut` by it), closed a tap (its rule), removed a foothold (the world's footholds shrank and the action is a remover of that one) or undid a defacement (a restore). A patch counts the moment it lands (`patch-applied`): its deploy becomes relevant then, and the last relevant action's time is that moment.
+  4. **Not relevant:** everything else: `ls`, `pwd`, `help`, an unfocused read, a snapshot, comms, bringing back, a lookup, a WAF rule that stopped nothing, a block on an address he no longer uses (on proxies, D-46, blocks never cut him and so never count).
+  5. **Same rule everywhere:** "time to notice" (SYS-11), the idle clock and the gaps (SYS-13, SYS-21). The door gap closes when a relevant read showed the door's own lines (its addresses or its route).
+- **Tests:** `assess.test.ts` "relevant actions by outcome": the accidental `tail` counts, the whole-log `cat` doesn't, a fifth of his lines makes a long read focused, a read with no `shown` isn't judged, his planted account and file in a query or a listing, every (b) effect with and without the matching action, the never-relevant kinds, verdicts kept in a run, a deploy relevant when its patch lands, a deleted account or file still his. `struggle.test.ts` and the SYS-11 rules read the same verdicts.
+- **Consequences:** KI-112 closed. The event log keeps a summary of the shown lines, never the text (D-122); ENGINE_API §3 says what to pass. The assessor remembers which move used each address and which app-log lines are his.
+
+### D-116: Confirming the breach: an escalation or a relevant action on the harvest, never a snapshot
+- **Context:** (2026-11-22) SYS-14 started the clock at "the first DEF-05 or DEF-19 after souls are taken", which punished the playbook order (a snapshot at the first alert, then nothing after the theft never confirmed; the concern on #85). The team ruled.
+- **Decision:** the breach is confirmed, and the 72 h clock starts, when after souls were taken the player escalates (DEF-19), or makes a relevant action (D-115) on a harvest move (a focused read that showed ATK-08's or ATK-09's lines, or a fix that hurt one of them, a landed patch included) or on Users (a focused `Users` query that showed his planted account). A snapshot never starts it. `confirmBreach` lives in `engine/notification.ts`; DEF-19 calls it from `actions.ts`, the assessor from its judging step (`stepAssess`, the tick the action is judged), and the `breach-confirmed` event names the action kind.
+- **Tests:** `assess.test.ts` "confirming the breach (D-116)"; `notification.test.ts` and `actions.test.ts` no longer confirm on DEF-05.
+- **Consequences:** SYS-14's row and the `breach-unconfirmed` gap read "escalate, or look at the harvest". A player who only snapshots and patches confirms the moment the search patch lands on a door he found.
+
+### D-117: The win needs the real fix on every soul door he found, even an empty one (closes KI-135)
+- **Context:** (2026-11-22) D-45 counted a landed soul door as open for the win only while a half had rows left, so once the taps' small leaks (D-135) stopped keeping the last soul out of reach, the search-flip cheater was banished with 324 of 325 souls gone and the search door never patched (KI-135). The team ruled.
+- **Decision:** `doorOpenForWin` counts a door he has found (landed) until a lasting fix (its patch, or a WAF rule stopping every half he may play) holds, whatever is left to take; containment that shuts it, a revoke, or an empty door don't count. A door he never entered is as before. `unfixedDoors` (`engine/shift.ts`) lists the found doors still without their real fix, and the ones nothing shuts right now.
+- **Tests:** `exploits.test.ts` (the search-flip cheater is never banished), `doors.test.ts` (the open-tap rule as a direct check, since every tap now runs dry within a few drips), `shift.test.ts` (an empty, unfixed door is walked-away).
+- **Consequences:** KI-135 closed. A player who lets him empty the search door still has to patch it to win or to hand over cleanly.
+
+### D-118: The end of the shift
+- **Context:** (2026-11-22) A run had no end but a loss or a win, and D-46's stuck rule could leave Death waiting while the player had nothing left to do (KI-76, KI-80). The team ruled a shift length and a verdict.
+- **Decision** (`game/src/engine/shift.ts`; numbers `(tune)` in `config.ts`):
+  1. **The shift** ends at `shiftGameMs`: Easy 20, Medium 16, Hard 13 real minutes (idle runs on the committed recordings flatline at 16.5–18, 14–15.3 and 11.7–12.8 real minutes on seeds 1–5). `world.clock.shiftEndsAt` carries it, so a lab sim that measures a harvest or a drain past a shift can push it out (`noShift`); the game never does.
+  2. **The verdict**, picked by the judge at the limit with the shop alive: **clean-handover** (every soul door he found really fixed, D-117; souls lost under 25 %); **rough-handover** (souls lost under 50 %, a found door without its real fix but shut by containment); **walked-away**, a loss (souls lost at 50 % or more, or a found door open with no real fix, an empty one included). A foothold left does not spoil a clean handover: it goes in the report's missed list.
+  3. **Three new endings** (`Ending`): the ending event carries the verdict; the report's Outcome fact and the Markdown title show it first ("Clean handover", "Rough handover", "Walked away (a loss)"). UI-06 gets one "shift ends" screen showing the verdict (SCENES.md §7).
+- **Tests:** `shift.test.ts`: each verdict on a crafted world, the clock ending the run at the limit, the lab override, the report's title; an idle player still loses before the shift ends on every level and five seeds; a player who patches every door he found but never hunts footholds hands over cleanly. `exploits.test.ts`: only toggling search ends the shift as a rough handover or worse. The lab sims (the robber, SIM-8/9, the SYS-06 drains, the exploit hunt) run with the shift pushed out.
+- **Consequences:** every run ends inside the shift; KI-76's run-length question has a ceiling. The idle margins on Medium and Hard are under a minute (tune with the first playtest).
+
+### D-119: Taps stay real and small
+- **Context:** (2026-11-22) D-135 made every tap leak a handful of named accounts, so taps run dry within a few drips and often take nothing. The team ruled taps stay that way, with two duties kept.
+- **Decision:** a tap that leaked counts toward the notification duty: its `souls-stolen` is a theft like any other, so legal must be told (the "not needed" fact only when no soul of any kind left); an open tap at the end is a report mistake (as D-44/D-112). Nothing else changes: taps still block the win while open (D-44).
+- **Tests:** `assess.test.ts` "taps (D-119)": a tap-only theft needs a notification; an open tap at the end is marked.
+- **Consequences:** none in play; the two rules were already in the report and now say so.
+
+### D-120: A door he got into is one he started a visit through (refines D-117)
+- **Context:** (2026-11-22) #93 read "a door Death has found" as one he got into, landed or cut, because "landed" made a clean handover unreachable (a landed first entry takes half the souls, and only a landed stage-4 move opens stage 5). The team ruled.
+- **Decision:** a soul door Death "got into" is one he **started a harvest visit through**, even if it was cut short (`found` in `engine/doors.ts`: a `played` entry of either outcome, a running visit, or a paused one). Every such door needs its real fix (its patch, or a WAF rule stopping every half he may play) for banished (`doorOpenForWin`) and for clean-handover (`unfixedDoors`). A player who cuts the first dump early (souls lost under 25 %) and patches the door can earn a clean handover.
+- **Tests:** `shift.test.ts`: on the fixture, over seeds 1–6, a player who turns search off at the first stolen row and deploys the search patch (and the users-access patch should he reach that door), restores defacements and closes taps, with the shift ending at 7 real minutes: every seed where the first dump was cut short and never landed ends as a clean handover with the door found and fixed and souls lost under 25 %.
+- **Consequences:** none in code beyond the wording; D-117's "found" is this.
+
+### D-121: A do-nothing player never wins (amends D-118)
+- **Context:** (2026-11-22) D-118's idle check was "loses before the shift ends", with margins under a minute on Medium and Hard over seeds 1–5. The team ruled the check that matters.
+- **Decision:** the idle check is **"a do-nothing player never wins"** on every level and seed: every soul lost, a flatline, or walked away at the shift's end all pass; never banished, never a handover. The shift's limits stay as D-118 set them.
+- **Tests:** `shift.test.ts`, `engine.test.ts` (the idle runs), `sims.test.ts` (SIM-1) accept the three losses.
+- **Consequences:** a seed whose idle run outlives the limit is not a test failure; the loss is the shift's verdict.
+
+### D-122: The log keeps a summary of a read's lines, never the text (amends D-115)
+- **Context:** (2026-11-22) D-115 logged the `shown` lines (up to 200 per read) inside the action event, a few megabytes over a long run and the log's text in the event log. The team ruled.
+- **Decision:** `applyAction` judges the lines before logging (`summariseShown` in `engine/assess.ts`, against what the world knows of his work right then) and keeps only what the judge needs: `shownCount` (lines passed, at most 200), `shownHis` (of them, lines of a Death move, his planted account or his planted file), `shownAbout` (which moves or things those lines belonged to, so the door gap and the breach confirmation still know a look at the harvest from one at the scan) and `shownTotal`. The text never reaches `world.events`. The judge reads the summary; a crafted test may still pass lines and is judged the same way.
+- **Tests:** `assess.test.ts`: the logged action carries the summary and none of the text; the judge reads it (two of three lines his: relevant; one of 200 of 9,000: not); over 200 lines, the first 200 are judged and the total kept.
+- **Consequences:** D-115's memory concern is gone; ENGINE_API §3 says the shell still passes the lines and what the engine keeps.
+
+### D-135: TAP-01 leaks only the customers whose emails are in the logs (closes KI-74, amends D-42 rule 4 and D-130)
+- **Context:** (2026-11-22) TAP-01.a (D-130) scraped a fresh shop whose log held no customer email, while the rules let TAP-01 drip from every customer (KI-74).
+- **Decision** (team ruling): TAP-01 is re-recorded after customer traffic with password-reset lookups has run in the same rig session, and it leaks only the customers whose emails really appear in those logs. `TAP-01.a.setup.sh` runs CUST.b's setup and shoppers (through nginx, at 10x speed) before the window, so their lines stay out of the recording and their requests are in the shop's own log when the scraper comes. The converter's exfil names the accounts: the five resetters (ids 37, 45, 166, 199, 229), emails only. `rules/taps.ts` lists exactly those; a recordings test now ties every tap's rule to its recording.
+- **Recorded 2026-11-22:** TAP-01.a 36.5 s, 11 requests (log fetches of about 120 KB, up from 34 KB), 3.0 KB.
+- **Consequences:** every tap now leaks a handful of named accounts, so taps run dry within a few drips and often take nothing once the first harvest has passed (KI-73). Two engine tests leaned on TAP-01's endless drip and fail (KI-135): a search-flip cheater is now banished at 324 of 325 souls, and the "open tap blocks the win" scenario ends before its tap matters. Those files are outside this work's list, so this lands as its own PR, red until the engine session fixes KI-135. `taps.test.ts` now checks each tap against its named accounts.
 
 ### D-150: The deploy console's patches (CON-02): real Juice Shop lines, four of its own fixes, four of ours
 - **Context:** (2026-11-22) DEF-13's console shows "the real vulnerable Juice Shop code and the fix diff". The `Patch` type has eight values; Juice Shop ships sanctioned fixes (its `data/static/codefixes/`) for only four of them (login, search, registration, product update), and its product-update fix (`denyAll` on every write) would break the admin's own product edits.

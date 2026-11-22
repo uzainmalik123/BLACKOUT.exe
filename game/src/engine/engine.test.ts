@@ -100,7 +100,7 @@ describe('a real run on the committed recordings, nobody at the keyboard (KI-17)
     expect(harvests[0]).toBe('d'); // D-42: the quiet halves on Medium
     expect(harvests.length).toBeGreaterThanOrEqual(3); // he keeps coming back to his door
     expect(eventsOfKind(r.world, 'banished')).toEqual([]);
-    expect(['souls-lost', 'flatline']).toContain(eventsOfKind(r.world, 'ending')[0]?.ending);
+    expect(['souls-lost', 'flatline', 'walked-away']).toContain(eventsOfKind(r.world, 'ending')[0]?.ending); // D-121: a do-nothing player never wins
     const byTen = eventsOfKind(r.world, 'souls-stolen').filter((e) => e.t <= 10 * REAL_MIN * 30).at(-1)!.stolen;
     expect(byTen).toBeGreaterThanOrEqual(r.world.souls.total / 2); // SIM-1 on the real recordings (D-42)
   });
@@ -119,7 +119,7 @@ describe('a real run on the committed recordings, nobody at the keyboard (KI-17)
         expect(highest, `${difficulty} seed ${seed}`).toBeGreaterThanOrEqual(3);
         expect(started.some((e) => MOVE_BY_ID[e.move].stage === 4), `${difficulty} seed ${seed}`).toBe(true);
         for (const v of ['a', 'b', 'c']) expect(started.filter((e) => e.move === 'ATK-08').map((e) => e.variant)).not.toContain(v); // D-42: only the halves
-        expect(['souls-lost', 'flatline'], `${difficulty} seed ${seed}`).toContain(eventsOfKind(r.world, 'ending')[0]?.ending); // D-41: after the ransom he stops, and the defacement can flatline the shop first
+        expect(['souls-lost', 'flatline', 'walked-away'], `${difficulty} seed ${seed}`).toContain(eventsOfKind(r.world, 'ending')[0]?.ending); // D-41: after the ransom he stops, and the defacement can flatline the shop first; D-121: or the shift ends
       }
     }
   });

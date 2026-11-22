@@ -1,3 +1,8 @@
+import { applyAction } from './actions';
+import { TAP_BY_ID } from '../rules/taps';
+import { stepTaps } from './taps';
+import { EMPTY_LIBRARY } from './library';
+import { checkBanishment } from './director';
 // D-42, D-44: soul doors. Once a big door (ATK-08, ATK-09) has landed it is his: he keeps coming back to it, each visit
 // taking at most half of the souls left (the rest once fewer than 10 % remain), while it is open. A door is shut only
 // while one of its own stoppers holds, and reopens when that fix lapses; a cut visit is paused, never over (D-45).
@@ -15,6 +20,7 @@ import { runSim, type ScriptedPlayer, type SimResult } from './sim';
 import { soulsStolen } from './souls';
 import { initialWorld, type World } from './state';
 import { committedLibrary } from './test-fixtures/committed';
+import { noShift } from './shift';
 import { WHOLE_RUN_TIMEOUT_MS } from './test-fixtures/timeouts';
 
 const REAL_MIN = 60_000;
@@ -23,7 +29,7 @@ const only = (ids: string[]): RecordingLibrary => libraryFrom(ids.flatMap((m) =>
 const searchDoor = only(['ATK-01', 'ATK-08']);
 const noTaps = (w: World) => { w.taps.nextAt = Infinity; };
 const run = (player: ScriptedPlayer, opts: { library?: RecordingLibrary; minutes?: number; difficulty?: 'easy' | 'medium' | 'hard'; taps?: boolean } = {}): SimResult =>
-  runSim({ seed: 1, difficulty: opts.difficulty ?? 'medium', library: opts.library ?? searchDoor, maxRealMs: (opts.minutes ?? 60) * REAL_MIN, player, ...(!opts.taps && { setup: noTaps }) });
+  runSim({ seed: 1, difficulty: opts.difficulty ?? 'medium', library: opts.library ?? searchDoor, maxRealMs: (opts.minutes ?? 60) * REAL_MIN, player, setup: (w) => { noShift(w); if (!opts.taps) noTaps(w); } }); // the robber is measured past a shift (D-118)
 
 /** Each visit to a door: when it started, how many souls were left then, how many it took, how it ended. */
 function visits(events: GameEvent[], move: MoveId) {
@@ -165,7 +171,7 @@ describe('the robber: an open door is visited until it is empty (D-42)', { timeo
 
   it('every second move he starts is a visit while story moves remain, and after the ransom every move is a visit', () => {
     for (const seed of [1, 2, 3]) {
-      const r = runSim({ seed, difficulty: 'medium', library: real, maxRealMs: 30 * REAL_MIN, player: () => [] });
+      const r = runSim({ setup: noShift, seed, difficulty: 'medium', library: real, maxRealMs: 30 * REAL_MIN, player: () => [] });
       const starts = eventsOfKind(r.world, 'move-started');
       const firstDoor = eventsOfKind(r.world, 'move-landed').find((e) => SOUL_DOORS.includes(e.move))!;
       const ransom = eventsOfKind(r.world, 'move-landed').find((e) => e.move === 'ATK-17');
@@ -276,7 +282,7 @@ describe('the doors, unit by unit (D-42)', () => {
   it('revoking sessions shuts the users API door; a MIN-02 success hands him a new session and reopens it (D-44, KI-70)', { timeout: WHOLE_RUN_TIMEOUT_MS }, () => {
     const users = libraryFrom(['ATK-01', 'ATK-03', 'ATK-09', 'MIN-02'].flatMap((m) => real.variantsOf(m as MoveId).map((v) => v.recording)));
     let revoked = false;
-    const r = runSim({ seed: 1, difficulty: 'medium', library: users, maxRealMs: 20 * REAL_MIN, setup: noTaps, player: (w) => {
+    const r = runSim({ seed: 1, difficulty: 'medium', library: users, maxRealMs: 20 * REAL_MIN, setup: (w) => { noShift(w); noTaps(w); }, player: (w) => {
       if (revoked || !eventsOfKind(w, 'move-landed').some((e) => e.move === 'ATK-09')) return [];
       revoked = true;
       return [{ type: 'DEF-09' }];
@@ -292,22 +298,17 @@ describe('the doors, unit by unit (D-42)', () => {
     expect(eventsOfKind(r.world, 'move-started').filter((e) => e.move === 'ATK-09' && e.t >= reopened.t).length).toBeGreaterThanOrEqual(1);
   });
 
-  it('an open leaky tap blocks the win: every route closed, no foothold, he is banished only once the tap is closed (D-44, KI-75)', { timeout: WHOLE_RUN_TIMEOUT_MS }, () => {
-    let fixed = false;
-    const r = run((w, realMs) => {
-      const acts: PlayerAction[] = [];
-      if (!fixed && eventsOfKind(w, 'move-landed').some((e) => e.move === 'ATK-08')) { fixed = true; acts.push({ type: 'DEF-10', feature: 'search', enabled: false }, { type: 'DEF-13', patch: 'search' }); }
-      if (realMs >= 12 * REAL_MIN) for (const t of w.taps.open) acts.push({ type: 'DEF-12', rule: { kind: 'block-path', method: 'GET', path: t.id === 'TAP-01' ? '/support/logs' : t.id === 'TAP-02' ? '/rest/memories' : '/rest/products/*/reviews' } });
-      return acts;
-    }, { minutes: 20, taps: true });
-    const opened = eventsOfKind(r.world, 'tap-opened')[0]!;
-    expect(opened.t).toBeLessThan(12 * REAL_MIN * 30);
-    expect(eventsOfKind(r.world, 'patch-applied')).toMatchObject([{ patch: 'search' }]);
-    expect(eventsOfKind(r.world, 'patch-applied')[0]!.t).toBeLessThan(12 * REAL_MIN * 30);
-    const ending = eventsOfKind(r.world, 'ending')[0]!;
-    expect(ending).toMatchObject({ ending: 'banished' });
-    expect(ending.t).toBeGreaterThanOrEqual(12 * REAL_MIN * 30);
-    expect(eventsOfKind(r.world, 'tap-closed').some((e) => e.by === 'DEF-12')).toBe(true);
-    expect(r.world.taps.open).toEqual([]);
+  it('an open leaky tap blocks the win: every route closed, no foothold, he is banished only once the tap is closed (D-44, KI-75; a direct check since taps run dry fast, D-135)', () => {
+    const w = initialWorld(1, 'medium');
+    w.taps.open.push({ id: 'TAP-01', openedAt: 0, nextDripAt: 99e9, drips: 0 }); // the open logs, with every account they leak still unstolen
+    const lib = EMPTY_LIBRARY; // no recording: no route he could take
+    checkBanishment(w, lib);
+    expect(w.ending).toBeUndefined();
+    expect(eventsOfKind(w, 'banished')).toEqual([]);
+    applyAction(w, { type: 'DEF-12', rule: TAP_BY_ID['TAP-01'].closedBy.rule });
+    stepTaps(w);
+    expect(eventsOfKind(w, 'tap-closed')).toMatchObject([{ tap: 'TAP-01', by: 'DEF-12' }]);
+    checkBanishment(w, lib);
+    expect(w.ending).toBe('banished');
   });
 });
