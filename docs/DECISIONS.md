@@ -61,6 +61,9 @@
 | D-117 | Winning requires the real fix (patch or WAF) on every soul door Death has found, even one with nothing left to take (closes KI-135) | Accepted |
 | D-118 | End of shift: Easy ~20, Medium ~16, Hard ~13 real min (tune); at the limit the judge picks clean-handover, rough-handover or walked-away (a loss); the report shows the verdict first; three new endings | Accepted |
 | D-119 | Taps stay real and small (D-135): any tap that leaked counts toward the notification duty, and an open tap at the end is a report mistake | Accepted |
+| D-120 | A soul door Death "got into" is one he started a harvest visit through, even if it was cut short; every such door needs its real fix for banished and for clean-handover (refines D-117) | Accepted |
+| D-121 | The idle check is "a do-nothing player never wins" on every level and seed (every soul lost, a flatline or walked away at the shift's end all pass), not "loses before the shift ends" (amends D-118) | Accepted |
+| D-122 | The event log keeps only what the judge needs of a read's `shown` lines (how many were passed, how many were Death's, what they were about, and `shownTotal`), never the text (amends D-115) | Accepted |
 
 ### D-01: Pivot to an incident-response game
 - **Context:** (2026-11-08) Reanimator raised dead repos so Death could attack them. Any agent can revive a repo on its own, so the product added nothing, and the UI had drifted into a pile of screens with no vision.
@@ -474,7 +477,7 @@
   4. **Not relevant:** everything else: `ls`, `pwd`, `help`, an unfocused read, a snapshot, comms, bringing back, a lookup, a WAF rule that stopped nothing, a block on an address he no longer uses (on proxies, D-46, blocks never cut him and so never count).
   5. **Same rule everywhere:** "time to notice" (SYS-11), the idle clock and the gaps (SYS-13, SYS-21). The door gap closes when a relevant read showed the door's own lines (its addresses or its route).
 - **Tests:** `assess.test.ts` "relevant actions by outcome": the accidental `tail` counts, the whole-log `cat` doesn't, a fifth of his lines makes a long read focused, a read with no `shown` isn't judged, his planted account and file in a query or a listing, every (b) effect with and without the matching action, the never-relevant kinds, verdicts kept in a run, a deploy relevant when its patch lands, a deleted account or file still his. `struggle.test.ts` and the SYS-11 rules read the same verdicts.
-- **Consequences:** KI-112 closed. The event log carries the shown lines (an action event with up to 200 lines); ENGINE_API §3 says what to pass. The assessor remembers which move used each address and which app-log lines are his.
+- **Consequences:** KI-112 closed. The event log keeps a summary of the shown lines, never the text (D-122); ENGINE_API §3 says what to pass. The assessor remembers which move used each address and which app-log lines are his.
 
 ### D-116: Confirming the breach: an escalation or a relevant action on the harvest, never a snapshot
 - **Context:** (2026-11-22) SYS-14 started the clock at "the first DEF-05 or DEF-19 after souls are taken", which punished the playbook order (a snapshot at the first alert, then nothing after the theft never confirmed; the concern on #85). The team ruled.
@@ -502,6 +505,24 @@
 - **Decision:** a tap that leaked counts toward the notification duty: its `souls-stolen` is a theft like any other, so legal must be told (the "not needed" fact only when no soul of any kind left); an open tap at the end is a report mistake (as D-44/D-112). Nothing else changes: taps still block the win while open (D-44).
 - **Tests:** `assess.test.ts` "taps (D-119)": a tap-only theft needs a notification; an open tap at the end is marked.
 - **Consequences:** none in play; the two rules were already in the report and now say so.
+
+### D-120: A door he got into is one he started a visit through (refines D-117)
+- **Context:** (2026-11-22) #93 read "a door Death has found" as one he got into, landed or cut, because "landed" made a clean handover unreachable (a landed first entry takes half the souls, and only a landed stage-4 move opens stage 5). The team ruled.
+- **Decision:** a soul door Death "got into" is one he **started a harvest visit through**, even if it was cut short (`found` in `engine/doors.ts`: a `played` entry of either outcome, a running visit, or a paused one). Every such door needs its real fix (its patch, or a WAF rule stopping every half he may play) for banished (`doorOpenForWin`) and for clean-handover (`unfixedDoors`). A player who cuts the first dump early (souls lost under 25 %) and patches the door can earn a clean handover.
+- **Tests:** `shift.test.ts`: on the fixture, over seeds 1–6, a player who turns search off at the first stolen row and deploys the search patch (and the users-access patch should he reach that door), restores defacements and closes taps, with the shift ending at 7 real minutes: every seed where the first dump was cut short and never landed ends as a clean handover with the door found and fixed and souls lost under 25 %.
+- **Consequences:** none in code beyond the wording; D-117's "found" is this.
+
+### D-121: A do-nothing player never wins (amends D-118)
+- **Context:** (2026-11-22) D-118's idle check was "loses before the shift ends", with margins under a minute on Medium and Hard over seeds 1–5. The team ruled the check that matters.
+- **Decision:** the idle check is **"a do-nothing player never wins"** on every level and seed: every soul lost, a flatline, or walked away at the shift's end all pass; never banished, never a handover. The shift's limits stay as D-118 set them.
+- **Tests:** `shift.test.ts`, `engine.test.ts` (the idle runs), `sims.test.ts` (SIM-1) accept the three losses.
+- **Consequences:** a seed whose idle run outlives the limit is not a test failure; the loss is the shift's verdict.
+
+### D-122: The log keeps a summary of a read's lines, never the text (amends D-115)
+- **Context:** (2026-11-22) D-115 logged the `shown` lines (up to 200 per read) inside the action event, a few megabytes over a long run and the log's text in the event log. The team ruled.
+- **Decision:** `applyAction` judges the lines before logging (`summariseShown` in `engine/assess.ts`, against what the world knows of his work right then) and keeps only what the judge needs: `shownCount` (lines passed, at most 200), `shownHis` (of them, lines of a Death move, his planted account or his planted file), `shownAbout` (which moves or things those lines belonged to, so the door gap and the breach confirmation still know a look at the harvest from one at the scan) and `shownTotal`. The text never reaches `world.events`. The judge reads the summary; a crafted test may still pass lines and is judged the same way.
+- **Tests:** `assess.test.ts`: the logged action carries the summary and none of the text; the judge reads it (two of three lines his: relevant; one of 200 of 9,000: not); over 200 lines, the first 200 are judged and the total kept.
+- **Consequences:** D-115's memory concern is gone; ENGINE_API §3 says the shell still passes the lines and what the engine keeps.
 
 ### D-135: TAP-01 leaks only the customers whose emails are in the logs (closes KI-74, amends D-42 rule 4 and D-130)
 - **Context:** (2026-11-22) TAP-01.a (D-130) scraped a fresh shop whose log held no customer email, while the rules let TAP-01 drip from every customer (KI-74).
