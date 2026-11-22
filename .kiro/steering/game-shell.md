@@ -8,7 +8,7 @@ The game's terminal is **our own emulated shell, not bash**. Only these commands
 
 `ls cd pwd cat head tail grep awk sort uniq wc cut file sha256sum tar cp rm mkdir sqlite3 iptables systemctl ss whois ping nmap curl date history clear help man`
 
-- Pipes (`|`) and `>` work. `systemctl` takes `status`, `stop`, `start` and `restart`. `/tmp` exists and is writable. Nothing else from bash does: no `sudo`, editors, package managers, `docker`, `&&`, subshells or scripts.
+- Pipes (`|`) and `>` work, as do `*` globs and a leading `~`. `;`, `>>`, `<`, `2>` and `$VAR` do not. `systemctl` takes `status`, `stop`, `start` and `restart`. `/tmp` exists and is writable. Nothing else from bash does: no `sudo`, editors, package managers, `docker`, `&&`, subshells or scripts.
 - `sqlite3` is real SQLite on the game's copy of the Juice Shop database.
 - When writing game code, tests or Kiro's in-game prompts, never assume a command outside this list exists.
 

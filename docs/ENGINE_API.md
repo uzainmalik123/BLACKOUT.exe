@@ -135,14 +135,34 @@ Every button, console and (later) shell command sends one of these. It returns `
 
 These parts are being built on the brain side. Their shape is agreed now so the screens never wait.
 
-**The shell** (SYS-09):
+**The shell** (SYS-09): built, in `game/src/shell/` (entry point `game/src/shell/index.ts`).
 ```ts
+import { createShell, COMMAND_LIST, checkCommandLine } from '../shell';   // game/src/shell/index.ts
+
+const shell = createShell(engine, { onInternalError: (e) => console.error(e) });   // opts optional
+
 interface Shell {
-  run(line: string): Promise<{ output: string }>;   // one command line, incl. pipes; output is plain text
-  complete?(partial: string): string[];               // Easy only: autocomplete suggestions
+  run(line: string): Promise<{ output: string; exitCode?: number; clear?: true }>;   // one command line, incl. pipes
+  complete?(partial: string): string[];               // Easy only: absent (undefined) on Medium and Hard
 }
 ```
-The terminal window sends each typed line to `run` and prints `output`. Commands that change things (`iptables`, `rm`, `systemctl`, …) call `engine.act` inside the shell, so the world updates by itself. **Stub:** echo `command not found` for everything.
+- `run(line)` always resolves, never rejects. `exitCode` is always set by the shell: 0 success, 1 command failure, 2 usage or parse error, 127 command not found. `clear: true` is set only by the `clear` command, and its `output` is empty. The terminal empties the screen first when `clear` is `true`.
+- `output` is **plain text**. The terminal window must render it as text (e.g. a React text node), never as HTML (D-106).
+- `onInternalError` receives anything the shell's catch-alls swallowed. It never reaches `output`.
+- `COMMAND_LIST` (the 31 commands, in steering order) and `checkCommandLine(line): boolean` are exported for KIRO-08 and KDEV-01. Both are pure and need no Engine. `checkCommandLine` never throws; an empty line, a parse error or an unknown command name gives `false`.
+- The shell reads logs, uploads and the database through the Engine, and sends DEF actions through `engine.act` itself, so the world updates by itself. It never calls `advance`, `pause` or `resume`; the screen owns the clock.
+
+| Shell command | Sends |
+|---|---|
+| any command reading the two log files (`cat`, `head`, `tail`, `grep`, `awk`, `sort`, …) | `DEF-01` (first read per line) |
+| `sqlite3` `SELECT`, `.tables`, `.schema` | `DEF-02` (first SQL text per line) |
+| any command reading a file under uploads (`cat`, `ls`, `file`, `sha256sum`, `cp`, `grep`, …) | `DEF-03` (first path per line). `tar czf` sources are not counted as reads |
+| `whois`, `ping`, `nmap`, `curl` on an IPv4 target | `DEF-04` (`mode`: `passive` or `active`) |
+| `tar czf /evidence/<name>.tgz …` (only this form; `cp` never sends it) | `DEF-05` |
+| `iptables` add / delete | `DEF-06` |
+| `sqlite3` locking / deleting an account | `DEF-08` / `DEF-14` |
+| `rm` in uploads | `DEF-15` |
+| `systemctl stop` / `start` / `restart` | `DEF-11` / `DEF-18` (`restart` sends both) |
 
 **Kiro** (SYS-12, KIRO-*):
 ```ts

@@ -72,7 +72,7 @@ Where the whole game is played. The busiest screen; the one judges will see most
 | 💀 Souls meter | Customers' data left / taken | `world.souls` |
 | 🫀 Heartbeat meter | The business's health, 0–100; should *feel* like a heartbeat (faster and weaker as it drops) | `world.heartbeat` |
 | Game clock | In-game time of the incident | `world.clock.gameMs` |
-| Terminal | Where the player types real commands (`grep`, `iptables`, `sqlite3`, …) | Shell interface, ENGINE_API §5 |
+| Terminal | Where the player types real commands (`grep`, `iptables`, `sqlite3`, …). It renders the shell's `output` as text, never as HTML (D-106): file content and typed arguments can hold `<`; it empties the screen when `clear` is true and may ignore `exitCode` (D-95) | Shell interface, ENGINE_API §5 |
 | Consoles | **WAF** (rules, rate limits) · **Feature flags** (search, registration, password reset, uploads, `/ftp`, feedback CAPTCHA) · **Accounts** (lock, delete, force reset) · **Sessions** (revoke all) · **Deploy** (review the vulnerable code and its fix, then deploy; shows progress) · **Backups** (list by time, restore) · **Comms** (escalate, notify legal / customers, the breach-notification countdown from `engine.notificationClock()`, SYS-14) · the **big red button** (pull the plug / bring it back) | `engine.act(...)`, ENGINE_API §3 |
 | Kiro panel | Chat, hints, "explain this line", drafted commands the player copies into the terminal; a visible "Kiro is reading the logs…" wait while the game keeps running; "Kiro (offline)" label when offline | Kiro interface, ENGINE_API §5 |
 | Briefing files | Reachable at any time | CON-01 |

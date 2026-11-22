@@ -51,6 +51,26 @@
 | D-63 | The harvests in halves: ATK-08.d/.e (quiet) and .f/.g (loud) over rows 1–163 / 164–325, ATK-09.b/.c one-by-one scraping of the same id halves; .b/.c of ATK-08 stay committed until the engine retires them | Accepted |
 | D-64 | A password hash shared by several users counts only for the users whose email left in that response or earlier (amends D-25) | Accepted |
 | D-65 | Customers in the game (SYS-19) and the backlash model: REC-06 loops under every run from the shared three-range pool; a flag, a rate limit, a WAF rule or an IP block costs what customers' failed requests cost (per-class prices, tickets, angry feedback, churn lowering the heartbeat's maximum), replacing D-46's interim feature weights; customers' DB changes are never applied and customers are never souls | Accepted |
+| D-90 | Shell file rules: only `/tmp` and `/evidence` are writable; `uploads/` allows `rm` and nothing else; `tar` may write an archive into `/tmp` (no DEF-05) | Accepted |
+| D-91 | Shell lookups: `ping`/`nmap`/`curl` on any IPv4 send DEF-04 `active` and the Engine decides the tip-off; hostnames get realistic output and no action | Accepted |
+| D-92 | Shell SQL: only `UPDATE Users SET deletedAt…` and `DELETE FROM Users…` write (as DEF-08 / DEF-14), other writes are read-only errors; `.tables`, `.schema [table]` and `-header` are supported | Accepted |
+| D-93 | Shell syntax: `*` globs and `~` are added; `;` `>>` `<` `2>` `$VAR` stay syntax errors | Accepted |
+| D-94 | Shell session: starts in `/srv/juice-shop`; `complete` exists on Easy only; an unknown command prints `<name>: command not found` | Accepted |
+| D-95 | The shell's result gains optional `exitCode` and `clear` fields (amends ENGINE_API §5) | Accepted |
+| D-96 | Shell `awk` is `{print <expr>[, <expr>…]}` with `$0`, `$N`, `$NF`, `NR`, plus `-F` and `/regex/`, nothing else | Accepted |
+| D-97 | Shell `systemctl`: `restart` always attempts the start; only the `nginx` unit exists | Accepted |
+| D-98 | Shell commands take no game time, but a command line that reads logs, the database or uploads sends DEF-01/02/03 once per kind of resource so the report can grade time-to-notice | Accepted |
+| D-99 | Shell spec corrections: DEF-06 removal is `op: 'delete'`; the robustness property uses strings up to 500 characters and 200 cases; no artificial delay instead of a 100 ms limit | Accepted |
+| D-100 | DEF-15 from the shell sends the path relative to `uploads/` (as the Engine matches it); DEF-03 keeps the absolute path; a file with no recorded bytes lists, hashes by its recorded sha256 and fails to read with `Input/output error` | Accepted |
+| D-101 | Shell evidence: `/evidence/<name>.tgz` is the only archive form; Engine evidence entries are immutable (`Operation not permitted`) and readable with synthesized content | Accepted |
+| D-102 | Shell: the `.sqlite` file is a read-only file whose bytes are `db.export()` on demand; raw reads send no DEF-02 | Accepted |
+| D-103 | Shell SQL execution: `;`-separated statements stop at the first error; reads are `SELECT`/`WITH`/`VALUES`/a few `PRAGMA`s; writes only in the two exact forms; an UPDATE that would set `deletedAt` to NULL or `''` is refused | Accepted |
+| D-104 | Shell quoting: no backslash escapes, quotes are literal (including `$`), adjacent pieces join, a quoted word is never globbed, redirect targets get `~` only | Accepted |
+| D-105 | Shell regex: `grep` basic and `-E`/`awk` extended dialects as JavaScript regexes, with a pattern-safety guard (length, back-references, nested quantifiers, repeat counts) | Accepted |
+| D-106 | Shell output: no markup added, control characters shown in caret notation, file content otherwise untouched; the terminal window renders output as text, never HTML (amends R1.4) | Accepted |
+| D-107 | Shell flags for the commands whose PRD row lists none: `ping -c`, `nmap -p -sV`, `curl -I -s`, `ss -t -l -n`, `rm -r`, `mkdir -p`; none for `cp`, `whois`, `date`, `history`, `help`, `file`, `sha256sum` | Accepted |
+| D-108 | Shell `rm -r` on an uploads directory sends one DEF-15 per file below it, in path order; several `rm` operands run left to right and end non-zero if any failed | Accepted |
+| D-109 | Shell archives: a deterministic byte string (gzip magic, then a canonical listing), `tar tzf` lists sources and descendants, `file` reports gzip data | Accepted |
 | D-110 | Detection tools (SYS-20, UI-09): the engine exposes, per real minute, top talkers, the 4xx/5xx error rate as a series and a status class per access line, read-only, counted from the real lines; the dashboard shows them as the three tools on every level | Accepted |
 | D-111 | DEF-04: an active lookup tips Death off only on an address he or his proxies use or have used this run; any other address does nothing (KI-90). A lock's `deletedAt` and the engine's own DB stamps use game time (KI-91) | Accepted |
 | D-112 | Report grading (SYS-11): the rules over the event log, their thresholds and the grade per phase; the notification window (SYS-14) is 6 game hours after confirmation, GDPR's 72 h compressed to the run length; the debrief is an offline placeholder until Kiro (KIRO-06) | Accepted |
@@ -365,6 +385,108 @@
   8. **Open, logged:** REC-06 has no forgot-password and no `/ftp` visit, so `password-reset` off and `ftp` off cost nothing until a shopper is recorded doing either (KI-82); MIN-03's one closing rule, `rate-limit /api/*`, would `429` shoppers' own bursts of `/api/` calls, and TAP-03's path block `403`s every review read (KI-83); the error pages' byte counts are estimates (KI-84); WAF user-agent rules are matched literally against customers but symbolically against Death (KI-85).
 - **Tests:** `customers.test.ts` (unit tests on a made-up traffic fixture, then the committed CUST.a): the loop restarts, each loop plays its share from fresh pool addresses in all three ranges, never an attacker's, never one Death or a wave holds, and Death's fresh address never a customer's; every class of PR #73's list is classed; search off answers `503` to searches and nothing else, registration off to sign-ups, uploads off to `/file-upload` only; a rate limit `429`s the third login in 15 s; a user-agent rule `403`s every browser it names and a path rule the paths it covers; a blocked address writes no line; the plug writes no line and costs nothing; a failure costs its class, files one ticket per shopper per loop, a second failure churns (max drops, the rest of the visit is gone, the feedback line and row appear) and recovery waits a minute; the DB changes are never applied and the souls never move; the idle Medium run's customers are ≥ 60 % of the lines outside the scan at about 2 lines a second (Easy about 1, Hard about 4). `heartbeat.test.ts`: the feature weights are gone, `backlash` costs and churns, the maximum caps recovery. `exploits.test.ts`, customer-aware cheaters on the committed recordings with customers: everything off (a flatline in 7–10.5 min, with `503`s, tickets and churn as the cause), search off with every other patch (9–16), search off alone on the search door (12–16), toggling every 5 s (a loss), the search flip on the search door with customers (a loss, search tickets), blocking every new address as it appears, customers included (he goes to proxies, the shop flatlines inside 10 minutes, the blocked customers' tickets name blocked addresses), a user-agent rule for `Mozilla` (every customer request `403`, none served, a flatline inside 8 minutes: no win), a path rule over `GET /rest/*` (no win, `403`s, POSTs still through), and DEF-07 (a few `429`s on the login only, nobody lost). The engine's WAF stoppers stay symbolic (D-24: a rule pattern names the PRD's rule), so a `Mozilla` rule stops no Death move while the customers are matched literally (KI-85). The cheap-actions property runs with customers on too (the made-up traffic), as does the engine-invariants property. `pool.ts` unit tests: `drawAddress` and `bump`. Changed expectations: the SYS-06 sims' feature-weight terms are gone; the ATK-03 access-log line sits among customers' lines; `initialWorld` differs between seeds in the customers' stream too.
 - **Consequences:** KI-60 and KI-61 closed; KI-79's interim weights gone (D-46 ruling 4 superseded). Flags, rate limits and WAF rules are honest containment with a bill that follows usage; blocking addresses blocks the customers who share the pool. Idle runs keep their endings and their seeded stories. CUST.a (1.05 MB) is now bundled with the game (KI-19's size question grows by it). New issues: KI-82, KI-83, KI-84, KI-85.
+
+### D-90: Where the shell may write
+- **Context:** (2026-11-21) SYS-09 says `/tmp` is writable (D-22) but not what else the player may change; the shell spec (`.kiro/specs/shell/`) needed the rule for `mkdir`, `cp`, `>`, `rm` and `tar`.
+- **Decision:** The writable area is `/tmp` and `/evidence`. `/srv/juice-shop/uploads/` accepts `rm` only (DEF-15); `mkdir`, `cp` and `>` into it are `Permission denied`. Logs and the database file can't be removed or written. `tar czf` into `/evidence/<name>.tgz` is DEF-05; `tar czf` into `/tmp/…` is allowed and sends no action, so it doesn't count as evidence.
+- **Consequences:** A test shows an archive in `/tmp` never reaches DEF-05. The report's "evidence preserved" (SYS-11) counts only `/evidence` archives.
+
+### D-91: DEF-04 from the shell
+- **Context:** (2026-11-21) PRD DEF-04 says active lookups of an attacker tip Death off, but the shell can't tell an attacker's address from any other.
+- **Decision:** `whois <ip>` sends DEF-04 `passive`. `ping`, `nmap` and `curl` with an IPv4 target always send DEF-04 `active`; the Engine decides whether it is a tip-off. A hostname target (e.g. `localhost`) prints realistic tool output and sends no action.
+- **Consequences:** The shell holds no list of attacker addresses. The Engine currently tips Death off on any active lookup (`actions.ts`), so pinging a harmless address does too (KI-90). (Found in the build, 2026-11-22: `ping`, `nmap` and `curl` exit 0 even when the Engine refuses DEF-04; the refusal message goes to stderr and the tool output still prints.)
+
+### D-92: SQL in the shell
+- **Context:** (2026-11-21) DEF-02, DEF-08 and DEF-14 are the only SQL uses in the PRD; the shell needed a rule for everything else.
+- **Decision:** `sqlite3 <db> "<sql>"` runs on the Engine's copy. `UPDATE Users SET deletedAt…` sends DEF-08 and `DELETE FROM Users…` sends DEF-14, once per matched account. Any other write is a read-only error and changes nothing. Also supported: `-header`, the dot-command `.tables` and `.schema [table]`.
+- **Consequences:** The shell finds the matched accounts by running the statement's WHERE clause as a SELECT first. Interactive `sqlite3` (no SQL argument) stays unsupported.
+
+### D-93: Shell syntax beyond pipes and `>`
+- **Context:** (2026-11-21) SYS-09 said "pipes and `>`" only, but `rm uploads/*` and `cd ~` are what a responder types.
+- **Decision:** Added: `*` globs (one path segment, not dotfiles, sorted, left as typed when nothing matches, not expanded inside quotes) and a leading `~` (the start directory `/srv/juice-shop`). Still syntax errors: `;`, `&&`, `>>`, `<`, `2>`, `$VAR`, `$(…)`, backticks. SYS-09 and the steering file are edited to match.
+- **Consequences:** The parser keeps globs and `~` unexpanded in its structure and expands them when it runs a command. (Found in the build, 2026-11-22: a redirect target's `~` always resolves under `/srv/juice-shop`, which is outside the Writable_Area (D-90), so `> ~/x` is always `Permission denied`.)
+
+### D-94: Shell session
+- **Context:** (2026-11-21) The shell spec had open questions on the start directory, `complete` and the unknown-command text.
+- **Decision:** The shell starts in `/srv/juice-shop`. `complete` exists on Easy only and is absent (undefined) on Medium and Hard. An unknown command prints `<name>: command not found`.
+- **Consequences:** ENGINE_API §5 says the same.
+
+### D-95: `run()` result: `exitCode` and `clear`
+- **Context:** (2026-11-21) `{ output }` can neither clear the screen nor tell success from failure, which the shell spec's error cases and the terminal window both need.
+- **Decision:** `run` resolves `{ output: string; exitCode?: number; clear?: true }`. `clear` is `true` only for the `clear` command, with an empty `output`. `exitCode` is 0 on success, 1 for a failed command (and `grep` with no match), 2 for a syntax error, 127 for `command not found`; omitted counts as 0. ENGINE_API §5 is edited; screens may ignore both fields.
+- **Consequences:** The terminal window clears when `clear` is true. Nothing else depends on `exitCode` yet.
+
+### D-96: The `awk` subset
+
+- **Context:** (2026-11-21) Real awk is large; the shell needs only what the DEF-01 log searches use.
+- **Decision:** `awk [-F<sep>] '[/regex/] {print <expr>[, <expr>…]}'` where each `<expr>` is `$0`, `$N`, `$NF` or `NR`; several expressions are joined by one space. Anything else prints `awk: unsupported program`. (Amended 2026-11-21 by the team: the first version allowed a single expression.)
+- **Consequences:** `{print $1, $7}` works; `{c[$1]++}`, `BEGIN`/`END` and arithmetic don't. If the scenes need more, change this decision first. (Found in the build, 2026-11-22: `-F` takes a single character; a longer separator such as `-F'::'` prints `awk: unsupported program`, as `cut -d` also takes one character.)
+
+### D-97: `systemctl` details
+- **Context:** (2026-11-21) D-22 made `restart` a stop then a start; two cases were open.
+- **Decision:** `restart` always attempts the stop and then the start, even when the stop is refused (nginx already stopped). Only the `nginx` unit exists; any other unit prints `Unit <name>.service could not be found.`.
+- **Consequences:** None.
+
+### D-98: Terminal commands and game time
+
+- **Context:** (2026-11-21) DEF-01 to DEF-03 are "Game time" actions in the PRD, but the Engine had no way to see that the player read the logs, the database or an upload. The report (SYS-11) grades time-to-notice.
+- **Decision:** A command takes no game time of its own. A command line that reads a log, the database (`sqlite3` SELECT, `.tables`, `.schema`) or `uploads/` sends one action per **kind of resource read**, each at most once per line, whatever the number of commands in a pipeline: DEF-01 for a log (`query` = the whole command line), DEF-02 for the database (`sql` = the first SQL text read), DEF-03 for uploads (`path` = the first uploads path read, absolute). A pipeline therefore sends at most three. A line that fails before reading anything sends nothing; `tar czf` sends DEF-05 only (its source reads send nothing); `cp` from uploads sends DEF-03. (Amended 2026-11-21 by the team: the first version sent one per reading command.)
+- **Consequences:** The event log gains up to three `action` events per line, so tests that compare worlds must allow for them. The shell sends DEF-04 `active` as D-91 says; KI-90 (the Engine tipping off on any address) stays open for the Engine team.
+
+### D-99: Shell spec corrections
+- **Context:** (2026-11-21) Review of the first requirements draft.
+- **Decision:** (1) Removing a firewall rule sends `{ type: 'DEF-06', op: 'delete', ip }`, the `PlayerAction` type's value, not `remove`. (2) The never-throws property uses strings of up to 500 characters and 200 cases. (3) "Resolves within 100 ms" becomes "adds no artificial delay", since the wait for `Engine.db()` isn't ours.
+- **Consequences:** None.
+
+### D-100: DEF-15's path from the shell
+- **Context:** (2026-11-22) `applyAction` matches `world.files` by a path relative to `uploads/` (`complaints/rip.php`), while the shell spec's R11.1 asked for the absolute path, which the Engine always answers with `No such file`.
+- **Decision:** The shell shows and accepts absolute paths and sends DEF-15 with the path relative to `/srv/juice-shop/uploads/`. DEF-03 keeps the absolute path, because the Engine only logs it. A file whose recorded bytes are missing (`contentBase64` absent) lists with its size, prints its recorded `sha256` for `sha256sum`, and fails to read with `Input/output error`.
+- **Consequences:** R11.1 and R11.5 are reworded. A test sends `rm` on every uploaded file of a committed scenario and checks each is removed.
+
+### D-101: Shell evidence files
+- **Context:** (2026-11-22) DEF-05 stores the name it is given; the shell shows `<name>.tgz`; `rm` of an evidence file would leave the Engine's record in place.
+- **Decision:** `/evidence/<name>.tgz` is the only archive form under `/evidence`; other extensions and nested paths are an invalid archive name (R8.10). Every Engine evidence entry is immutable: `rm`, `cp` onto it and `>` onto it print `Operation not permitted`. Evidence made elsewhere (the Easy console) is listed, readable and hashable with content synthesized from the first `accessLines` and `appLines` lines of the logs, but `tar tzf` on it says it isn't an archive the shell created.
+- **Consequences:** The report's "evidence preserved" can't be undone from the terminal.
+
+### D-102: The database file as a file
+- **Context:** (2026-11-22) The spec lists `juiceshop.sqlite` in the file system without saying what `cat`, `cp`, `tar`, `sha256sum` and `ls -l` do with it.
+- **Decision:** It is a read-only file whose bytes are `(await engine.db()).db.export()`, taken when needed. Raw reads send no DEF-02 (that action is for SQL). `cat`, `head`, `tail` and `grep` on it print the bytes decoded and sanitized (D-106). `rm`, `cp` onto it and `>` onto it are `Permission denied`.
+- **Consequences:** `export()` closes and re-opens the sql.js database, so the shell always fetches `Engine.db()` afresh and never caches it.
+
+### D-103: SQL execution rules
+- **Context:** (2026-11-22) D-92 fixed which writes exist but not how statements are split, which reads are allowed or what the errors say.
+- **Decision:** (1) The argument is split on `;` outside quotes and parentheses; statements run in order and the first error stops the rest. (2) Reads: `SELECT`, `WITH` without a write keyword, `VALUES`, and `PRAGMA table_info|table_xinfo|index_list|foreign_key_list|database_list`. (3) A write is recognised only as `UPDATE Users SET deletedAt = <expr> [WHERE <w>]` or `DELETE FROM Users [WHERE <w>]`; `OR`, `RETURNING`, `ORDER BY`, `LIMIT`, `FROM`, a second assigned column or an alias make it a read-only error. (4) The `<expr>` is evaluated while finding the matched rows; if it gives NULL or `''` the statement is a read-only error, since no action unlocks an account. (5) Messages: `Error: attempt to write a readonly database` for refused writes, `Error: <SQLite message>` for invalid SQL, `Error: database is unavailable` when `Engine.db()` rejects.
+- **Consequences:** The WHERE clause is run as a SELECT on the Engine's database to find the emails for DEF-08 / DEF-14.
+
+### D-104: Quoting
+- **Context:** (2026-11-22) R3 lists the syntax errors but not what quotes do.
+- **Decision:** No backslash escapes. Inside single and double quotes every character is literal, `$` included (D-93 forbids `$` only outside quotes). Adjacent quoted and unquoted pieces join into one word. A word quoted anywhere is never glob-expanded. A redirect target gets `~` expansion only. Outside quotes `&`, `(`, `)` and a lone `$` are syntax errors.
+- **Consequences:** The pretty-printer drops quotes that carry no meaning, so the parse → print → parse round trip holds. (Found by Property 1, 2026-11-22: quoting a word that holds `*` or starts with `~` would mark it literal and change its meaning, so the printer leaves such a word bare unless the lexer would misread it, e.g. `~é` or `*#`.)
+
+### D-105: Regex dialect and guard
+- **Context:** (2026-11-22) `grep` and `awk` take patterns from the player, and a catastrophic pattern would freeze the page.
+- **Decision:** `grep` without `-E` is a basic regex: `. * ^ $ [ ]` are special, `+ ? | ( ) { }` literal. With `-E`, and in `awk /re/`, the extended operators are special (a JavaScript `RegExp`). A pattern longer than 256 characters, with a back-reference, with a quantified group that itself holds a quantifier (`(a+)+`), or with a counted repeat above 255 prints `grep: unsupported pattern` (`awk: unsupported program`).
+- **Consequences:** No timer is needed to keep `run` inside the 5 s bound of the robustness property.
+
+### D-106: Output text, never markup (amends R1.4)
+- **Context:** (2026-11-22) "No HTML tags" can't hold for echoed arguments or file content: an uploaded file may contain `<script>`.
+- **Decision:** The shell adds no markup. Every character below U+0020 except newline and tab, and U+007F, is shown in caret notation (`^[` for ESC), as `cat -v` does. Other content is unchanged. The terminal window renders `output` as text, never as HTML (added to `docs/SCENES.md`).
+- **Consequences:** The R1.4 test checks the control-character rule and that lines the shell writes itself hold no `<`.
+
+### D-107: Flags for commands with none in the PRD
+- **Context:** (2026-11-22) Requirement 16 needs a defined flag list for every command.
+- **Decision:** `ping -c <count>` (default 4, 1 to 20); `nmap -p <ports>` and `-sV`; `curl -I` and `-s`; `ss -t -l -n` and their bundles; `rm -r` only (no `-f`, no `-R`); `mkdir -p`. None for `cp`, `whois`, `date`, `history`, `help`, `file`, `sha256sum`. Any other flag is the unsupported-flag error.
+- **Consequences:** The registry holds these; `man` prints them.
+
+### D-108: `rm -r` in uploads, and several operands
+- **Context:** (2026-11-22) DEF-15 removes one file.
+- **Decision:** `rm -r <dir in uploads>` sends one DEF-15 per file below it, in ascending path order, and goes on after a refusal. `rm` with several operands (a glob included) handles them left to right, one action per uploaded file, and ends with exit code 1 if any failed. The directory disappears by itself when its last file is removed.
+- **Consequences:** None.
+
+### D-109: Archives
+- **Context:** (2026-11-22) `tar czf` needs bytes to hash and a listing to print, without real compression.
+- **Decision:** An archive is a deterministic byte string: the gzip magic `1f 8b 08 00`, then a canonical listing of entries (path, type, length, bytes). `sha256sum` hashes those bytes. `tar tzf` prints each source path in the order given, each followed by its descendants in ascending order, directories with a trailing `/` and the leading `/` removed, as real tar does. `file` reports `gzip compressed data`. A missing source prints `tar: <path>: No such file or directory`.
+- **Consequences:** Same content, same digest, on every run.
 
 ### D-130: The leaky taps recorded (closes KI-59, amends D-42 rule 4)
 - **Context:** (2026-11-22) D-42 let the taps play without a recording: each opening and drip wrote an access line the engine built, with estimated byte counts (KI-59), the one exception to "every line shown is recorded".
