@@ -13,6 +13,9 @@ import { SEED_ACCOUNTS } from './seed';
 import { initialWorld, type World } from './state';
 import { stepTaps } from './taps';
 import { WHOLE_RUN_TIMEOUT_MS } from './test-fixtures/timeouts';
+import { readFileSync } from 'node:fs';
+import type { AccessEvent, Recording } from '../recordings/format';
+import { gameTimeIso } from './clock';
 
 const REAL_S = 30_000; // game ms
 const REAL_MIN = 60 * REAL_S;
@@ -89,6 +92,38 @@ describe('leaky taps open on schedule (D-42)', () => {
     const w = tapsOnly(1, 'medium', 30);
     expect(eventsOfKind(w, 'tap-opened').length).toBeGreaterThan(0);
     expect(w.rng).toBe(initialWorld(1, 'medium').rng);
+  });
+});
+
+describe('a tap plays its recording\'s real lines (KI-59, D-130)', () => {
+  const recorded = (id: TapId) => (JSON.parse(readFileSync(new URL(`../recordings/taps/${id}.a.json`, import.meta.url), 'utf8')) as Recording)
+    .events.filter((e): e is AccessEvent => e.kind === 'access');
+  const DATE = /\d{4}-\d\d-\d\d/;
+  const shape = (l: { method: string; target: string; protocol: string; status: number; bytes: number; referer: string; userAgent: string }) =>
+    ({ method: l.method, target: l.target.replace(DATE, 'DATE'), protocol: l.protocol, status: l.status, bytes: l.bytes, referer: l.referer, userAgent: l.userAgent });
+
+  it('each opening plays the recording\'s first request and each drip the next one, round again when they run out', { timeout: WHOLE_RUN_TIMEOUT_MS }, () => {
+    for (const seed of [1, 2, 3]) {
+      const w = tapsOnly(seed, 'hard', 60);
+      for (const id of TAP_IDS) {
+        const lines = w.logs.access.filter((l) => l.by === id);
+        if (lines.length === 0) continue;
+        const rec = recorded(id);
+        const drips = rec.length > 1 ? rec.slice(1) : rec;
+        expect(shape(lines[0]!), `${id} opening`).toEqual(shape(rec[0]!));
+        lines.slice(1).forEach((l, i) => expect(shape(l), `${id} drip ${i + 1}`).toEqual(shape(drips[i % drips.length]!)));
+      }
+    }
+  });
+
+  it('the open logs are served under the game\'s date, not the day they were recorded', () => {
+    // a seed whose first tap is the open logs
+    const w = [1, 2, 3, 4, 5, 6, 7, 8].map((seed) => { const v = initialWorld(seed, 'medium'); v.taps.nextAt = 0; stepTaps(v); return v; })
+      .find((v) => v.taps.opened[0] === 'TAP-01')!;
+    for (let i = 0; i < 2 * 600; i++) { w.clock.gameMs += CONFIG.medium.tickGameMs; stepTaps(w); } // two real minutes
+    const fetches = w.logs.access.filter((l) => l.by === 'TAP-01' && l.target.includes('access.log'));
+    expect(fetches.length).toBeGreaterThanOrEqual(1);
+    for (const l of fetches) expect(l.target).toBe(`/support/logs/access.log.${gameTimeIso(w, l.t).slice(0, 10)}`);
   });
 });
 

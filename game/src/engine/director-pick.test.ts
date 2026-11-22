@@ -94,11 +94,12 @@ describe('the Director (SYS-02)', () => {
     const w = initialWorld(1, 'medium');
     w.death.knowledge.push('map');
     w.death.played.push({ move: 'ATK-01', variant: 'a', outcome: 'landed' });
+    w.events.push({ id: 1, t: 0, kind: 'move-started', move: 'ATK-01', variant: 'a', stage: 1, ip: '203.0.113.10' }); // D-111: a tip-off needs one of his addresses
     w.clock.gameMs = 1000;
     w.death.nextMoveAt = 10 * medium.breatherGameMs.max;
     applyAction(w, { type: 'DEF-04', ip: '203.0.113.10', mode: 'active' });
     directorTick(w, lib);
-    const [started] = eventsOfKind(w, 'move-started');
+    const started = eventsOfKind(w, 'move-started').at(-1);
     expect(started!.stage).toBe(3);
     expect(started!.move).toBe('ATK-06');
     expect(w.death.stageSkips).toBe(0);
@@ -147,6 +148,7 @@ describe('the harvest variant (D-31, D-42: the halves)', () => {
     const w = initialWorld(1, difficulty);
     w.death.knowledge.push('map');
     w.death.played.push({ move: 'ATK-01', variant: 'a', outcome: 'landed' });
+    w.events.push({ id: 1, t: 0, kind: 'move-started', move: 'ATK-01', variant: 'a', stage: 1, ip: '203.0.113.10' }); // D-111: a tip-off needs one of his addresses
     return w;
   }
   const harvest = (w: World) => eventsOfKind(w, 'move-started').find((e) => e.move === 'ATK-08');

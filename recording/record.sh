@@ -21,6 +21,7 @@ echo "== fresh rig"
 compose --profile attack build -q tools >/dev/null   # the tools image is local-only; cleanup below needs it
 compose --profile attack down -v --remove-orphans >/dev/null 2>&1 || true
 # nginx writes its logs as root, so a throwaway container clears them; we recreate the dirs as us.
+mkdir -p runs   # first, or Docker creates it for the mount as root (a fresh clone or worktree)
 docker run --rm --network none -v "$PWD/runs:/r" rec-tools:2 rm -rf /r/.nginx /r/.out "/r/$move.$variant"
 mkdir -p runs/.nginx runs/.out "$out"
 compose up -d --wait juice nginx >/dev/null 2>&1
