@@ -147,7 +147,7 @@ interface Report {
 }
 function buildReport(world: World): Promise<Report>;
 ```
-**Stub:** a fixed example report.
+**Built** (SYS-11, D-112): `import { buildReport } from './engine/report'`. It reads only `world.events`, so call it on the ending (or any time for a live preview). `grades` are letters per phase; `mistakes` come in phase order (detect, contain, eradicate, recover), each with the real-world reason to show under its title; `missed` are the footholds left behind, in words; `debrief` is a fixed placeholder with `offline: true` until Kiro writes it (KIRO-06), so label it "Kiro (offline)"; `markdown` is the whole report for the download button. Times in `facts` are game time, as the player's clock showed them.
 
 ---
 

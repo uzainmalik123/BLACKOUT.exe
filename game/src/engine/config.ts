@@ -53,6 +53,7 @@ export interface EngineConfig {
     dripEveryGameMs: number; // D-42: an open tap drips once per real minute
     dripFraction: number; // D-42: each drip takes this share of the total souls (rounded, at least 1)
   };
+  notification: { windowGameMs: number }; // SYS-14 (D-112): the breach-notification window after confirmation, GDPR's 72 h compressed to the run length
   backupEveryGameMs: number; // DEF-17: hourly snapshots
   scenarioStartIso: string; // D-24
   /** SYS-08, D-31, D-42: the only variants Death may play of these moves, normally and once tipped off. Other variants stay for reference. */
@@ -98,6 +99,7 @@ const MEDIUM: EngineConfig = {
   proxies: { afterIpCuts: 3, pool: 24 },
   stuckBreathers: 2,
   taps: { everyGameMs: { min: 180 * REAL_S, max: 240 * REAL_S }, maxOpen: 2, dripEveryGameMs: 60 * REAL_S, dripFraction: 0.01 },
+  notification: { windowGameMs: 6 * 60 * GAME_MIN }, // D-112: a run is about 6 game hours (PRD §1), so the 72 h clock runs 12× game time
   backupEveryGameMs: 60 * GAME_MIN,
   scenarioStartIso: '2026-10-31T22:00:00Z',
   pinnedVariants: { 'ATK-08': { normal: ['d', 'e'], tippedOff: ['f', 'g'] } }, // D-42: the halves (D-63); .b/.c retired, .a test-only

@@ -1,6 +1,7 @@
 import { footholds } from './facts';
+import { gradeEvents } from './report';
 // SYS-16: the playthrough sims of PRD §10, headless, seed 1, Medium, on the made-up library (test-fixtures).
-// They assert only from the event log (SYS-10). SIM-2's and SIM-5's report lines wait for SYS-11.
+// They assert only from the event log (SYS-10); SIM-2's and SIM-5's report lines read SYS-11's grading of it.
 import { describe, expect, it } from 'vitest';
 import { MINION_BY_ID } from '../rules/minions';
 import { MOVE_BY_ID } from '../rules/moves';
@@ -101,7 +102,8 @@ describe('the playthrough sims (PRD §10, SYS-16)', { timeout: WHOLE_RUN_TIMEOUT
     }, 4000));
     const deathIps = new Set(eventsOfKind(r.world, 'move-started').map((e) => e.ip));
     const blocksOnDeath = eventsOfKind(r.world, 'action').filter((e) => e.ok && e.action.type === 'DEF-06' && deathIps.has(e.action.ip));
-    expect(blocksOnDeath.length).toBeGreaterThanOrEqual(3); // SYS-11's whack-a-mole rule; the report line itself waits for SYS-11
+    expect(blocksOnDeath.length).toBeGreaterThanOrEqual(3); // SYS-11's whack-a-mole rule
+    expect(gradeEvents(r.events).mistakes.map((m) => m.title)).toContainEqual(expect.stringMatching(/^IP whack-a-mole/)); // the report flags it (PRD §10)
     const cut = eventsOfKind(r.world, 'move-cut').filter((e) => e.by === 'DEF-06');
     expect(cut.length).toBeGreaterThanOrEqual(1);
     const comeback = eventsOfKind(r.world, 'move-started').filter((e) => e.move === cut[0]!.move && e.id > cut[0]!.id);
@@ -167,7 +169,9 @@ describe('the playthrough sims (PRD §10, SYS-16)', { timeout: WHOLE_RUN_TIMEOUT
     expect(eventsOfKind(r.world, 'return')).toEqual([]);
     expect(eventsOfKind(r.world, 'action').some((e) => e.action.type === 'DEF-05')).toBe(true);
     for (const f of FOOTHOLDS) expect(eventsOfKind(r.world, 'return').some((e) => e.through === f)).toBe(false);
-    // grade ≥ B in every phase waits for SYS-11
+    const report = gradeEvents(r.events); // PRD §10: grade ≥ B in every phase (SYS-11)
+    for (const phase of ['detect', 'contain', 'eradicate', 'recover'] as const) expect(['A', 'B'], `${phase}: ${JSON.stringify(report.mistakes.filter((m) => m.phase === phase).map((m) => m.title))}`).toContain(report.grades[phase]);
+    expect(report.missed).toEqual([]);
   });
 
   it('SIM-6: ignoring minions and handling Death perfectly loses noticeable heartbeat and some souls to MIN-02 but can still win', () => {
