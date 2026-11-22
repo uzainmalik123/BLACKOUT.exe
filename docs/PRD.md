@@ -307,6 +307,15 @@ From the Kiroween 2026 rules. Each one is a hard requirement unless marked bonus
 
 3D · live attacks during play · multiplayer · accounts or saved progress · mobile · scenarios two and three (stretch) · Kiro upgrades (stretch, KIRO-11) · an LLM driving Death.
 
+## 14.1 Parked (stretch: decided, not built)
+
+Ideas the team wants to keep, with their limits fixed now so nobody builds a different version later. Nothing here is built until the core game is playable and polished; promoting one is a PRD edit plus a decision, like any row (D-170).
+
+| ID | Idea | Rules fixed now |
+|---|---|---|
+| PARK-01 | **Log rotation** | A cron job (`logrotate`) rotates the access and app logs on a schedule; a rotated log is gone from the shell unless the player took an evidence snapshot (DEF-05) first. Teaches the real tension between disk space and evidence (CISA AA20-245A: don't destroy evidence). The player may change the schedule; a disk that fills up gives customers and the player real errors. The engine's own memory never depends on this (D-115's events store counts, not text) |
+| PARK-02 | **Death floods the logs** (needs PARK-01) | Only as **one Death move** with a stage, Needs and stoppers like every ATK row, played under D-41's pacing (one move at a time, a breather after it). **At most once per run**, Hard only or after a tip-off; a **burst of at most 60 real seconds**, never continuous; built from a real recording; visible in the detection tools (SYS-20: top talkers, error rate) so a watching player sees it coming; stopped by a rate limit or WAF rule (DEF-07/DEF-12). Its purpose is to push his early lines out of the log before rotation, so a player who snapshotted evidence loses nothing |
+
 ## 15. Still open (doesn't block building)
 
 - **Name** (KI-01): the team decides.
