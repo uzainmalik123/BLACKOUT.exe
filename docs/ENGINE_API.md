@@ -106,11 +106,11 @@ These parts are being built on the brain side. Their shape is agreed now so the 
 **The shell** (SYS-09):
 ```ts
 interface Shell {
-  run(line: string): Promise<{ output: string }>;   // one command line, incl. pipes; output is plain text
-  complete?(partial: string): string[];               // Easy only: autocomplete suggestions
+  run(line: string): Promise<{ output: string; exitCode?: number; clear?: true }>;   // one command line, incl. pipes; output is plain text
+  complete?(partial: string): string[];               // Easy only: absent (undefined) on Medium and Hard
 }
 ```
-The terminal window sends each typed line to `run` and prints `output`. Commands that change things (`iptables`, `rm`, `systemctl`, …) call `engine.act` inside the shell, so the world updates by itself. **Stub:** echo `command not found` for everything.
+The terminal window sends each typed line to `run` and prints `output`. When `clear` is `true` it empties the screen first (only the `clear` command sets it). `exitCode` is 0 or omitted on success, non-zero on failure; the window may ignore it (D-95). Commands that change things (`iptables`, `rm`, `systemctl`, …) call `engine.act` inside the shell, so the world updates by itself. **Stub:** echo `command not found` for everything.
 
 **Kiro** (SYS-12, KIRO-*):
 ```ts

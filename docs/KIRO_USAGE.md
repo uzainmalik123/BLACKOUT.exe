@@ -8,3 +8,4 @@ Credit budget: about 1500 for development, 2500 for in-game use, judges and the 
 |---|---|---|---|---|---|
 | 2026-11-09 | — | Steering | `.kiro/steering/project.md` and `game-shell.md` written (by Claude, not yet loaded in Kiro) | KDEV-01 | 0 |
 | 2026-11-20 | CLI (2.37.1) | Chat, steering | Latency and drift test for the in-game assistant: 5 in-game-style prompts. Steering loaded (listed the exact 29 shell commands); read a real sqlmap log line correctly; drafts stayed in the command set except `systemctl restart` (KI-14); used its Grep tool despite `--trust-tools=` and leaked PRD mechanics (KI-13) | KI-02, KIRO-08, KDEV-01 | ≈ 1 (all five) |
+| 2026-11-21 | IDE/CLI (not recorded) | Spec | Started `.kiro/specs/shell/`: requirements for SYS-09 (16 requirements, refined one by one), then updated with the team's answers to its open questions (D-90..D-99). Design not started | SYS-09, KDEV-02 | not measured |
