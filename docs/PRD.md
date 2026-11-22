@@ -350,4 +350,5 @@ Rows not listed here are `planned`. A PR that moves a row adds or updates its li
 | TAP-02 | building | As TAP-01; leaks only 5 of Juice Shop's own users, usually gone to the first harvest visit (KI-73) |
 | TAP-03 | building | As TAP-01; leaks only 12 of Juice Shop's own users (KI-73) |
 | CON-01 | done | `game/src/content/briefing/`: system map, admins, normal traffic, playbook; a test checks the admin list and counts against the baseline DB |
+| CON-03 | done | `game/src/content/kiro-fallback.ts`: hints for every move, minion and leaky tap at Easy/Medium/Hard (move hints never name a closing action, KIRO-03), 14 offline drafts in the shell's commands only, an offline chat answer, and the debrief template quoting every report fact and grade; tests check all three (D-151) |
 | CON-04 | done | `game/src/content/taunts.ts`: 3 lines per move plus blocked, tipped off, banished, return; a test checks counts and that no line gives away a defence |
