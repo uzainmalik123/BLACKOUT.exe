@@ -98,7 +98,7 @@ A closed minion type stays closed until a variant gets round it (e.g. MIN-01 ret
 
 ### 4.1 Leaky taps (TAP, D-42)
 
-Small, obvious exposures a real shop leaves open: not Death's doors, but anyone (his bots and him alike) scrapes them. They open over time and keep dripping customer data until the player closes them with **one** action; easy to close, easy to forget in the rush. Every row is a real Juice Shop v20.4.0 exposure that leaks customers' `Users` rows with no login (KI-03). **For now a tap plays without a recording** (its lines are built by the engine from the real request; KI-59).
+Small, obvious exposures a real shop leaves open: not Death's doors, but anyone (his bots and him alike) scrapes them. They open over time and keep dripping customer data until the player closes them with **one** action; easy to close, easy to forget in the rush. Every row is a real Juice Shop v20.4.0 exposure that leaks customers' `Users` rows with no login (KI-03). **Each tap plays its recording** (D-130): a scraper on the rig hitting the real endpoint; the opening is its first request, each drip the next.
 
 | ID | Tap | Real exposure | What the defender sees | Rows it leaks | Closed by | Pri |
 |---|---|---|---|---|---|---|
@@ -315,7 +315,7 @@ Rows not listed here are `planned`. A PR that moves a row adds or updates its li
 |---|---|---|
 | REC-01 | done | `recording/`: isolated rig; `check-isolation.sh` checks the network is internal, no container asks for a published port, and nothing outside is reachable |
 | REC-02 | building | `recording/record.sh` + `npm run recording:convert`, format D-15. Exfil comes from sqlmap's traffic log or, for curl moves, captured responses (D-25); setup scripts give a move what it assumes Death holds |
-| REC-03 | building | ATK-01: `.a` loud and `.b` quiet (D-46: browser user agent, 40 requests a second, ~2 min, the same hits); one variant each so far for ATK-03, 04, 06, 11, 13, 15, 17 (`.a`); ATK-08: `.a` (test-only), `.b` low and slow and quiet (D-35) and `.c` loud (D-32), both retired from play (D-42), and the halves (D-63) `.d`/`.e` (quiet) and `.f`/`.g` (loud), the ones in play; ATK-09: the halves `.b`/`.c` (one-by-one scraping, D-63). The leaky taps (§4.1) still need recordings (KI-59) |
+| REC-03 | building | ATK-01: `.a` loud and `.b` quiet (D-46: browser user agent, 40 requests a second, ~2 min, the same hits); one variant each so far for ATK-03, 04, 06, 11, 13, 15, 17 (`.a`); ATK-08: `.a` (test-only), `.b` low and slow and quiet (D-35) and `.c` loud (D-32), both retired from play (D-42), and the halves (D-63) `.d`/`.e` (quiet) and `.f`/`.g` (loud), the ones in play; ATK-09: the halves `.b`/`.c` (one-by-one scraping, D-63). The leaky taps (§4.1) are recorded too (D-130: TAP-01.a, TAP-02.a, TAP-03.a, `game/src/recordings/taps/`) |
 | REC-04 | done | 300 seeded customers (D-26); baseline `juiceshop.sqlite` has 325 users |
 | REC-05 | building | MIN-01.a, MIN-02.a (the must minions); MIN-03/04 still to record |
 | SYS-19 | done | `game/src/engine/customers.ts` + `pool.ts` (D-65): CUST.a loops under every run, a seeded, stratified share of its shoppers per loop from the three-range pool; `503`/`429`/`403`/dropped as the world stands; the backlash (per-class cost, tickets, angry feedback, churn lowering `heartbeatMax`); the DB changes are not applied. No UI yet (the comms console reads `world.tickets`) |
@@ -346,8 +346,8 @@ Rows not listed here are `planned`. A PR that moves a row adds or updates its li
 | SIM-9 | building | In `game/src/engine/sims.test.ts`: passes on made-up and committed ATK-01.a + ATK-08.d/.e (D-34, D-42); the search-off player sees no second visit |
 | SYS-08 | building | Dials so far in `game/src/engine/config.ts`: the harvest halves per level (`pinnedVariants`, D-31, D-42), which WAF rules each half slips past (`wafEvasion`, D-34), D-41's breather range, successes per wave and the wave/move combo (Easy off), D-42's half cap per visit (`doors`) and tap cadence (`taps`), D-65's customer share per loop (`customers.share`) |
 | SYS-16 | building | SIM-1…SIM-9 run headless in `game/src/engine/sims.test.ts` on a made-up library (`engine/test-fixtures/`), and an idle seeded run on the committed recordings in `engine.test.ts` (KI-17 closed); D-41's pacing sims and D-42's door and tap sims (`doors.test.ts`, `taps.test.ts`) on the committed recordings; SIM-1's expectation changed with D-42; SIM-2's whack-a-mole line and SIM-5's grades wait for SYS-11 |
-| TAP-01 | building | `game/src/engine/taps.ts`, `rules/taps.ts`: opens on the seeded schedule, drips about 1 % a minute, closed by its path block (D-42, `taps.test.ts`); plays without a recording (KI-59); no UI yet |
-| TAP-02 | building | As TAP-01; leaks only 5 of Juice Shop's own users, usually gone to the first harvest visit (KI-73) |
-| TAP-03 | building | As TAP-01; leaks only 12 of Juice Shop's own users (KI-73) |
+| TAP-01 | building | `game/src/engine/taps.ts`, `rules/taps.ts`: opens on the seeded schedule, drips about 1 % a minute, closed by its path block (D-42, `taps.test.ts`); plays its recording TAP-01.a (D-130): 36.5 s, 11 requests (the listing, then the log 10 times), 2.9 KB. On a fresh shop the log carries no customer row (KI-74); no UI yet |
+| TAP-02 | building | As TAP-01; TAP-02.a: 27.5 s, 10 requests (6,183 bytes each, the 5 posters' emails and hashes), 2.6 KB. Leaks only 5 of Juice Shop's own users, usually gone to the first harvest visit (KI-73) |
+| TAP-03 | building | As TAP-01; TAP-03.a: 55.9 s, 56 requests (products 1 to 56, the 12 reviewers' emails), 13.5 KB. Leaks only 12 of Juice Shop's own users (KI-73) |
 | CON-01 | done | `game/src/content/briefing/`: system map, admins, normal traffic, playbook; a test checks the admin list and counts against the baseline DB |
 | CON-04 | done | `game/src/content/taunts.ts`: 3 lines per move plus blocked, tipped off, banished, return; a test checks counts and that no line gives away a defence |

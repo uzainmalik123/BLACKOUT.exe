@@ -1,0 +1,24 @@
+{
+  "format": 1,
+  "move": "TAP-02",
+  "variant": "a",
+  "label": "leaky tap: /rest/memories polled 10 times, python-requests user agent",
+  "recordedAt": "2026-11-22T06:57:46.245Z",
+  "durationMs": 27511,
+  "attackerIp": "203.0.113.175",
+  "juiceShop": "bkimminich/juice-shop:v20.4.0",
+  "tool": "curl 8.x (lib/capture.sh)",
+  "events": [
+    {"t":235,"kind":"access","ip":"203.0.113.175","method":"GET","target":"/rest/memories","protocol":"HTTP/1.1","status":200,"bytes":6183,"referer":"","userAgent":"python-requests/2.32.3","requestTimeMs":11},
+    {"t":235,"kind":"exfil","table":"Users","keys":[4,13,18,19,21],"columns":["email","password"]},
+    {"t":3249,"kind":"access","ip":"203.0.113.175","method":"GET","target":"/rest/memories","protocol":"HTTP/1.1","status":200,"bytes":6183,"referer":"","userAgent":"python-requests/2.32.3","requestTimeMs":8},
+    {"t":6262,"kind":"access","ip":"203.0.113.175","method":"GET","target":"/rest/memories","protocol":"HTTP/1.1","status":200,"bytes":6183,"referer":"","userAgent":"python-requests/2.32.3","requestTimeMs":7},
+    {"t":9282,"kind":"access","ip":"203.0.113.175","method":"GET","target":"/rest/memories","protocol":"HTTP/1.1","status":200,"bytes":6183,"referer":"","userAgent":"python-requests/2.32.3","requestTimeMs":14},
+    {"t":12309,"kind":"access","ip":"203.0.113.175","method":"GET","target":"/rest/memories","protocol":"HTTP/1.1","status":200,"bytes":6183,"referer":"","userAgent":"python-requests/2.32.3","requestTimeMs":15},
+    {"t":15324,"kind":"access","ip":"203.0.113.175","method":"GET","target":"/rest/memories","protocol":"HTTP/1.1","status":200,"bytes":6183,"referer":"","userAgent":"python-requests/2.32.3","requestTimeMs":7},
+    {"t":18337,"kind":"access","ip":"203.0.113.175","method":"GET","target":"/rest/memories","protocol":"HTTP/1.1","status":200,"bytes":6183,"referer":"","userAgent":"python-requests/2.32.3","requestTimeMs":7},
+    {"t":21350,"kind":"access","ip":"203.0.113.175","method":"GET","target":"/rest/memories","protocol":"HTTP/1.1","status":200,"bytes":6183,"referer":"","userAgent":"python-requests/2.32.3","requestTimeMs":7},
+    {"t":24364,"kind":"access","ip":"203.0.113.175","method":"GET","target":"/rest/memories","protocol":"HTTP/1.1","status":200,"bytes":6183,"referer":"","userAgent":"python-requests/2.32.3","requestTimeMs":8},
+    {"t":27378,"kind":"access","ip":"203.0.113.175","method":"GET","target":"/rest/memories","protocol":"HTTP/1.1","status":200,"bytes":6183,"referer":"","userAgent":"python-requests/2.32.3","requestTimeMs":7}
+  ]
+}

@@ -1,5 +1,6 @@
 // Converts one raw run from recording/record.sh into src/recordings/<MOVE>.<variant>.json (D-15);
-// customer traffic (move CUST, REC-06) goes to src/recordings/traffic/ instead, so it's never loaded as a move (D-62).
+// customer traffic (move CUST, REC-06) goes to src/recordings/traffic/ instead, so it's never loaded as a move (D-62),
+// and the leaky taps (TAP-01..03, PRD §4.1) to src/recordings/taps/, which taps.ts reads itself (D-130).
 //   npm run recording:convert -- ../recording/runs/ATK-03.a [--baseline]
 // --baseline also copies the run's before.sqlite to src/recordings/juiceshop.sqlite, the DB the game boots from.
 import { createHash } from 'node:crypto';
@@ -24,6 +25,8 @@ import { isTestNet3, type RecEvent, type Recording } from '../src/recordings/for
 const OUT_DIR = resolve(import.meta.dirname, '../src/recordings');
 /** Customer traffic (REC-06) is not a move: it lives one folder down, out of the moves' `*.json` (D-62). */
 const TRAFFIC_MOVE = 'CUST';
+/** A leaky tap isn't a move either: its own folder, read by the taps engine only (D-130). */
+const TAP_MOVE = /^TAP-\d\d$/;
 
 function walk(root: string): Map<string, FileInfo> {
   const files = new Map<string, FileInfo>();
@@ -82,7 +85,7 @@ async function main(): Promise<void> {
   }
 
   const rec = buildRecording(meta, events);
-  const outDir = meta.move === TRAFFIC_MOVE ? join(OUT_DIR, 'traffic') : OUT_DIR;
+  const outDir = meta.move === TRAFFIC_MOVE ? join(OUT_DIR, 'traffic') : TAP_MOVE.test(meta.move) ? join(OUT_DIR, 'taps') : OUT_DIR;
   mkdirSync(outDir, { recursive: true });
   const out = join(outDir, `${meta.move}.${meta.variant}.json`);
   writeFileSync(out, serialize(rec));

@@ -3,12 +3,16 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import initSqlJs from 'sql.js';
 import { describe, expect, it } from 'vitest';
+import { TAP_BY_ID, TAPS } from '../rules/taps';
 import { isTestNet3, validateRecording, type AccessEvent, type DbEvent, type ExfilEvent, type FileEvent, type Recording } from './format';
 
 const dir = new URL('./', import.meta.url);
 const jsonFiles = readdirSync(dir).filter((f) => f.endsWith('.json'));
 // Customer traffic (REC-06) sits one folder down so it's never loaded as a move (D-62).
 const trafficFiles = readdirSync(new URL('traffic/', dir)).filter((f) => f.endsWith('.json')).map((f) => `traffic/${f}`);
+// The leaky taps (PRD §4.1) too: not moves, read by the taps engine only (D-130).
+const tapFiles = readdirSync(new URL('taps/', dir)).filter((f) => f.endsWith('.json')).map((f) => `taps/${f}`);
+const folderOf = (move: string) => (move === 'CUST' ? 'traffic/' : /^TAP-\d\d$/.test(move) ? 'taps/' : '');
 const raw = (file: string) => readFileSync(new URL(file, dir), 'utf8');
 const load = (file: string) => JSON.parse(raw(file)) as Recording;
 const accessOf = (r: Recording) => r.events.filter((e): e is AccessEvent => e.kind === 'access');
@@ -26,10 +30,10 @@ describe('every committed recording', () => {
     expect(jsonFiles).toEqual(expect.arrayContaining(moves.map((m) => (m.includes('.') ? `${m}.json` : `${m}.a.json`))));
   });
 
-  it.each([...jsonFiles, ...trafficFiles])('%s is valid D-15, named after its move and variant, with no rig address left', (file) => {
+  it.each([...jsonFiles, ...trafficFiles, ...tapFiles])('%s is valid D-15, named after its move and variant, with no rig address left', (file) => {
     const r = load(file);
     expect(validateRecording(r)).toEqual([]);
-    expect(file).toBe(`${r.move === 'CUST' ? 'traffic/' : ''}${r.move}.${r.variant}.json`);
+    expect(file).toBe(`${folderOf(r.move)}${r.move}.${r.variant}.json`);
     expect(raw(file)).not.toMatch(/\b10\.66\.\d+\.\d+\b/);
     expect(accessOf(r).every((e) => isTestNet3(e.ip))).toBe(true);
   });
@@ -266,6 +270,42 @@ describe('CUST.a: ordinary customer traffic (REC-06, D-61)', () => {
     expect(access.filter((e) => /union|select|%27|'|<script|\.\.\/|\.php/i.test(e.target))).toEqual([]);
     const admins = dbOf(r).filter((e) => e.table === 'Users' && e.op === 'insert' && e.after?.role !== 'customer');
     expect(admins).toEqual([]);
+  });
+});
+
+describe('the leaky taps, each scraped for real (PRD §4.1, KI-59, D-130)', () => {
+  const tap = (id: string) => load(`taps/${id}.a.json`);
+  const leaked = (r: Recording) => [...new Set(exfilOf(r).flatMap((e) => e.keys))].sort((x, y) => x - y);
+
+  it('every tap is recorded, and no tap sits among the moves', () => {
+    expect(tapFiles).toEqual(TAPS.map((t) => `taps/${t.id}.a.json`));
+    expect(jsonFiles.filter((f) => f.startsWith('TAP-'))).toEqual([]);
+  });
+
+  it.each(TAPS.map((t) => t.id))('%s is GET 200s on the exposed route only, with no login and a scraper user agent', (id) => {
+    const route = TAP_BY_ID[id].closedBy.rule.path.replace('*', '\\d+');
+    for (const e of accessOf(tap(id))) {
+      expect(e).toMatchObject({ method: 'GET', status: 200, userAgent: 'python-requests/2.32.3' });
+      expect(e.target).toMatch(new RegExp(`^${route}(/|$)`));
+    }
+  });
+
+  it.each(TAPS.filter((t) => t.leaks !== 'every-customer').map((t) => t.id))('%s leaks exactly the accounts its PRD row names', (id) => {
+    expect(leaked(tap(id))).toEqual([...(TAP_BY_ID[id].leaks as readonly number[])].sort((x, y) => x - y));
+  });
+
+  it('TAP-02 hands over each poster\'s password hash with their email; TAP-03 only emails', () => {
+    expect(exfilOf(tap('TAP-02')).every((e) => e.columns.includes('password'))).toBe(true);
+    expect(exfilOf(tap('TAP-03')).every((e) => e.columns.join() === 'email')).toBe(true);
+  });
+
+  it('TAP-01: the listing, then the access log, growing; on a fresh shop it carries no customer row (KI-74)', () => {
+    const [listing, ...fetches] = accessOf(tap('TAP-01'));
+    expect(listing!.target).toBe('/support/logs');
+    expect(fetches.length).toBeGreaterThanOrEqual(5);
+    for (const e of fetches) expect(e.target).toMatch(/^\/support\/logs\/access\.log\.\d{4}-\d\d-\d\d$/);
+    for (let i = 1; i < fetches.length; i++) expect(fetches[i]!.bytes).toBeGreaterThan(fetches[i - 1]!.bytes);
+    expect(leaked(tap('TAP-01'))).toEqual([]);
   });
 });
 

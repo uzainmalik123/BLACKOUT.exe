@@ -1,7 +1,9 @@
 // Leaky taps (PRD §4.1, D-42): small obvious exposures that open over time and drip about 1 % of the souls a real
 // minute until the player closes each with one WAF path block. They draw from their own seeded stream (world.taps.rng)
-// so Death's and the minions' draws don't move. No recording yet (KI-59): each opening and drip writes one access line
-// built from the request the real exposure answers.
+// so Death's and the minions' draws don't move. Each tap plays its recording (src/recordings/taps/, KI-59, D-130): the
+// opening is the scraper's first recorded request, each drip the next one, round again when they run out.
+import type { AccessEvent, Recording } from '../recordings/format';
+import { validateRecording } from '../recordings/format';
 import { TAP_BY_ID, TAPS } from '../rules/taps';
 import type { TapId } from '../rules/vocabulary';
 import { gameTimeIso } from './clock';
@@ -14,7 +16,18 @@ import { SEED_ACCOUNTS } from './seed';
 import { steal } from './souls';
 import { mulberry, type World } from './state';
 
-const SCRAPER_AGENT = 'python-requests/2.32.3';
+const RECORDED = import.meta.glob<Recording>('../recordings/taps/*.json', { eager: true, import: 'default' });
+
+/** Each tap's recorded requests, in order (the `.a` variant: one scrape per tap). */
+const REQUESTS: Readonly<Record<TapId, AccessEvent[]>> = Object.fromEntries(TAPS.map((t) => {
+  const rec = Object.values(RECORDED).find((r) => r.move === t.id && r.variant === 'a');
+  if (!rec) throw new Error(`${t.id}: no recording in src/recordings/taps/ (D-130)`);
+  const errors = validateRecording(rec);
+  if (errors.length > 0) throw new Error(`${t.id}.a: ${errors.join('; ')}`);
+  const access = rec.events.filter((e): e is AccessEvent => e.kind === 'access');
+  if (access.length === 0) throw new Error(`${t.id}.a: no access line`);
+  return [t.id, access];
+})) as Record<TapId, AccessEvent[]>;
 
 function nextTapRandom(world: World): number {
   const { value, state } = mulberry(world.taps.rng);
@@ -27,9 +40,18 @@ export function tapClosed(world: World, id: TapId): boolean {
   return stopperHolds(world, TAP_BY_ID[id].closedBy);
 }
 
-function line(world: World, id: TapId, target: string, bytes: number): void {
+/** Plays one recorded request from a fresh scraper address; a dated log file is served under the game's date. */
+function line(world: World, id: TapId, e: AccessEvent): void {
   const ip = bump(`203.0.113.${100 + Math.floor(nextTapRandom(world) * 150)}`, customerAddresses(world), 100, 249); // D-65: never a customer's address
-  world.logs.access.push({ t: world.clock.gameMs, ip, method: 'GET', target, protocol: 'HTTP/1.1', status: 200, bytes, referer: '', userAgent: SCRAPER_AGENT, by: id });
+  const target = e.target.replace(/(access\.log\.)\d{4}-\d\d-\d\d$/, `$1${gameTimeIso(world, world.clock.gameMs).slice(0, 10)}`);
+  world.logs.access.push({ t: world.clock.gameMs, ip, method: e.method, target, protocol: e.protocol, status: e.status, bytes: e.bytes, referer: e.referer, userAgent: e.userAgent, by: id });
+}
+
+/** The recorded request for drip `n` (from 1): the scraper's requests after its first, round again when they run out. */
+function dripRequest(id: TapId, n: number): AccessEvent {
+  const all = REQUESTS[id];
+  const drips = all.length > 1 ? all.slice(1) : all;
+  return drips[(n - 1) % drips.length]!;
 }
 
 /** The seed rows a tap leaks that are still unstolen. */
@@ -49,19 +71,16 @@ function open(world: World): void {
   world.taps.open.push({ id: tap.id, openedAt: now, nextDripAt: now + CONFIG[world.difficulty].taps.dripEveryGameMs, drips: 0 });
   openAlert(world, tap.id);
   emit(world, { kind: 'tap-opened', tap: tap.id });
-  const first = tap.line(0, gameTimeIso(world, now).slice(0, 10));
-  line(world, tap.id, first.target.replace(/\/access\.log\.[\d-]+$/, '/'), 1_120); // a scraper finds it: the listing or the first page
+  line(world, tap.id, REQUESTS[tap.id][0]!); // a scraper finds it: the listing or the first page
 }
 
 /** One drip: about 1 % of the total souls from the rows the tap really leaks, chosen from the taps' stream. */
 function drip(world: World, id: TapId, n: number): void {
-  const tap = TAP_BY_ID[id];
   const rows = leakable(world, id);
   const size = Math.max(1, Math.round(world.souls.total * CONFIG[world.difficulty].taps.dripFraction));
   const taken: number[] = [];
   while (taken.length < size && rows.length > 0) taken.push(rows.splice(Math.floor(nextTapRandom(world) * rows.length), 1)[0]!);
-  const req = tap.line(n, gameTimeIso(world, world.clock.gameMs).slice(0, 10));
-  line(world, id, req.target, req.bytes);
+  line(world, id, dripRequest(id, n));
   if (taken.length > 0) steal(world, id, 'Users', taken);
 }
 
