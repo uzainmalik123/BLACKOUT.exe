@@ -84,6 +84,7 @@
 | D-120 | A soul door Death "got into" is one he started a harvest visit through, even if it was cut short; every such door needs its real fix for banished and for clean-handover (refines D-117) | Accepted |
 | D-121 | The idle check is "a do-nothing player never wins" on every level and seed (every soul lost, a flatline or walked away at the shift's end all pass), not "loses before the shift ends" (amends D-118) | Accepted |
 | D-122 | The event log keeps only what the judge needs of a read's `shown` lines (how many were passed, how many were Death's, what they were about, and `shownTotal`), never the text (amends D-115) | Accepted |
+| D-170 | Parked ideas get their limits fixed when they're parked (PRD §14.1): log rotation (PARK-01) and Death flooding the logs (PARK-02: one paced move, once per run, ≤ 60 s, Hard or after a tip-off, visible and stoppable) | Accepted |
 
 ### D-01: Pivot to an incident-response game
 - **Context:** (2026-11-08) Reanimator raised dead repos so Death could attack them. Any agent can revive a repo on its own, so the product added nothing, and the UI had drifted into a pile of screens with no vision.
@@ -666,3 +667,9 @@
   - **Drafts** are investigation and evidence (busiest addresses and agents, status codes, app-log errors, odd searches, failed logins, special-role and new accounts, recent password changes, uploads, snapshot, passive `whois`, `iptables -L`), never a fix for a move. They use only the commands in `.kiro/steering/game-shell.md` (checked equal to SYS-09's list in the PRD) and only the flags the shell spec lists (`sort -r -n`, `uniq -c`, `grep -i -c -E`, `awk -F`, `head`/`tail -n`, `sqlite3 -header`, `tar czf`); every SQL a draft runs is executed against the baseline DB in the test.
   - **The debrief template** quotes every fact (`label: value`) and every grade exactly, adds a fixed sentence per phase and grade, lists mistakes and misses, and adds no number the report doesn't contain (tested), so KIRO-06's diff passes on the offline text too. Its input type mirrors ENGINE_API §5's `Report` until SYS-11 exports one.
 - **Consequences:** the Kiro panel's stub (ENGINE_API §5) can return these texts with `offline: true` today. SYS-12/KIRO-03's live prompts should hold the same vocabulary line. KI-150: the drafts' flags follow the shell spec, which is not merged yet.
+
+### D-170: Parked ideas, with their limits
+- **Context:** (2026-11-22) The team proposed log storage with a cron job rotating old logs: a real tension (disk space vs evidence), and attackers really do flood logs so evidence rotates away. With 12 days left and the screens not started, it's a stretch feature, but an unlimited flood would overwhelm the player, so the limits are fixed now.
+- **Decision:** PRD §14.1 holds parked ideas with their rules. PARK-01 log rotation; PARK-02 a log flood only as one Death move under D-41's pacing, at most once per run, Hard or after a tip-off, a burst of at most 60 real seconds, from a real recording, visible in SYS-20's tools and stoppable by DEF-07/DEF-12. Parked rows use their own IDs so the PRD tests that read §3 and §5 don't expect them in code.
+- **Consequences:** promoting a parked idea is a PRD edit plus a decision. The engine's memory doesn't depend on PARK-01 (D-115 stores counts, not text).
+
