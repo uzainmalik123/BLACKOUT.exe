@@ -90,8 +90,13 @@ export const TAP_IDS: readonly TapId[] = ['TAP-01', 'TAP-02', 'TAP-03'];
 export const REQUEST_CLASSES: readonly RequestClass[] = ['page', 'search', 'login', 'signup', 'basket', 'checkout', 'feedback', 'complaint', 'password-reset', 'ftp'];
 
 /** One player action, as the shell, the consoles and the sims send it to the engine (PRD §5). */
-/** What a read showed the player (D-115): the shell or a console passes at most SHOWN_LINES_MAX lines of its output, and `shownTotal` when it cut them. */
-export interface Shown { shown?: string[]; shownTotal?: number }
+/**
+ * What a read showed the player (D-115, D-122): the shell or a console passes at most SHOWN_LINES_MAX lines of its
+ * output in `shown`, and `shownTotal` when it cut them. The engine never stores the text: before logging the action it
+ * keeps only what the judge needs: `shownCount` (lines passed), `shownHis` (of them, lines of Death's), `shownAbout`
+ * (which moves or things those lines belonged to) and `shownTotal`.
+ */
+export interface Shown { shown?: string[]; shownTotal?: number; shownCount?: number; shownHis?: number; shownAbout?: string[] }
 export const SHOWN_LINES_MAX = 200;
 
 export type PlayerAction =

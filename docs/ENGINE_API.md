@@ -103,7 +103,7 @@ Every button, console and (later) shell command sends one of these. It returns `
 | Comms | `DEF-19` escalate · `DEF-20` notify | `{ type: 'DEF-20', to: 'customers' }` |
 | Terminal (via the shell) | `DEF-01`–`06`, `08`, `11`, `14`, `15`, `18` | The shell sends these for you (§5). On **Easy**, the consoles also get buttons for them |
 
-**What a read showed (D-115).** A `DEF-01`, `DEF-02` or `DEF-03` may carry `shown: string[]`, the lines the shell or console printed (at most 200: pass the first 200 and set `shownTotal` to the real count; the engine cuts longer lists). The judging engine decides from those lines whether the read was relevant (it showed something of Death's, and was focused): an accidental `tail` that shows his lines counts, a `cat` of the whole log does not. A read with no `shown` is never relevant. Pass the lines exactly as printed (access-log lines in `combined` format, SQL rows as the shell renders them, file names as listed).
+**What a read showed (D-115, D-122).** A `DEF-01`, `DEF-02` or `DEF-03` may carry `shown: string[]`, the lines the shell or console printed (at most 200: pass the first 200 and set `shownTotal` to the real count; the engine cuts longer lists). The judging engine decides from those lines whether the read was relevant (it showed something of Death's, and was focused): an accidental `tail` that shows his lines counts, a `cat` of the whole log does not. A read with no `shown` is never relevant. Pass the lines exactly as printed (access-log lines in `combined` format, SQL rows as the shell renders them, file names as listed). **The text is never stored:** the logged action keeps only `shownCount`, `shownHis` (lines of his), `shownAbout` and `shownTotal`.
 
 ## 4. Events: what to animate
 

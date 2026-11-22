@@ -211,22 +211,38 @@ export function hisLine(line: string, ctx: Pick<RelevanceContext, 'addresses' | 
   return undefined;
 }
 
-/** What a read showed of his (the moves and things its lines belong to) and whether it was focused; undefined when nothing of his. */
-export function showedOfHis(a: PlayerAction, ctx: RelevanceContext): { about: Set<HisThing>; focused: boolean } | undefined {
-  if (a.type !== 'DEF-01' && a.type !== 'DEF-02' && a.type !== 'DEF-03') return undefined;
-  if (!a.shown || a.shown.length === 0) return undefined; // a read with no shown lines can't be judged (the shell sends them later)
+/** D-122: what the judge keeps of a read's lines: how many were passed, how many were his, what they were about; never the text. */
+export interface ShownSummary { shownCount: number; shownHis: number; shownAbout: HisThing[] }
+
+/** Classifies shown lines against his work as known (`ctx`): the summary the action event stores (D-122). */
+export function summariseLines(lines: readonly string[], ctx: Pick<RelevanceContext, 'addresses' | 'moves' | 'appTexts' | 'hisAccounts' | 'hisFiles'>): ShownSummary {
   const about = new Set<HisThing>();
   let his = 0;
-  for (const line of a.shown) {
+  for (const line of lines) {
     const what = hisLine(line, ctx);
     if (what === undefined) continue;
     his += 1;
     about.add(what);
     for (const door of SOUL_DOORS) if (line.includes(DOOR_PATH[door]!)) about.add(door);
   }
-  if (his === 0) return undefined;
-  const total = a.shownTotal ?? a.shown.length;
-  return { about, focused: total <= FOCUS.max || his / a.shown.length >= FOCUS.share };
+  return { shownCount: lines.length, shownHis: his, shownAbout: [...about] };
+}
+
+/** The same, against what the world knows of him right now (actions.ts, before the action is logged). */
+export function summariseShown(world: World, lines: readonly string[]): ShownSummary {
+  const know = learn(world);
+  for (const e of world.events) if (e.kind === 'move-started') { know.addresses.add(e.ip); if (!know.moves.has(e.ip)) know.moves.set(e.ip, e.move); }
+  return summariseLines(lines, know);
+}
+
+/** What a read showed of his (the moves and things its lines belong to) and whether it was focused; undefined when nothing of his. */
+export function showedOfHis(a: PlayerAction, ctx: RelevanceContext): { about: Set<HisThing>; focused: boolean } | undefined {
+  if (a.type !== 'DEF-01' && a.type !== 'DEF-02' && a.type !== 'DEF-03') return undefined;
+  // the lines themselves (a crafted test, or a read judged before it was logged), else the summary the event kept (D-122)
+  const sum: ShownSummary | undefined = a.shown && a.shown.length > 0 ? summariseLines(a.shown, ctx) : a.shownCount !== undefined ? { shownCount: a.shownCount, shownHis: a.shownHis ?? 0, shownAbout: (a.shownAbout ?? []) as HisThing[] } : undefined;
+  if (!sum || sum.shownCount === 0 || sum.shownHis === 0) return undefined; // a read with no shown lines can't be judged (the shell sends them later)
+  const total = a.shownTotal ?? sum.shownCount;
+  return { about: new Set(sum.shownAbout), focused: total <= FOCUS.max || sum.shownHis / sum.shownCount >= FOCUS.share };
 }
 
 /** D-115 rule (b): what this action, on purpose or not, cut, interrupted, stopped or closed of his this tick. */
@@ -339,11 +355,12 @@ function relevantActions(world: World, know: Knowledge): Action[] {
   return world.events.filter((e): e is Action => e.kind === 'action' && e.ok && (judged.has(e.id) || fresh.has(e.id)));
 }
 
-/** Did a relevant read show this soul door: its addresses or its route in the lines it showed (for the door gap). */
+/** Did a relevant read show this soul door: its lines were about it (its addresses, or its route), by the summary the event kept or the lines themselves. */
 function lookShowedDoor(a: Action, door: MoveId, know: Knowledge, doorIps: Set<string>): boolean {
   const act = a.action;
-  if ((act.type !== 'DEF-01' && act.type !== 'DEF-02' && act.type !== 'DEF-03') || !act.shown) return false;
-  return act.shown.some((line) => line.includes(DOOR_PATH[door]!) || [...doorIps].some((ip) => line.includes(ip)) || [...know.addresses].some((ip) => line.includes(ip) && know.moves.get(ip) === door));
+  if (act.type !== 'DEF-01' && act.type !== 'DEF-02' && act.type !== 'DEF-03') return false;
+  if (act.shown) return act.shown.some((line) => line.includes(DOOR_PATH[door]!) || [...doorIps].some((ip) => line.includes(ip)) || [...know.addresses].some((ip) => line.includes(ip) && know.moves.get(ip) === door));
+  return (act.shownAbout ?? []).includes(door);
 }
 
 /** SYS-21: the assessment of the world as it stands. Pure: the same world gives the same answer. */

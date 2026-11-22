@@ -4,6 +4,7 @@ import { ACTION_BY_ID } from '../rules/actions';
 import { FEATURE_DEFAULTS, SHOWN_LINES_MAX, type ActionId, type Patch, type PlayerAction, type WafRule } from '../rules/vocabulary';
 import { CONFIG } from './config';
 import { dip } from './heartbeat';
+import { summariseShown } from './assess';
 import { emit } from './log';
 import { confirmBreach } from './notification';
 import { deathAddresses } from './pool';
@@ -166,8 +167,10 @@ function restore(world: World, b: Backup): void {
 /** Applies one player action and logs it (SYS-10). After an ending every action is refused. */
 export function applyAction(world: World, action: PlayerAction): ActionResult {
   const result = world.ending ? no(`The incident is over: ${world.ending}`) : run(world, action);
-  if ('shown' in action && action.shown !== undefined && action.shown.length > SHOWN_LINES_MAX) { // D-115: at most 200 lines reach the log
-    action = { ...action, shownTotal: action.shownTotal ?? action.shown.length, shown: action.shown.slice(0, SHOWN_LINES_MAX) };
+  if ('shown' in action && action.shown !== undefined) {
+    // D-115, D-122: at most 200 lines are judged, and the log keeps only what the judge needs of them, never the text
+    const { shown, ...rest } = action;
+    action = { ...rest, shownTotal: action.shownTotal ?? shown.length, ...summariseShown(world, shown.slice(0, SHOWN_LINES_MAX)) };
   }
   emit(world, { kind: 'action', action, ok: result.ok, note: result.message });
   return result;

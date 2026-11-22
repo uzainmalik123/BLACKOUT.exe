@@ -350,6 +350,28 @@ describe('relevant actions by outcome (D-115)', () => {
     yes({ type: 'DEF-09' }, ctx({ effects: { ...NO_EFFECTS, shut: [{ move: 'ATK-09', by: 'DEF-09' }] } }));
   });
 
+  it('the log keeps a summary of a read, never its text (D-122): the lines passed, how many were his, what they were about, the total; the judge reads the summary', () => {
+    const w = initialWorld(1, 'medium');
+    emit(w, { kind: 'move-started', move: 'ATK-08', variant: 'd', stage: 4, ip: HIS_IP });
+    stepAssess(w);
+    applyAction(w, { type: 'DEF-01', query: 'grep 500 access.log', shown: [HIS, SHOPPER, HIS], shownTotal: 9000 });
+    const logged = w.events.find((e) => e.kind === 'action')!;
+    expect(logged.kind === 'action' && logged.action).toEqual({ type: 'DEF-01', query: 'grep 500 access.log', shownTotal: 9000, shownCount: 3, shownHis: 2, shownAbout: ['ATK-08'] });
+    expect(JSON.stringify(w.events)).not.toContain('sqlmap'); // nothing of the lines' text
+    w.clock.gameMs += 1;
+    stepAssess(w);
+    expect(w.assess.relevant).toEqual([logged.id]); // judged from the summary: two of three lines his, so focused
+    applyAction(w, { type: 'DEF-01', query: 'cat access.log', shown: Array.from({ length: 200 }, (_, i) => (i === 0 ? HIS : SHOPPER)), shownTotal: 9000 });
+    w.clock.gameMs += 1;
+    stepAssess(w);
+    expect(w.assess.relevant).toEqual([logged.id]); // the unfocused cat is logged as 1 of 200, and stays irrelevant
+    const cat = w.events.filter((e) => e.kind === 'action').at(-1)!;
+    expect(cat.kind === 'action' && cat.action).toMatchObject({ shownCount: 200, shownHis: 1, shownTotal: 9000 });
+    applyAction(w, { type: 'DEF-01', query: 'cat access.log', shown: Array.from({ length: 300 }, () => HIS) }); // over the cap: the first 200 are judged, the total kept
+    const big = w.events.filter((e) => e.kind === 'action').at(-1)!;
+    expect(big.kind === 'action' && big.action).toMatchObject({ shownCount: 200, shownHis: 200, shownTotal: 300 });
+  });
+
   it('never relevant on their own: a snapshot, comms, bringing back, a lookup', () => {
     for (const a of [{ type: 'DEF-05', name: 'x' }, { type: 'DEF-18', what: 'nginx' }, { type: 'DEF-19' }, { type: 'DEF-20', to: 'legal' }, { type: 'DEF-04', ip: HIS_IP, mode: 'active' }] as PlayerAction[]) no(a);
   });
