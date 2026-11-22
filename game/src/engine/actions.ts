@@ -5,6 +5,7 @@ import { FEATURE_DEFAULTS, type ActionId, type Patch, type PlayerAction, type Wa
 import { CONFIG } from './config';
 import { dip } from './heartbeat';
 import { emit } from './log';
+import { deathAddresses } from './pool';
 import type { Backup, World } from './state';
 
 export type { PlayerAction } from '../rules/vocabulary';
@@ -30,8 +31,11 @@ function tipOff(world: World, by: ActionId): void {
   world.death.tippedOff = true;
 }
 
-function confirmBreach(world: World): void {
-  if (world.souls.stolen.length > 0 && world.comms.breachConfirmedAt === undefined) world.comms.breachConfirmedAt = world.clock.gameMs;
+/** SYS-14: the notification clock starts at the first DEF-05 or DEF-19 after souls were taken. */
+function confirmBreach(world: World, by: 'DEF-05' | 'DEF-19'): void {
+  if (world.souls.stolen.length === 0 || world.comms.breachConfirmedAt !== undefined) return;
+  world.comms.breachConfirmedAt = world.clock.gameMs;
+  emit(world, { kind: 'breach-confirmed', by });
 }
 
 function costOf(world: World, id: ActionId): void {
@@ -47,12 +51,14 @@ function run(world: World, action: PlayerAction): ActionResult {
     case 'DEF-03':
       return ok(ACTION_BY_ID[action.type].name);
     case 'DEF-04':
-      if (action.mode === 'active') tipOff(world, 'DEF-04');
-      return ok(action.mode === 'active' ? `Active lookup of ${action.ip}: he noticed` : `whois ${action.ip}`);
+      // D-111 (KI-90): only an active lookup of an address Death or his proxies use or have used tips him off; the
+      // answer reads the same either way, so the shell never becomes an oracle for which addresses are his.
+      if (action.mode === 'active' && deathAddresses(world).has(action.ip)) tipOff(world, 'DEF-04');
+      return ok(action.mode === 'active' ? `Active lookup of ${action.ip}` : `whois ${action.ip}`);
     case 'DEF-05': {
       if (world.evidence.some((e) => e.name === action.name)) return no(`Evidence ${action.name} already exists`);
       world.evidence.push({ name: action.name, takenAt: now, accessLines: world.logs.access.length, appLines: world.logs.app.length });
-      confirmBreach(world);
+      confirmBreach(world, 'DEF-05');
       return ok(`Evidence ${action.name} preserved`);
     }
     case 'DEF-06': {
@@ -148,7 +154,7 @@ function run(world: World, action: PlayerAction): ActionResult {
     case 'DEF-19':
       if (world.comms.escalatedAt !== undefined) return no('The incident lead already knows');
       world.comms.escalatedAt = now;
-      confirmBreach(world);
+      confirmBreach(world, 'DEF-19');
       return ok('The incident lead acknowledges');
     case 'DEF-20':
       if (world.comms.notifiedAt[action.to] !== undefined) return no(`${action.to} already notified`);

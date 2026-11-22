@@ -81,8 +81,8 @@ describe('a breather after every Death move (D-41 rule 4)', () => {
 
   it('a tip-off still skips one wait', () => {
     const w = scanned(1);
-    startReplay(w, FIXTURE_LIBRARY.variantsOf('ATK-03')[0]!, 'death');
-    applyAction(w, { type: 'DEF-04', ip: '203.0.113.10', mode: 'active' });
+    const r = startReplay(w, FIXTURE_LIBRARY.variantsOf('ATK-03')[0]!, 'death');
+    applyAction(w, { type: 'DEF-04', ip: r.ip, mode: 'active' }); // D-111: the address he is playing from
     w.clock.gameMs += 10 * REAL_S;
     stepReplays(w, FIXTURE_LIBRARY);
     expect(w.death.nextMoveAt).toBe(w.clock.gameMs);

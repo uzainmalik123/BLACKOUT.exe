@@ -1,6 +1,7 @@
 // The one time step: real milliseconds in, the world moved forward in fixed game-time sub-steps (D-24),
 // so the order of effects never depends on the frame rate. Everything the engine does over time happens here.
 import { applyPendingPatches, takeBackupIfDue } from './actions';
+import { stepAssess } from './assess';
 import { realToGameMs } from './clock';
 import { CONFIG } from './config';
 import { stepCustomers } from './customers';
@@ -12,6 +13,8 @@ import { endRun } from './log';
 import { stepWaves } from './minions';
 import { stepReplays } from './replay';
 import { soulsLeft } from './souls';
+import { stepStruggle } from './struggle';
+import { stepNotificationClock } from './notification';
 import { stepTaps } from './taps';
 import type { World } from './state';
 
@@ -32,12 +35,15 @@ function step(world: World, library: RecordingLibrary, dt: number): void {
   stepCustomers(world, library); // SYS-19: after Death and the minions, so their addresses are known (D-65)
   refreshDoors(world, library); // D-44: a door is shut only while its fix holds
   integrateHeartbeat(world, dt);
+  stepNotificationClock(world); // SYS-14
   const config = CONFIG[world.difficulty];
   if (world.clock.gameMs - world.clock.lastDirectorTick >= config.directorPeriodGameMs) {
     world.clock.lastDirectorTick = world.clock.gameMs;
     directorTick(world, library);
   }
   checkEndings(world);
+  stepAssess(world); // SYS-21: last, so the snapshot sees everything this step did, the ending included
+  stepStruggle(world); // SYS-13: reads the assessor's verdicts and its biggest gap
 }
 
 export function advance(world: World, library: RecordingLibrary, realMs: number): void {
