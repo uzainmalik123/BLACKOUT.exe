@@ -1,6 +1,7 @@
 // The event log (SYS-10): every Death move, minion wave, player action and Kiro call, in game time.
 // The report (SYS-11) and the sims (SYS-16) read only from world.events.
 import type { ActionId, Actor, Ending, Foothold, MinionId, MoveId, Patch, PlayerAction, RequestClass, Stage, TapId } from '../rules/vocabulary';
+import type { GapType } from './assess';
 import type { World } from './state';
 
 export type GameEventBody =
@@ -22,6 +23,9 @@ export type GameEventBody =
   | { kind: 'proxies' } // D-46 (KI-78): after three IP blocks in a row he plays from rotating proxies for the rest of the run
   | { kind: 'ticket'; ticket: number; about: RequestClass; status: 403 | 429 | 503 | 'blocked' } // D-65: a customer's first failure this loop: a support ticket
   | { kind: 'customer-lost'; about: RequestClass; max: number } // D-65: a customer gave up (a second failure): the heartbeat's maximum dropped to `max`
+  | { kind: 'suggestion'; n: number; reason: 'idle' | 'souls' | 'gap'; gap?: GapType } // SYS-13 (D-113, D-114): the player is struggling; one suggestion unlocked (Medium/Hard), aimed at the biggest gap standing (a type, never a text)
+  | { kind: 'breach-confirmed'; by: 'DEF-05' | 'DEF-19' } // SYS-14: the notification clock starts
+  | { kind: 'notification-overdue' } // SYS-14: the window passed with legal not notified
   | { kind: 'patch-applied'; patch: Patch }
   | { kind: 'banished' }
   | { kind: 'return'; through: Foothold }

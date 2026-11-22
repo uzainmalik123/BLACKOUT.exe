@@ -29,3 +29,8 @@ export function gameTimeIso(world: World, gameMs = world.clock.gameMs): string {
 export function gameClockLabel(world: World): string {
   return gameTimeIso(world).slice(11, 16);
 }
+
+/** Game time the way the shop's own ORM writes it into the DB (`2026-10-31 22:00:00.000 +00:00`), for rows the engine stamps itself (KI-91). */
+export function gameTimeSql(world: World, gameMs = world.clock.gameMs): string {
+  return gameTimeIso(world, gameMs).replace('T', ' ').replace('Z', ' +00:00');
+}

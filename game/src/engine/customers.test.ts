@@ -14,7 +14,8 @@ import { startReplay } from './replay';
 import { runSim } from './sim';
 import { initialWorld, type World } from './state';
 import { committedLibrary } from './test-fixtures/committed';
-import { FIXTURE_IPS, FIXTURE_LIBRARY, FIXTURE_VISIT, withTraffic } from './test-fixtures/recordings';
+import { FIXTURE_IPS, FIXTURE_LIBRARY, FIXTURE_TRAFFIC, FIXTURE_VISIT, withTraffic } from './test-fixtures/recordings';
+import type { AccessEvent, Recording } from '../recordings/format';
 import { WHOLE_RUN_TIMEOUT_MS } from './test-fixtures/timeouts';
 
 const REAL_MIN = 60_000;
@@ -238,6 +239,29 @@ describe('how the world answers customers (SYS-19, D-65)', () => {
   });
 });
 
+describe('two customer recordings take turns (KI-82, D-131)', () => {
+  // A made-up CUST.b: the same 8 shoppers over 30 s, each only looking up a security question, resetting, and opening /ftp.
+  const tail = FIXTURE_VISIT.slice(-4);
+  const SECOND: Recording = {
+    ...FIXTURE_TRAFFIC, variant: 'b', durationMs: 30_000,
+    events: FIXTURE_TRAFFIC.events.filter((e): e is AccessEvent => e.kind === 'access' && tail.some(([m, t]) => m === e.method && t === e.target))
+      .map((e, i) => ({ ...e, t: 500 + i * 100 })),
+  };
+  const BOTH = libraryFrom([FIXTURE_TRAFFIC, SECOND]);
+  const ratio = CONFIG.hard.gameMsPerRealMs;
+
+  it('the loop plays CUST.a, then CUST.b, then CUST.a again, each for its own length', () => {
+    const w = customersOnly({ library: BOTH, realMs: 100_000 });
+    expect(w.customers.loop).toBe(3); // a: 0–60 real s, b: 60–90, a again from 90
+    const second = custLines(w).filter((l) => l.t >= 60_000 * ratio && l.t < 90_000 * ratio);
+    expect(second.length).toBe(6 * tail.length); // Hard plays 6 of the 8 shoppers
+    expect(second.every((l) => tail.some(([m, t]) => m === l.method && t === l.target))).toBe(true);
+    const third = custLines(w).filter((l) => l.t >= 90_000 * ratio);
+    expect(third.length).toBeGreaterThan(0);
+    expect(third.some((l) => l.target === '/')).toBe(true); // CUST.a's page load again
+  });
+});
+
 describe('the backlash: cost, complaints, churn (D-65)', () => {
   const cost = CONFIG.hard.customers.cost;
 
@@ -303,12 +327,13 @@ describe('the committed customers (REC-06) in whole runs', { timeout: WHOLE_RUN_
   const real = committedLibrary();
   const idle = (difficulty: Difficulty, seed = 1) => runSim({ seed, difficulty, library: real, maxRealMs: 20 * REAL_MIN, player: () => [] });
 
-  it('an idle Medium run: customers write at least 60% of the lines outside the scan, about 2 a second; Easy about 1, Hard about 4 (SYS-19)', () => {
+  it('an idle Medium run: customers write at least 60% of the lines outside the scan and the minions\' waves, about 2 a second; Easy about 1, Hard about 4 (SYS-19, D-134)', () => {
     const r = idle('medium');
     const lines = r.world.logs.access;
     const cust = lines.filter((l) => l.by === 'CUST').length;
-    const scan = lines.filter((l) => l.by === 'ATK-01').length;
-    expect(cust / (lines.length - scan)).toBeGreaterThanOrEqual(0.6);
+    const bursts = lines.filter((l) => l.by === 'ATK-01' || l.by?.startsWith('MIN-')).length; // Death's scan and the waves: bursts by nature
+    expect(lines.some((l) => l.by?.startsWith('MIN-'))).toBe(true);
+    expect(cust / (lines.length - bursts)).toBeGreaterThanOrEqual(0.6);
     expect(cust / (r.realMs / 1000)).toBeGreaterThan(1.5);
     expect(cust / (r.realMs / 1000)).toBeLessThan(2.8);
     expect(r.world.customers.failed).toBe(0); // nobody did anything to them
@@ -328,8 +353,10 @@ describe('the committed customers (REC-06) in whole runs', { timeout: WHOLE_RUN_
     expect(cust.some((l) => attackers.has(l.ip))).toBe(false);
     // at every moment, no address carries both a customer's line and an attacker's line within the same loop
     const byLoop = new Map<string, Set<string>>();
+    const lengths = real.variantsOf('CUST').map((v) => v.recording.durationMs * CONFIG.medium.gameMsPerRealMs);
+    const loopAt = (t: number) => { let n = 0; for (let start = 0; ; n++) { start += lengths[n % lengths.length]!; if (t < start) return n; } };
     for (const l of r.world.logs.access) {
-      const loop = Math.floor(l.t / (real.variantsOf('CUST')[0]!.recording.durationMs * 30));
+      const loop = loopAt(l.t);
       const key = `${loop} ${l.ip}`;
       byLoop.set(key, (byLoop.get(key) ?? new Set()).add(l.by === 'CUST' ? 'CUST' : 'attacker'));
     }
@@ -348,7 +375,26 @@ describe('the committed customers (REC-06) in whole runs', { timeout: WHOLE_RUN_
     expect(plug.world.customers.failed).toBe(0);
   });
 
-  it('on Medium, customers alone: search off flatlines the shop in about 15 real minutes, everything off in about 10; a flag nobody uses costs nothing (KI-82)', () => {
+  it('both recordings take turns: CUST.a then CUST.b, and every CUST.b loop has its password resets and /ftp readers (KI-82, D-131)', () => {
+    expect(real.variantsOf('CUST').map((v) => v.variant)).toEqual(['a', 'b']);
+    const only = libraryFrom(real.variantsOf('CUST').map((v) => v.recording));
+    const [a, b] = real.variantsOf('CUST').map((v) => v.recording.durationMs * CONFIG.medium.gameMsPerRealMs) as [number, number];
+    const w = initialWorld(1, 'medium');
+    for (let realMs = 0; realMs < 45 * REAL_MIN; realMs += 100) { w.clock.gameMs += 3000; stepCustomers(w, only); }
+    const lines = custLines(w);
+    for (let start = 0, loop = 1; start + (loop % 2 ? a : b) <= w.clock.gameMs; start += loop % 2 ? a : b, loop++) {
+      const inLoop = lines.filter((l) => l.t >= start && l.t < start + (loop % 2 ? a : b));
+      const of = (cls: string) => inLoop.filter((l) => classify(l.method, l.target) === cls).length;
+      if (loop % 2) expect(of('password-reset') + of('ftp'), `loop ${loop} (CUST.a)`).toBe(0);
+      else {
+        expect(of('password-reset'), `loop ${loop} (CUST.b)`).toBeGreaterThanOrEqual(2);
+        expect(of('ftp'), `loop ${loop} (CUST.b)`).toBeGreaterThanOrEqual(1);
+      }
+    }
+    expect(w.customers.loop).toBeGreaterThanOrEqual(6);
+  });
+
+  it('on Medium, customers alone: search off flatlines the shop in about 15 real minutes, everything off in about 10; password-reset off and ftp off now cost a little (KI-82)', () => {
     const only = libraryFrom(real.variantsOf('CUST').map((v) => v.recording));
     const minutes = (actions: PlayerAction[]) => {
       const w = initialWorld(1, 'medium');
@@ -363,13 +409,17 @@ describe('the committed customers (REC-06) in whole runs', { timeout: WHOLE_RUN_
     };
     const search = minutes([{ type: 'DEF-10', feature: 'search', enabled: false }]);
     expect(search.minutes).toBeGreaterThan(13); // about 15 in a whole run, where Death's open door drains too (exploits.test.ts)
-    expect(search.minutes).toBeLessThan(18);
+    expect(search.minutes).toBeLessThan(20); // 18.8 with CUST.b taking turns (fewer searches a minute than CUST.a, D-131); 17.3 on CUST.a alone
     const all = minutes((['search', 'registration', 'password-reset', 'uploads', 'ftp'] as const).map((feature) => ({ type: 'DEF-10', feature, enabled: false })));
     expect(all.minutes).toBeGreaterThan(8.5);
     expect(all.minutes).toBeLessThan(14); // 10.1 in the whole run (exploits.test.ts)
     expect(all.minutes).toBeLessThan(search.minutes);
     expect(all.w.heartbeatMax).toBeLessThan(90); // churn: shoppers who gave up
-    expect(minutes([{ type: 'DEF-10', feature: 'ftp', enabled: false }]).w.heartbeat).toBe(100);
-    expect(minutes([{ type: 'DEF-10', feature: 'password-reset', enabled: false }]).w.heartbeat).toBe(100);
+    for (const feature of ['ftp', 'password-reset'] as const) {
+      const off = minutes([{ type: 'DEF-10', feature, enabled: false }]);
+      expect(off.w.customers.failed, feature).toBeGreaterThan(0);
+      expect(off.w.tickets.some((t) => t.about === feature && t.status === 503), feature).toBe(true);
+      expect(off.minutes, feature).toBe(30); // a price, not a flatline: still alive after 30 real minutes
+    }
   });
 });

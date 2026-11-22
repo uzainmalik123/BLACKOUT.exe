@@ -1,6 +1,7 @@
 // The world state (PRD SYS-04): one typed, JSON-plain model every DEF and ATK reads and writes through.
 // Times are game milliseconds since the scenario start (SYS-01). Derived facts (gains, footholds) live in facts.ts.
 import type { Row } from '../recordings/format';
+import { initialAssess, type AssessState } from './assess';
 import type { GameEvent } from './log';
 import type { Actor, Difficulty, Ending, Feature, Foothold, MinionId, MoveId, Patch, RequestClass, TapId, WafRule } from '../rules/vocabulary';
 import { FEATURE_DEFAULTS } from '../rules/vocabulary';
@@ -174,7 +175,9 @@ export interface World {
   patches: { applied: Patch[]; pending: Array<{ patch: Patch; readyAt: number }> };
   backups: Backup[];
   evidence: Evidence[];
-  comms: { escalatedAt?: number; notifiedAt: { legal?: number; customers?: number }; breachConfirmedAt?: number };
+  comms: { escalatedAt?: number; notifiedAt: { legal?: number; customers?: number }; breachConfirmedAt?: number; notificationOverdue?: boolean }; // SYS-14: the clock runs from breachConfirmedAt for config.notification.windowGameMs
+  assess: AssessState; // SYS-21 (D-114): the judging engine's latest snapshot and what it remembers of his work; read-only, for the hint/Kiro layer
+  struggle: { lastSuggestionAt?: number; suggestions: number }; // SYS-13 (D-113, D-114): the struggle detector's state; `suggestions` is how many it has unlocked; the last relevant action is the assessor's
   death: {
     knowledge: Array<'map' | 'secrets-leaked' | 'admin-password'>;
     forgedToken: boolean;
@@ -253,6 +256,8 @@ export function initialWorld(seed: number, difficulty: Difficulty): World {
     backups: [{ id: 0, takenAt: 0, accounts: accounts.map((a) => ({ ...a })), files: [], defacements: [] }],
     evidence: [],
     comms: { notifiedAt: {} },
+    assess: initialAssess(),
+    struggle: { suggestions: 0 },
     death: { knowledge: [], forgedToken: false, played: [], nextMoveAt: 0, stageSkips: 0, pacingDelayed: false, skipWait: false, tippedOff: false, resume: {}, shutDoors: [], ipCutsInRow: 0, proxies: false, nextId: 1 },
     replays: [],
     waves: [],
