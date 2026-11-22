@@ -1,4 +1,5 @@
-// Customer traffic (SYS-19, D-60, D-65): REC-06's shoppers play underneath everything, looping, from the shared
+// Customer traffic (SYS-19, D-60, D-65): REC-06's shoppers play underneath everything, looping (CUST.a, then CUST.b, in
+// turn: D-131), from the shared
 // address pool, and the world answers them as a real shop would: 503 from a disabled feature, 429 from a rate
 // limit, 403 from a WAF rule that matches them, nothing at all behind a blocked address or a pulled plug. Each
 // request the player's actions fail costs heartbeat by what the customer was doing (the backlash), the customer
@@ -142,8 +143,8 @@ function angryFeedback(world: World, library: RecordingLibrary, e: AccessEvent, 
   world.logs.dbChanges.push({ t, op: 'insert', table: 'Feedbacks', key: { id }, after: { id, UserId: null, comment, rating: 1, createdAt: at, updatedAt: at } });
 }
 
-/** The rarest, most valuable thing a shopper does in the recording: the strata a loop samples from (D-65). */
-const STRATA: readonly RequestClass[] = ['signup', 'complaint', 'checkout', 'login', 'search', 'page'];
+/** The rarest, most valuable thing a shopper does in the recording: the strata a loop samples from (D-65, D-131). */
+const STRATA: readonly RequestClass[] = ['signup', 'complaint', 'checkout', 'password-reset', 'ftp', 'login', 'search', 'page'];
 
 /**
  * A new loop: a fresh seeded subset of the recording's shoppers, each with a pool address nobody holds (D-65). The subset
@@ -183,14 +184,17 @@ function startLoop(world: World, library: RecordingLibrary, shoppers: Shoppers, 
 
 /** One tick: play the customer requests that are due, as the world answers them now. */
 export function stepCustomers(world: World, library: RecordingLibrary): void {
-  const traffic = library.variantsOf('CUST')[0];
-  if (!traffic || traffic.recording.durationMs <= 0) return;
-  const rec = traffic.recording;
+  const traffic = library.variantsOf('CUST').filter((v) => v.recording.durationMs > 0);
+  if (traffic.length === 0) return;
+  const recordingOf = (loop: number) => traffic[(loop - 1) % traffic.length]!.recording; // CUST.a, CUST.b, CUST.a, … (D-131)
   const ratio = CONFIG[world.difficulty].gameMsPerRealMs;
   const c = world.customers;
   const now = world.clock.gameMs;
-  if (c.loop === 0) startLoop(world, library, shoppersOf(rec), 0); // the first loop starts with the run
-  while (now >= c.loopStartedAt + rec.durationMs * ratio) startLoop(world, library, shoppersOf(rec), c.loopStartedAt + rec.durationMs * ratio);
+  if (c.loop === 0) startLoop(world, library, shoppersOf(recordingOf(1)), 0); // the first loop starts with the run
+  for (let end = c.loopStartedAt + recordingOf(c.loop).durationMs * ratio; now >= end; end = c.loopStartedAt + recordingOf(c.loop).durationMs * ratio) {
+    startLoop(world, library, shoppersOf(recordingOf(c.loop + 1)), end);
+  }
+  const rec = recordingOf(c.loop);
   const blocked = new Set(world.firewall.blocked);
   while (c.cursor < rec.events.length && c.loopStartedAt + rec.events[c.cursor]!.t * ratio <= now) {
     const e = rec.events[c.cursor]!;

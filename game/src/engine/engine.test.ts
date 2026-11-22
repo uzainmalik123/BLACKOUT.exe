@@ -21,7 +21,7 @@ describe('Engine', () => {
       expect(COMMITTED_LIBRARY.variantsOf(move).map((v) => v.variant), f).toContain(variant);
     }
     expect(COMMITTED_LIBRARY.variantsOf('ATK-08').map((v) => v.variant)).toEqual(['a', 'b', 'c', 'd', 'e', 'f', 'g']); // D-63 halves; D-42 plays only .d–.g
-    expect(COMMITTED_LIBRARY.variantsOf('CUST').map((v) => v.variant)).toEqual(['a']); // the customers, from traffic/ (D-62, D-65)
+    expect(COMMITTED_LIBRARY.variantsOf('CUST').map((v) => v.variant)).toEqual(['a', 'b']); // the customers, from traffic/ (D-62, D-65); CUST.b takes turns with CUST.a (D-131)
   });
 
   it('plays both of his sign-ups (ATK-06.a and ATK-11.a record the same new id) as two accounts, in the world and in sqlite3', async () => {

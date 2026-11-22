@@ -1,17 +1,25 @@
 """Ordinary shoppers (docs/PRD.md REC-06, D-60, D-61). Runs inside the rig's tools container only.
 
-    python3 shoppers.py <shop URL>        e.g. http://10.66.0.10 (through nginx, so it's logged)
+    python3 shoppers.py <shop URL> [a|b]  e.g. http://10.66.0.10 (through nginx, so it's logged); a by default
+    python3 shoppers.py setup-b <shop URL> CUST.b's setup, straight at the shop before the window (not logged)
 
-About ten minutes of customers using the shop the way its own Angular front-end does: page loads,
+Variant a (CUST.a): about ten minutes of customers using the shop the way its own Angular front-end does: page loads,
 the product list, product details and reviews, searches, guest baskets, logins (a few typos and a
 couple of forgotten passwords), baskets, the full checkout, sign-ups, feedback (with the shop's
 CAPTCHA, solved as a person reads it) and complaints with a small real PDF. No attack payloads.
+
+Variant b (CUST.b, KI-82): about three minutes of the same kind of shoppers, plus the two things a
+shopper does that CUST.a never shows: forgot-password (the security question looked up as the email is
+typed, a mistyped answer, then the right one, then a login with the new password; one gives up) and
+/ftp (the About page's "Terms of Use" link to /ftp/legal.md; one curious shopper opens /ftp itself).
+Its setup gives the reset shoppers the security answer they set long ago, outside the recording.
 
 Each visitor is named in X-Forwarded-For (trusted from the tools box only, D-27), always inside
 203.0.113.0/24 and never on an address a Death or minion recording uses. Every choice comes from a
 fixed seed, so the same people do the same things every run; only the server's own ids and
 the exact millisecond timings differ. CUST_SCALE (default 1) multiplies every wait, for quick tests.
 """
+import http.client
 import json
 import os
 import random
@@ -37,6 +45,15 @@ ORIGIN = "https://juice-sh.op/"   # the shop's public address, as browsers put i
 # Addresses Death's and the minions' recordings use (recording/README.md); customers never get one.
 ATTACKER_HOSTS = {11, 23, 44, 61, 81, 82, 83, 91, 111, 131, 151, 171, 201} | set(range(128, 256))
 SOURCES = 64
+
+# CUST.b (KI-82): its own seed, a shorter window, and the addresses added since CUST.a (D-46, D-63) kept clear too.
+SEED_B = 6110
+WINDOW_B_S = 150      # sessions start in the first 150 s; the last ones finish by about 180 s
+LONG_BY_B_S = 100
+ATTACKER_HOSTS_B = ATTACKER_HOSTS | {13, 85, 86, 88, 90, 96, 97}
+SOURCES_B = 20
+ABOUT_CHUNK = "/about.component-HWmrgSem.js"   # v20.4.0's lazy chunk for the About page (its name is in main.js)
+CAROUSEL = [f"/assets/public/images/carousel/{n}" for n in ("1.jpg", "2.jpg", "3.jpg", "4.jpg", "5.png", "6.jpg", "7.jpg")]
 
 # Real, current desktop and mobile browser user agents (Chrome, Edge, Firefox, Safari).
 AGENTS = [
@@ -129,7 +146,11 @@ class Visitor:
         req = urllib.request.Request(self.shop + path, data, headers, method=method)
         try:
             with urllib.request.urlopen(req, timeout=30) as res:
-                status, payload = res.status, res.read()
+                status = res.status
+                try:
+                    payload = res.read()
+                except http.client.IncompleteRead as short:
+                    payload = short.partial   # Juice Shop's directory listings announce more bytes than they send
         except urllib.error.HTTPError as err:
             status, payload = err.code, err.read()
         tally(status)
@@ -282,6 +303,31 @@ class Visitor:
         if status < 300:
             self.call("POST", "/api/Complaints/", {"UserId": me["user"]["id"], "message": message})
 
+    def forgot_password(self, email, answers, new):
+        """The forgot-password page: the question is looked up once the email is typed, then each answer is tried."""
+        self.think(6, 14)     # typing the email
+        self.call("GET", "/rest/user/security-question?email=" + urllib.parse.quote(email, safe="@"))  # the front-end appends it as typed
+        for answer in answers:
+            self.think(10, 25)   # answer, new password, again
+            status, _ = self.call("POST", "/rest/user/reset-password", {"email": email, "answer": answer, "new": new, "repeat": new})
+            if status == 200:
+                return True
+        return False
+
+    def about(self, first_visit):
+        """The About Us page: its lazy chunk, the config, the feedback carousel (and its pictures, the first time)."""
+        if first_visit:
+            self.call("GET", ABOUT_CHUNK)
+        self.call("GET", "/rest/admin/application-configuration")
+        self.call("GET", "/api/Feedbacks/")
+        if first_visit:
+            for image in CAROUSEL:
+                self.call("GET", image)
+
+    def terms(self):
+        """The About page's "Terms of Use" link: /ftp/legal.md, opened in a new tab."""
+        self.call("GET", "/ftp/legal.md")
+
 
 # --- the day's sessions ----------------------------------------------------------------------------
 
@@ -404,6 +450,117 @@ def run(shop, s, seen, seen_lock):
         v.logout()
 
 
+# --- CUST.b (KI-82): password resets and /ftp ---------------------------------------------------
+
+def answer_typo(answer, rng):
+    """How people get their own security answer wrong: the wrong case, or a slipped letter."""
+    if rng.random() < 0.5 and answer.lower() != answer:
+        return answer.lower()
+    return typo(answer, rng)
+
+
+def plan_b():
+    """CUST.b's sessions; the reset shoppers carry the question and answer their setup gives them."""
+    rng = random.Random(SEED_B)
+    hosts = rng.sample([h for h in range(2, 128) if h not in ATTACKER_HOSTS_B], SOURCES_B)
+    agent_of = {h: rng.choice(AGENTS) for h in hosts}
+    seeded = rng.sample(customers(), 12)
+    kinds = ["browse"] * 9 + ["shop"] * 4 + ["checkout"] * 1 + ["reset"] * 5 + ["about"] * 4 + ["ftp"] * 1
+    timed = sorted((rng.uniform(0, LONG_BY_B_S if k in ("checkout", "reset") else WINDOW_B_S), k) for k in kinds)
+    starts, kinds = [t for t, _ in timed], [k for _, k in timed]
+    starts[0] = 0.5
+    order = hosts + [rng.choice(hosts) for _ in range(len(kinds) - len(hosts))]
+    rng.shuffle(order)
+    sessions, taken, resets = [], 0, 0
+    for i, (kind, start, host) in enumerate(zip(kinds, starts, order)):
+        who = None
+        if kind in ("shop", "checkout", "reset"):
+            who, taken = dict(seeded[taken]), taken + 1
+        if kind == "reset":
+            who["question"] = rng.randint(1, 14)
+            who["answer"] = rng.choice(QUESTION_ANSWERS)
+            who["new"] = f"{rng.choice(STREETS).split()[0]}{rng.randint(1000, 9999)}!"
+            who["gives_up"] = resets == 4      # one of the five never gets it and leaves
+            resets += 1
+        sessions.append({"n": i, "kind": kind, "start": start, "ip": f"203.0.113.{host}",
+                         "agent": agent_of[host], "who": who})
+    return sessions
+
+
+def setup_b(shop):
+    """Before CUST.b's window: each reset shopper's security answer, as they set it when they signed up."""
+    for s in plan_b():
+        who = s["who"]
+        if s["kind"] != "reset":
+            continue
+        body = json.dumps({"email": who["email"], "password": who["password"]}).encode()
+        req = urllib.request.Request(f"{shop}/rest/user/login", body, {"Content-Type": "application/json"})
+        with urllib.request.urlopen(req) as res:
+            token = json.loads(res.read())["authentication"]["token"]
+        req = urllib.request.Request(f"{shop}/rest/user/whoami?fields=id", headers={"Authorization": f"Bearer {token}", "Cookie": f"token={token}"})
+        with urllib.request.urlopen(req) as res:
+            uid = json.loads(res.read())["user"]["id"]
+        body = json.dumps({"UserId": uid, "answer": who["answer"], "SecurityQuestionId": who["question"]}).encode()
+        req = urllib.request.Request(f"{shop}/api/SecurityAnswers/", body, {"Content-Type": "application/json"})
+        with urllib.request.urlopen(req) as res:
+            if res.status != 201:
+                sys.exit(f"setup failed for {who['email']}: HTTP {res.status}")
+    print("set the security answers of the reset shoppers")
+
+
+def run_b(shop, s, seen, seen_lock):
+    rng = random.Random(f"{SEED_B}-{s['n']}")
+    v = Visitor(shop, s["ip"], s["agent"], rng)
+    with seen_lock:
+        first = s["ip"] not in seen
+        seen.add(s["ip"])
+    v.page_load(first)
+    kind, who = s["kind"], s["who"]
+    if kind == "browse":
+        browse_a_bit(v, rng, views=(1, 5), searches=(0, 3))
+        return
+    if kind in ("about", "ftp"):
+        browse_a_bit(v, rng, views=(0, 2), searches=(0, 1))
+        v.think(4, 10)
+        v.about(first)
+        v.think(10, 30)      # reading about the shop
+        v.terms()
+        if kind == "ftp":    # curious: what else is in that folder?
+            v.think(8, 20)
+            v.call("GET", "/ftp")
+            v.think(5, 12)
+            v.terms()
+        return
+    browse_a_bit(v, rng, views=(0, 2), searches=(0, 2))
+    v.think(8, 20)
+    if kind == "reset":
+        v.login(who["email"], typo(who["password"], rng))   # can't remember it, then the "Forgot your password?" link
+        v.think(4, 10)
+        tries = [answer_typo(who["answer"], rng)] * (2 if who["gives_up"] else 1)
+        tries = tries if who["gives_up"] else tries + [who["answer"]]
+        if not v.forgot_password(who["email"], tries, who["new"]):
+            return   # gives up
+        v.think(4, 10)
+        if not v.login(who["email"], who["new"]):
+            print(f"login after reset failed for {who['email']}", file=sys.stderr)
+            return
+        browse_a_bit(v, rng, views=(1, 2), searches=(0, 1))
+        if rng.random() < 0.5:
+            v.think(4, 12)
+            v.add_to_basket(rng.choice(v.products))
+        return
+    if not v.login(who["email"], who["password"]):
+        print(f"login failed for {who['email']}", file=sys.stderr)
+        return
+    browse_a_bit(v, rng, views=(1, 3), searches=(0, 2))
+    for _ in range(rng.randint(1, 3)):
+        v.think(4, 12)
+        v.add_to_basket(rng.choice(v.products))
+    if kind == "checkout":
+        v.think(4, 10)
+        v.checkout(full_name(who["email"]))
+
+
 STATUS = {}
 STATUS_LOCK = threading.Lock()
 
@@ -413,8 +570,8 @@ def tally(status):
         STATUS[status] = STATUS.get(status, 0) + 1
 
 
-def main(shop):
-    sessions = plan()
+def main(shop, variant="a"):
+    sessions, runner = (plan_b(), run_b) if variant == "b" else (plan(), run)
     seen, seen_lock = set(), threading.Lock()
     began = time.monotonic()
     threads = []
@@ -422,7 +579,7 @@ def main(shop):
         delay = s["start"] * SCALE - (time.monotonic() - began)
         if delay > 0:
             time.sleep(delay)
-        t = threading.Thread(target=run, args=(shop, s, seen, seen_lock), daemon=True)
+        t = threading.Thread(target=runner, args=(shop, s, seen, seen_lock), daemon=True)
         t.start()
         threads.append(t)
     for t in threads:
@@ -435,6 +592,9 @@ def main(shop):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 2:
+    if sys.argv[1:2] == ["setup-b"] and len(sys.argv) == 3:
+        setup_b(sys.argv[2].rstrip("/"))
+    elif len(sys.argv) == 2 or (len(sys.argv) == 3 and sys.argv[2] in ("a", "b")):
+        main(sys.argv[1].rstrip("/"), sys.argv[2] if len(sys.argv) == 3 else "a")
+    else:
         sys.exit(__doc__)
-    main(sys.argv[1].rstrip("/"))

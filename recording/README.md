@@ -52,9 +52,10 @@ address the attacker gets in the recording (always inside `203.0.113.0/24`).
 | TAP-01.a | `attacks/TAP-01.a.sh` | 203.0.113.174 | **Leaky tap** (PRD §4.1, D-130): the `/support/logs` listing, then today's access log fetched 10 times, python-requests user agent, responses captured |
 | TAP-02.a | `attacks/TAP-02.a.sh` | 203.0.113.175 | **Leaky tap:** `GET /rest/memories` polled 10 times, python-requests user agent, responses captured |
 | TAP-03.a | `attacks/TAP-03.a.sh` | 203.0.113.176 | **Leaky tap:** reviews of products 1 to 56 walked, python-requests user agent, responses captured; converted to `game/src/recordings/taps/` (D-130) |
+| CUST.b | `attacks/CUST.b.sh` (+ `.setup.sh`) | 20 addresses in 203.0.113.2 to .127, none an attacker's | **Not an attack:** ~3.5 min of customers incl. 5 forgot-password flows and 5 `/ftp` visits (KI-82, D-131); setup gives the 5 resetters a security answer; converted to `traffic/CUST.b.json` |
 | CUST.a | `attacks/CUST.a.sh` | 64 addresses in 203.0.113.2 to .127, none an attacker's | **Not an attack:** ~10 min of ordinary customers (REC-06, D-61), `lib/shoppers.py`; converted to `game/src/recordings/traffic/CUST.a.json` (D-62) |
 
-Customer traffic is recorded the same way: `recording/record.sh CUST a 203.0.113.1` (the third argument is
+Customer traffic is recorded the same way: `recording/record.sh CUST a 203.0.113.1` (or `CUST b`) (the third argument is
 only the header's `attackerIp`; every request names its own customer address). `CUST_SCALE=0.05` in the tools
 container's environment runs the same visits 20 times faster, for a quick check of the script.
 

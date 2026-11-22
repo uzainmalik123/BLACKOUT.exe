@@ -273,6 +273,47 @@ describe('CUST.a: ordinary customer traffic (REC-06, D-61)', () => {
   });
 });
 
+describe('CUST.b: shoppers who reset a password and open /ftp (KI-82, D-131)', () => {
+  const r = load('traffic/CUST.b.json');
+  const access = accessOf(r);
+  const count = (method: string, target: RegExp, status: number) => access.filter((e) => e.method === method && target.test(e.target) && e.status === status).length;
+
+  it('is short, from 15 to 30 addresses, none a Death or minion address, all with browser user agents', () => {
+    expect(r.durationMs).toBeGreaterThan(150_000);
+    expect(r.durationMs).toBeLessThan(300_000);
+    const ips = new Set(access.map((e) => e.ip));
+    expect(ips.size).toBeGreaterThanOrEqual(15);
+    expect(ips.size).toBeLessThanOrEqual(30);
+    const attackers = new Set(readdirSync(dir).filter((f) => f.endsWith('.json')).flatMap((f) => accessOf(load(f)).map((e) => e.ip)));
+    expect([...ips].filter((ip) => attackers.has(ip))).toEqual([]);
+    expect(access.every((e) => e.userAgent.startsWith('Mozilla/5.0'))).toBe(true);
+  });
+
+  it('has forgot-password flows: the question looked up, a mistyped answer refused, then reset, and a login with the new password', () => {
+    expect(count('GET', /^\/rest\/user\/security-question\?email=[^&]+@example\.(com|net|org)$/, 200)).toBeGreaterThanOrEqual(4);
+    expect(count('POST', /^\/rest\/user\/reset-password$/, 401)).toBeGreaterThanOrEqual(4);
+    expect(count('POST', /^\/rest\/user\/reset-password$/, 200)).toBeGreaterThanOrEqual(3);
+    const resets = access.filter((e) => e.target === '/rest/user/reset-password' && e.status === 200);
+    for (const reset of resets) {
+      expect(access.some((e) => e.ip === reset.ip && e.t > reset.t && e.target === '/rest/user/login' && e.status === 200)).toBe(true);
+    }
+  });
+
+  it('has shoppers reading /ftp/legal.md from the About page, and one opening /ftp itself', () => {
+    expect(count('GET', /^\/ftp\/legal\.md$/, 200)).toBeGreaterThanOrEqual(4);
+    expect(count('GET', /^\/ftp$/, 200)).toBeGreaterThanOrEqual(1);
+    expect(count('GET', /^\/api\/Feedbacks\/$/, 200)).toBeGreaterThanOrEqual(4); // the About page's carousel
+  });
+
+  it('is otherwise ordinary: searches, logins, baskets, nothing broken and no attack payloads', () => {
+    expect(count('GET', /^\/rest\/products\/search\?q=[a-z]/, 200)).toBeGreaterThan(10);
+    expect(count('POST', /^\/api\/BasketItems\/$/, 200)).toBeGreaterThanOrEqual(1);
+    expect(access.filter((e) => e.status >= 500)).toEqual([]);
+    expect(access.filter((e) => /union|select|%27|'|<script|\.\.\/|\.php/i.test(e.target))).toEqual([]);
+    expect(access.filter((e) => /^\/ftp\/./.test(e.target) && e.target !== '/ftp/legal.md')).toEqual([]); // no confidential file opened
+  });
+});
+
 describe('the leaky taps, each scraped for real (PRD §4.1, KI-59, D-130)', () => {
   const tap = (id: string) => load(`taps/${id}.a.json`);
   const leaked = (r: Recording) => [...new Set(exfilOf(r).flatMap((e) => e.keys))].sort((x, y) => x - y);
