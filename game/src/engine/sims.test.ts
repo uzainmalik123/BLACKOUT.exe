@@ -89,9 +89,9 @@ function bringBack(e: GameEvent, act: Act): void {
 }
 
 describe('the playthrough sims (PRD §10, SYS-16)', { timeout: WHOLE_RUN_TIMEOUT_MS }, () => {
-  it('SIM-1: a player who does nothing loses (every soul or a flatline), never wins, and has lost at least half the souls before the 10th real minute (D-42)', () => {
+  it('SIM-1: a player who does nothing loses (every soul, a flatline, or walked away at the shift\'s end), never wins, and has lost at least half the souls before the 10th real minute (D-42, D-121)', () => {
     const r = sim(() => []);
-    expect(['souls-lost', 'flatline']).toContain(ending(r));
+    expect(['souls-lost', 'flatline', 'walked-away']).toContain(ending(r));
     expect(kinds(r)).not.toContain('banished');
     const byTen = eventsOfKind(r.world, 'souls-stolen').filter((e) => e.t <= 10 * REAL_MIN * 30).at(-1)!.stolen;
     expect(byTen).toBeGreaterThanOrEqual(r.world.souls.total / 2);
