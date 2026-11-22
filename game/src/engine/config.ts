@@ -55,7 +55,7 @@ export interface EngineConfig {
   };
   assess: { everyGameMs: number }; // SYS-21 (D-114): the assessor refreshes its snapshot this often (and at once on an action or the ending)
   notification: { windowGameMs: number }; // SYS-14 (D-112): the breach-notification window after confirmation, GDPR's 72 h compressed to the run length
-  struggle: { idleGameMs: number; soulsWindowGameMs: number; soulsFraction: number; unlocks: boolean }; // SYS-13 (D-113): struggling = no useful action for idleGameMs, or souls down by soulsFraction within soulsWindowGameMs; unlocks a suggestion on Medium/Hard only
+  struggle: { idleGameMs: number; soulsWindowGameMs: number; soulsFraction: number; gapGameMs: number; unlocks: boolean }; // SYS-13 (D-113, D-114): struggling = no RELEVANT action for idleGameMs, souls down by soulsFraction within soulsWindowGameMs, or the same biggest gap standing for gapGameMs; unlocks (and shows) a suggestion on Medium/Hard only
   backupEveryGameMs: number; // DEF-17: hourly snapshots
   scenarioStartIso: string; // D-24
   /** SYS-08, D-31, D-42: the only variants Death may play of these moves, normally and once tipped off. Other variants stay for reference. */
@@ -103,7 +103,7 @@ const MEDIUM: EngineConfig = {
   taps: { everyGameMs: { min: 180 * REAL_S, max: 240 * REAL_S }, maxOpen: 2, dripEveryGameMs: 60 * REAL_S, dripFraction: 0.01 },
   assess: { everyGameMs: 1 * REAL_S },
   notification: { windowGameMs: 6 * 60 * GAME_MIN }, // D-112: a run is about 6 game hours (PRD §1), so the 72 h clock runs 12× game time
-  struggle: { idleGameMs: 90 * REAL_S, soulsWindowGameMs: 120 * REAL_S, soulsFraction: 0.1, unlocks: true }, // SYS-13
+  struggle: { idleGameMs: 90 * REAL_S, soulsWindowGameMs: 120 * REAL_S, soulsFraction: 0.1, gapGameMs: 180 * REAL_S, unlocks: true }, // SYS-13
   backupEveryGameMs: 60 * GAME_MIN,
   scenarioStartIso: '2026-10-31T22:00:00Z',
   pinnedVariants: { 'ATK-08': { normal: ['d', 'e'], tippedOff: ['f', 'g'] } }, // D-42: the halves (D-63); .b/.c retired, .a test-only

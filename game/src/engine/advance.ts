@@ -35,7 +35,6 @@ function step(world: World, library: RecordingLibrary, dt: number): void {
   stepCustomers(world, library); // SYS-19: after Death and the minions, so their addresses are known (D-65)
   refreshDoors(world, library); // D-44: a door is shut only while its fix holds
   integrateHeartbeat(world, dt);
-  stepStruggle(world); // SYS-13
   stepNotificationClock(world); // SYS-14
   const config = CONFIG[world.difficulty];
   if (world.clock.gameMs - world.clock.lastDirectorTick >= config.directorPeriodGameMs) {
@@ -44,6 +43,7 @@ function step(world: World, library: RecordingLibrary, dt: number): void {
   }
   checkEndings(world);
   stepAssess(world); // SYS-21: last, so the snapshot sees everything this step did, the ending included
+  stepStruggle(world); // SYS-13: reads the assessor's verdicts and its biggest gap
 }
 
 export function advance(world: World, library: RecordingLibrary, realMs: number): void {

@@ -22,7 +22,7 @@
 |---|---|---|---|
 | Suspicious log lines | Highlighted; hover = plain-words explanation | Highlighted | Raw, no highlight |
 | Terminal actions | Also available as console buttons | Terminal | Terminal |
-| Kiro | Explains alerts, suggests a next move, "Kiro, apply it" button | Hints after you're stuck a while | Silent unless asked |
+| Kiro | Explains alerts, suggests a next move, "Kiro, apply it" button | Hints after you're stuck a while | Silent unless asked, except one suggestion in the terminal when you're struggling (SYS-13, D-114) |
 | Pause | Allowed | No | No |
 
 ---

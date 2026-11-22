@@ -9,7 +9,7 @@ import { initialWorld, type World } from './state';
 
 const medium = CONFIG.medium;
 const fresh = () => initialWorld(1, 'medium');
-const withoutEvents = (w: World) => ({ ...w, events: [], struggle: undefined }); // an action that took also resets the struggle detector's idle clock (SYS-13)
+const withoutEvents = (w: World) => ({ ...w, events: [] });
 const deathAdmin = (w: World) => w.accounts.push({ id: 326, email: 'death@juice-sh.op', role: 'admin', createdBy: 'ATK-06' });
 const hiddenAdmin = (w: World) => w.accounts.push({ id: 327, email: 'support-ops@juice-sh.op', role: 'admin', createdBy: 'ATK-11' });
 

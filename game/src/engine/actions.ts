@@ -174,7 +174,6 @@ function restore(world: World, b: Backup): void {
 export function applyAction(world: World, action: PlayerAction): ActionResult {
   const result = world.ending ? no(`The incident is over: ${world.ending}`) : run(world, action);
   emit(world, { kind: 'action', action, ok: result.ok, note: result.message });
-  if (result.ok) world.struggle.lastUsefulActionAt = world.clock.gameMs; // SYS-13: an action that took is a useful one; a refused one isn't
   return result;
 }
 
