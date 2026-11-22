@@ -73,8 +73,15 @@ describe('struggling (SYS-13)', () => {
     act(w, USERS);
     expect(struggling(w)).toBe('gap');
     w.clock.gameMs += CONFIG.medium.assess.everyGameMs; // the snapshot (and its gaps) refreshes once a real second
-    act(w, { type: 'DEF-01', query: 'grep 203.0.113.85 /var/log/nginx/access.log' }); // the look closes the gap
+    act(w, { type: 'DEF-01', query: 'grep 203.0.113.85 /var/log/nginx/access.log' }); // the look closes that gap
     expect(w.assess.gaps.map((g) => g.type)).not.toContain('door-uninvestigated');
+    expect(w.assess.gap).toMatchObject({ type: 'door-unpatched', since: 0 }); // the next biggest has stood as long
+    expect(struggling(w)).toBe('gap');
+    w.clock.gameMs += CONFIG.medium.assess.everyGameMs;
+    act(w, { type: 'DEF-05', name: 'first' }); // evidence first, or the deploy itself opens a gap
+    w.clock.gameMs += CONFIG.medium.assess.everyGameMs;
+    act(w, { type: 'DEF-13', patch: 'search' }); // deploying: the gap closes
+    expect(w.assess.gaps).toEqual([]);
     expect(struggling(w)).toBeUndefined();
   });
 

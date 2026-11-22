@@ -510,19 +510,19 @@ export function initialAssess(): AssessState {
 export function stepAssess(world: World): void {
   const a = world.assess;
   const know = learn(world);
-  if (know.addresses.size !== a.hisAddresses.length) a.hisAddresses = [...know.addresses];
-  if (know.paths.size !== a.hisPaths.length) a.hisPaths = [...know.paths];
-  if (know.hisAccounts.size !== a.hisAccounts.length) a.hisAccounts = [...know.hisAccounts];
-  if (know.hisFiles.size !== a.hisFiles.length) a.hisFiles = [...know.hisFiles];
-  a.logCursor = know.logCursor;
   const last = world.events.at(-1)?.id ?? 0;
   if (last > a.judgedUpTo) {
-    for (const e of judgeFrom(world, know, a.judge, a.judgedUpTo)) {
+    for (const e of judgeFrom(world, know, a.judge, a.judgedUpTo)) { // also learns the addresses and door paths the new events carry
       a.relevant.push(e.id);
       a.lastRelevantActionAt = e.t;
     }
     a.judgedUpTo = last;
   }
+  if (know.addresses.size !== a.hisAddresses.length) a.hisAddresses = [...know.addresses];
+  if (know.paths.size !== a.hisPaths.length) a.hisPaths = [...know.paths];
+  if (know.hisAccounts.size !== a.hisAccounts.length) a.hisAccounts = [...know.hisAccounts];
+  if (know.hisFiles.size !== a.hisFiles.length) a.hisFiles = [...know.hisFiles];
+  a.logCursor = know.logCursor;
   const ended = world.ending !== undefined && a.cursor < world.events.length;
   a.cursor = world.events.length;
   if (!ended && a.assessedAt >= 0 && world.clock.gameMs - a.assessedAt < CONFIG[world.difficulty].assess.everyGameMs) return;
