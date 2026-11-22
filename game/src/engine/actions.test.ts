@@ -41,10 +41,11 @@ describe('applyAction: every DEF row', () => {
     expect(eventsOfKind(w, 'tip-off')).toHaveLength(0);
   });
 
-  it('DEF-04 active and DEF-08 tip Death off: next move now and one stage skip each', () => {
+  it('DEF-04 active on one of his addresses and DEF-08 tip Death off: next move now and one stage skip each', () => {
     const w = fresh();
     w.clock.gameMs = 500_000;
     w.death.nextMoveAt = 9_000_000;
+    w.events.push({ id: 1, t: 1, kind: 'move-started', move: 'ATK-01', variant: 'a', stage: 1, ip: '203.0.113.23' });
     expect(applyAction(w, { type: 'DEF-04', ip: '203.0.113.23', mode: 'active' }).ok).toBe(true);
     expect(w.death).toMatchObject({ nextMoveAt: 500_000, stageSkips: 1 });
     w.death.nextMoveAt = 9_000_000;
@@ -53,6 +54,37 @@ describe('applyAction: every DEF row', () => {
     expect(w.death).toMatchObject({ nextMoveAt: 500_000, stageSkips: 2 });
     expect(eventsOfKind(w, 'tip-off').map((e) => e.by)).toEqual(['DEF-04', 'DEF-08']);
     expect(applyAction(w, { type: 'DEF-08', email: 'jim@juice-sh.op' }).ok).toBe(false);
+  });
+
+  it('DEF-04 active on any other address does nothing (D-111, KI-90): not a customer, a minion, the proxy or the internet', () => {
+    const w = fresh();
+    w.clock.gameMs = 500_000;
+    w.death.nextMoveAt = 9_000_000;
+    w.logs.access.push({ t: 1, ip: '203.0.113.150', method: 'GET', target: '/wp-admin', protocol: 'HTTP/1.1', status: 200, bytes: 1, referer: '', userAgent: 'scanner', by: 'MIN-01' });
+    w.logs.access.push({ t: 2, ip: '192.0.2.7', method: 'GET', target: '/', protocol: 'HTTP/1.1', status: 200, bytes: 1, referer: '', userAgent: 'Mozilla/5.0', by: 'CUST' });
+    w.waves.push({ id: 9, minion: 'MIN-01', n: 1, ips: ['203.0.113.150', '203.0.113.151'], startedAt: 0, endsAt: 1, successesDone: 0 });
+    const before = structuredClone(w);
+    for (const ip of ['8.8.8.8', '10.0.0.10', '192.0.2.7', '203.0.113.150', '203.0.113.151']) {
+      const r = applyAction(w, { type: 'DEF-04', ip, mode: 'active' });
+      expect(r.ok, ip).toBe(true);
+      expect(r.message, ip).toBe(`Active lookup of ${ip}`); // the same words whether or not he noticed: the answer is never an oracle
+    }
+    expect(withoutEvents(w)).toEqual(withoutEvents(before));
+    expect(eventsOfKind(w, 'tip-off')).toHaveLength(0);
+    expect(w.death).toMatchObject({ nextMoveAt: 9_000_000, stageSkips: 0, tippedOff: false });
+  });
+
+  it("DEF-04 active tips him off on every address he has used this run: a move's start, a fresh address after an IP cut, a proxy he holds or rotated through", () => {
+    const w = fresh();
+    w.events.push({ id: 1, t: 1, kind: 'move-started', move: 'ATK-01', variant: 'a', stage: 1, ip: '203.0.113.23' }); // the recorded start
+    w.events.push({ id: 2, t: 2, kind: 'move-started', move: 'ATK-01', variant: 'a', stage: 1, ip: '203.0.113.77' }); // resumed from a fresh address (D-24)
+    w.logs.access.push({ t: 3, ip: '198.18.4.9', method: 'GET', target: '/x', protocol: 'HTTP/1.1', status: 200, bytes: 1, referer: '', userAgent: 'ffuf', by: 'ATK-01' }); // a proxy he rotated through (D-46)
+    w.replays.push({ id: 5, owner: 'death', move: 'ATK-08', variant: 'd', ip: '198.19.1.1', recordedIp: '203.0.113.85', ips: ['198.19.1.1', '198.19.1.2'], startedAt: 0, cursor: 0 }); // the pool he holds now
+    for (const ip of ['203.0.113.23', '203.0.113.77', '198.18.4.9', '198.19.1.1', '198.19.1.2']) {
+      expect(applyAction(w, { type: 'DEF-04', ip, mode: 'active' })).toEqual({ ok: true, message: `Active lookup of ${ip}` });
+    }
+    expect(eventsOfKind(w, 'tip-off')).toHaveLength(5);
+    expect(w.death.tippedOff).toBe(true);
   });
 
   it('DEF-05 snapshots the logs, confirms a breach once souls are gone, and refuses a duplicate name', () => {
