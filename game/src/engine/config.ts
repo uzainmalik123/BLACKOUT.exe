@@ -53,6 +53,7 @@ export interface EngineConfig {
     dripEveryGameMs: number; // D-42: an open tap drips once per real minute
     dripFraction: number; // D-42: each drip takes this share of the total souls (rounded, at least 1)
   };
+  assess: { everyGameMs: number }; // SYS-21 (D-114): the assessor refreshes its snapshot this often (and at once on an action or the ending)
   notification: { windowGameMs: number }; // SYS-14 (D-112): the breach-notification window after confirmation, GDPR's 72 h compressed to the run length
   struggle: { idleGameMs: number; soulsWindowGameMs: number; soulsFraction: number; unlocks: boolean }; // SYS-13 (D-113): struggling = no useful action for idleGameMs, or souls down by soulsFraction within soulsWindowGameMs; unlocks a suggestion on Medium/Hard only
   backupEveryGameMs: number; // DEF-17: hourly snapshots
@@ -100,6 +101,7 @@ const MEDIUM: EngineConfig = {
   proxies: { afterIpCuts: 3, pool: 24 },
   stuckBreathers: 2,
   taps: { everyGameMs: { min: 180 * REAL_S, max: 240 * REAL_S }, maxOpen: 2, dripEveryGameMs: 60 * REAL_S, dripFraction: 0.01 },
+  assess: { everyGameMs: 1 * REAL_S },
   notification: { windowGameMs: 6 * 60 * GAME_MIN }, // D-112: a run is about 6 game hours (PRD §1), so the 72 h clock runs 12× game time
   struggle: { idleGameMs: 90 * REAL_S, soulsWindowGameMs: 120 * REAL_S, soulsFraction: 0.1, unlocks: true }, // SYS-13
   backupEveryGameMs: 60 * GAME_MIN,

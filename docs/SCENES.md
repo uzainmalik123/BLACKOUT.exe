@@ -13,7 +13,7 @@
 1. **Readable data stays crisp text.** Logs, alerts, the terminal, consoles and the report are real text in a mono font. The dot-matrix effect is for the atmosphere (Death, minions, the room, charts), never for text the player has to read (GAME_PLAN §11.4).
 2. **The dot world bleeds into the screens.** Death's hand reaching over a panel, a panel glitching when a move lands: the room and the data should feel like one place, not panels pasted on a background.
 3. **Desktop only**, 1024 px wide and up; keyboard first. The terminal must always be one keypress away.
-4. **No spoilers on screen.** Never show internal ids (`ATK-08`, `MIN-02`) or which move an alert is "about". The player only learns what a real defender would see: logs, alerts, meters.
+4. **No spoilers on screen.** Never show internal ids (`ATK-08`, `MIN-02`) or which move an alert is "about". The player only learns what a real defender would see: logs, alerts, meters. The engine's live assessment (`world.assess`: grades, phase statuses, gaps; SYS-21, D-114) is **never shown as a score or a checklist during the run**: it feeds Kiro's hints and the report at the end, nothing else.
 5. **Our own or free-licence assets only** (images, fonts, sounds). The demo video can't contain copyrighted material (SUB-03).
 6. **Flashes:** impact frames and glitches flash at most 3 times per second (photosensitive seizure safety, WCAG 2.3.1).
 7. **Difficulty changes what the screens help with, never what's true:**

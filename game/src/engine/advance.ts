@@ -1,6 +1,7 @@
 // The one time step: real milliseconds in, the world moved forward in fixed game-time sub-steps (D-24),
 // so the order of effects never depends on the frame rate. Everything the engine does over time happens here.
 import { applyPendingPatches, takeBackupIfDue } from './actions';
+import { stepAssess } from './assess';
 import { realToGameMs } from './clock';
 import { CONFIG } from './config';
 import { stepCustomers } from './customers';
@@ -42,6 +43,7 @@ function step(world: World, library: RecordingLibrary, dt: number): void {
     directorTick(world, library);
   }
   checkEndings(world);
+  stepAssess(world); // SYS-21: last, so the snapshot sees everything this step did, the ending included
 }
 
 export function advance(world: World, library: RecordingLibrary, realMs: number): void {

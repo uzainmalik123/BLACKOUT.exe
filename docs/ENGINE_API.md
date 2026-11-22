@@ -71,6 +71,20 @@ statusClass(line.status)    // '1xx' | '2xx' | '3xx' | '4xx' | '5xx', for colour
 
 Both selectors are cheap enough to call every frame (the rate is counted incrementally), but once a second is plenty: they change per real minute. The talkers' window and the rate's buckets are real minutes (60 real s = 30 game min). Show them as any log viewer would, on every level: a top-talkers list, a small 4xx/5xx strip, coloured lines. Don't look up who a talker is in `world.logs.access[].by`: that's the spoiler the tools exist to replace.
 
+### 2.2 The judging engine (SYS-21, D-114): for the hint layer only
+
+`world.assess` is the engine's live assessment of the player, refreshed once a real second and at the ending (verdicts on actions land the tick they happen). **Never show any of it during the run**: a grade, a status, a gap or its evidence tells the player what they haven't found yet. It exists for the hint/Kiro layer (KIRO-03, CON-03) and for the report, which is its final snapshot.
+
+```ts
+world.assess.lastRelevantActionAt   // game ms of the last RELEVANT action (a focused look, a Users query, a fix on one of his moves…; ls/pwd/tail are not)
+world.assess.gap                    // { type, since }: the biggest gap standing, e.g. 'door-uninvestigated', 'foothold-unqueried', 'eradicated-without-evidence'; undefined when none
+world.assess.gaps                   // every gap standing now, biggest first (the types are GAP_TYPES in engine/assess.ts)
+world.assess.phases                 // per phase (detect, contain, eradicate, recover): { status, evidence: string[] } for Kiro's reasoning, not the screen
+world.assess.grades / facts / mistakes / missed   // the report as it would read now
+```
+
+A hint built on it names the *kind* of gap in the defender's own words ("have you looked at who that address is?"), never the move, the door or the foothold it is about. The `suggestion` event (§4) carries the gap's type for the same purpose.
+
 ## 3. What the player can do: `engine.act(action)`
 
 Every button, console and (later) shell command sends one of these. It returns `{ ok, message }`: show `message` to the player (e.g. in a console's status line or a toast).
@@ -152,7 +166,7 @@ interface Report {
 }
 function buildReport(world: World): Promise<Report>;
 ```
-**Built** (SYS-11, D-112): `import { buildReport } from './engine/report'`. It reads only `world.events`, so call it on the ending (or any time for a live preview). `grades` are letters per phase; `mistakes` come in phase order (detect, contain, eradicate, recover), each with the real-world reason to show under its title; `missed` are the footholds left behind, in words; `debrief` is a fixed placeholder with `offline: true` until Kiro writes it (KIRO-06), so label it "Kiro (offline)"; `markdown` is the whole report for the download button. Times in `facts` are game time, as the player's clock showed them.
+**Built** (SYS-11, D-112, D-114): `import { buildReport } from './engine/report'`. It is the judging engine's final snapshot (§2.2), so call it on the ending; before that it is a spoiler, not a preview. `grades` are letters per phase; `mistakes` come in phase order (detect, contain, eradicate, recover), each with the real-world reason to show under its title; `missed` are the footholds left behind, in words; `debrief` is a fixed placeholder with `offline: true` until Kiro writes it (KIRO-06), so label it "Kiro (offline)"; `markdown` is the whole report for the download button. Times in `facts` are game time, as the player's clock showed them.
 
 ---
 
