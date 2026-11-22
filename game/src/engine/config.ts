@@ -53,6 +53,7 @@ export interface EngineConfig {
     dripEveryGameMs: number; // D-42: an open tap drips once per real minute
     dripFraction: number; // D-42: each drip takes this share of the total souls (rounded, at least 1)
   };
+  assess: { everyGameMs: number }; // SYS-21 (D-114): the assessor refreshes its snapshot this often (and at once on an action or the ending)
   notification: { windowGameMs: number }; // SYS-14 (D-112): the breach-notification window after confirmation, GDPR's 72 h compressed to the run length
   backupEveryGameMs: number; // DEF-17: hourly snapshots
   scenarioStartIso: string; // D-24
@@ -99,6 +100,7 @@ const MEDIUM: EngineConfig = {
   proxies: { afterIpCuts: 3, pool: 24 },
   stuckBreathers: 2,
   taps: { everyGameMs: { min: 180 * REAL_S, max: 240 * REAL_S }, maxOpen: 2, dripEveryGameMs: 60 * REAL_S, dripFraction: 0.01 },
+  assess: { everyGameMs: 1 * REAL_S },
   notification: { windowGameMs: 6 * 60 * GAME_MIN }, // D-112: a run is about 6 game hours (PRD §1), so the 72 h clock runs 12× game time
   backupEveryGameMs: 60 * GAME_MIN,
   scenarioStartIso: '2026-10-31T22:00:00Z',
