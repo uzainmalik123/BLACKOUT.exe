@@ -26,7 +26,7 @@ async function baseline() {
 
 describe('every committed recording', () => {
   it('exists', () => {
-    const moves = ['ATK-01', 'ATK-03', 'ATK-04', 'ATK-06', 'ATK-08', 'ATK-08.b', 'ATK-08.c', 'ATK-08.d', 'ATK-08.e', 'ATK-08.f', 'ATK-08.g', 'ATK-09.b', 'ATK-09.c', 'ATK-11', 'ATK-13', 'ATK-15', 'ATK-17', 'MIN-01', 'MIN-02'];
+    const moves = ['ATK-01', 'ATK-03', 'ATK-04', 'ATK-06', 'ATK-08', 'ATK-08.b', 'ATK-08.c', 'ATK-08.d', 'ATK-08.e', 'ATK-08.f', 'ATK-08.g', 'ATK-09.b', 'ATK-09.c', 'ATK-11', 'ATK-13', 'ATK-15', 'ATK-17', 'MIN-01', 'MIN-02', 'MIN-03', 'MIN-04'];
     expect(jsonFiles).toEqual(expect.arrayContaining(moves.map((m) => (m.includes('.') ? `${m}.json` : `${m}.a.json`))));
   });
 
@@ -232,6 +232,33 @@ describe('MIN-02.a: credential stuffing wave', () => {
     expect(stolen).toHaveLength(wins.length);
     expect(stolen.every((id) => id > 25)).toBe(true);
     expect(exfilOf(r).map((e) => e.t)).toEqual(wins.map((e) => e.t));
+  });
+});
+
+describe('MIN-03.a and MIN-04.a: the should minions, one wave each (REC-05, D-132)', () => {
+  const WAVE_MS = 20_000; // a wave lasts 20 real s (config.ts) and replays a recorded second per real second
+
+  it('MIN-03.a is a scraper hammering the catalogue: GET /api/Products only, about 2 a second, a Scrapy agent, inside one wave', () => {
+    const r = load('MIN-03.a.json');
+    const access = accessOf(r);
+    expect(access.length).toBeGreaterThanOrEqual(20);
+    expect(access.every((e) => e.method === 'GET' && e.target === '/api/Products' && e.status === 200 && e.userAgent.startsWith('Scrapy/'))).toBe(true);
+    expect(access.every((e) => e.bytes > 10_000)).toBe(true); // the whole catalogue each time
+    expect(r.durationMs).toBeLessThanOrEqual(WAVE_MS);
+    expect(new Set(access.map((e) => e.ip)).size).toBe(1);
+  });
+
+  it('MIN-04.a is a spam bot: each post fetches a CAPTCHA first, every post is accepted, and the spam lands in Feedbacks, inside one wave', () => {
+    const r = load('MIN-04.a.json');
+    const access = accessOf(r);
+    const posts = access.filter((e) => e.method === 'POST' && e.target === '/api/Feedbacks/');
+    expect(posts.length).toBe(10);
+    expect(posts.every((e) => e.status === 201)).toBe(true);
+    access.forEach((e, i) => expect(e.target).toBe(i % 2 === 0 ? '/rest/captcha/' : '/api/Feedbacks/'));
+    const spam = dbOf(r).filter((e) => e.table === 'Feedbacks' && e.op === 'insert');
+    expect(spam).toHaveLength(10);
+    expect(spam.every((e) => /www\.example\.(com|net|org)/.test(String(e.after?.comment)))).toBe(true);
+    expect(r.durationMs).toBeLessThanOrEqual(WAVE_MS);
   });
 });
 
