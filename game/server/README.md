@@ -10,19 +10,25 @@ npm run server            # http://127.0.0.1:8787, API only; `npm run dev` proxi
 npm run server -- --serve-dist   # also serves game/dist (after `npm run build`): the production shape (SYS-18)
 ```
 
+The Fly image (`Dockerfile` at the repo root, `docs/HOSTING.md`, D-200) runs exactly this shape: `tsx server/main.ts` with `NODE_ENV=production`, `HOST=0.0.0.0`, `PORT=8080`, `kiro-cli` from Kiro's Linux zip, as a non-root user.
+
 Environment (read from the repo-root `.env`, see `.env.example`, or the shell):
 
 | Variable | Default | Meaning |
 |---|---|---|
 | `PORT`, `HOST` | `8787`, `127.0.0.1` | Where to listen (`HOST=0.0.0.0` in a container) |
 | `KIRO_CLI` | `kiro-cli` | The Kiro CLI binary (2.37.1 is what this was built against) |
-| `KIRO_API_KEY` | unset | Passed to `kiro-cli` as its environment when set. **Unset: `kiro-cli` uses its own login** (`kiro-cli login`), which is how the team's machines run it; this build of `kiro-cli` reports `is_api_key=false` in its logs when there is none, so a key is honoured if the CLI supports it |
+| `KIRO_API_KEY` | unset | Passed to `kiro-cli` as its environment when set (on Fly: `fly secrets set KIRO_API_KEY=…`, docs/HOSTING.md). **Unset: `kiro-cli` uses its own login** (`kiro-cli login`), which is how the team's machines run it; kiro-cli 3.5.0's logged-out error names `KIRO_API_KEY` as accepted (KI-201 until a key has run) |
+| `KIRO_STATE_FILE` | `server/.state/runs.json` | The counters between restarts (KI-193); `/data/runs.json` in the Fly image |
 | `NODE_ENV=production` | | Same as `--serve-dist` |
+
+At start-up the server logs **which auth mode kiro-cli will use** (`server/auth.ts`, D-200; no credits: with a key nothing runs, else `kiro-cli whoami --format json`): `[kiro] auth: KIRO_API_KEY set …`, `[kiro] auth: kiro-cli login on this machine (<who>)`, or `[kiro] auth: none (<why>); every run plays offline …` (KIRO-09).
 
 Logs go to stdout, one line per call: `[kiro] run <id> ask #3 (today 12/400): 7462 ms, credits 0.104, tools [@game/alerts @game/tail_logs], stop end_turn, 720 chars`. The credits are what Kiro's agent server reports per turn (`session_info_update` / `turn_completion`); KI-02 reads them from here.
 
 ## What it does
 
+- `GET /healthz` → 200 `{ ok, page, callsToday }` when the page is servable (in dev, with no `dist/`, the API alone is healthy), 503 when `dist/index.html` is missing. The host's check (Fly, SYS-18); it never starts Kiro. `/api/kiro/health` is the client's.
 - `POST /api/kiro/run` → `{ token, callsLeft }`. A run token per game; refused with 429 once the day's cap is spent.
 - `POST /api/kiro/ask | hint | explain | draft | debrief` with `{ token, snapshot, … }` (`src/kiro/client.ts` sends them). The **snapshot** (`src/kiro/snapshot.ts`) is the browser's spoiler-free view of the world: meters, alerts (kind and time only), the newest 500 log lines as rendered, accounts, uploads, defences, the player's last 20 actions. The server keeps the latest one per run; that is what Kiro's tools read.
 - `POST /mcp/<token>`: the game tools (KIRO-07) as an **MCP server over HTTP**, inside this process. `kiro-cli acp` is given its URL in `session/new`. Nine read-only tools: `alerts`, `meters`, `search_logs`, `tail_logs`, `accounts`, `uploads`, `defences`, `recent_actions`, `command_list`. No write tool exists.
