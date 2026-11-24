@@ -1,6 +1,9 @@
 // The Kiro server against the fake ACP agent (server/test/fake-acp.mjs): no Kiro, no credits (PRD SYS-12, KIRO-07..10).
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { DRAFTS, OFFLINE_ANSWER, debriefTemplate } from '../src/content/kiro-fallback';
@@ -207,6 +210,31 @@ describe('the Kiro server (SYS-12)', () => {
     expect((await h.post('/api/kiro/end', { token })).json).toEqual({ ok: true });
     expect((await h.post('/api/kiro/ask', { token, snapshot: SNAPSHOT, question: 'x' })).status).toBe(401);
     expect(h.log.some((l) => /ended after 1 calls/.test(l))).toBe(true);
+  });
+
+  it('GET /healthz (SYS-18) says whether the page is servable and starts no agent', async () => {
+    const runsBefore = h.log.length;
+    const dev = await fetch(`http://127.0.0.1:${h.port}/healthz`);
+    expect(dev.status).toBe(200); // no dist configured: the API alone is healthy (dev shape)
+    expect(await dev.json()).toMatchObject({ ok: true, page: true });
+    expect((await fetch(`http://127.0.0.1:${h.port}/healthz`, { method: 'POST' })).status).toBe(405);
+    expect(h.log.length).toBe(runsBefore); // nothing spawned, nothing logged
+
+    const dist = mkdtempSync(join(tmpdir(), 'kiro-dist-'));
+    const prod = createServer(createHandler({ runs: h.runs, distDir: dist }));
+    await new Promise<void>((r) => prod.listen(0, '127.0.0.1', r));
+    const port = (prod.address() as AddressInfo).port;
+    try {
+      expect((await fetch(`http://127.0.0.1:${port}/healthz`)).status).toBe(503); // dist without index.html: not servable
+      writeFileSync(join(dist, 'index.html'), '<!doctype html><title>BLACKOUT.exe</title>');
+      expect((await fetch(`http://127.0.0.1:${port}/healthz`)).status).toBe(200);
+      const page = await fetch(`http://127.0.0.1:${port}/`);
+      expect(page.headers.get('content-type')).toContain('text/html');
+      expect(await page.text()).toContain('BLACKOUT.exe');
+    } finally {
+      await new Promise<void>((r) => prod.close(() => r()));
+      rmSync(dist, { recursive: true, force: true });
+    }
   });
 });
 

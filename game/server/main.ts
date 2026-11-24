@@ -1,12 +1,14 @@
 // The Kiro server's entry point (PRD SYS-12, D-190): `npm run server` in game/. Reads the repo-root `.env`
 // (KIRO_API_KEY, optional), starts `http` on PORT (8787), and runs one `kiro-cli acp --agent-engine v3` per run
 // with the custom agent in `.kiro/agents/kiro-game.*`. With `--serve-dist` (or NODE_ENV=production) it also
-// serves `game/dist` (SYS-18). In dev, Vite proxies `/api/kiro/*` here.
+// serves `game/dist` and answers `GET /healthz` for the host (SYS-18; the Fly image runs it this way, D-200).
+// In dev, Vite proxies `/api/kiro/*` here.
 import { existsSync, readFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createHandler } from './app';
+import { describeAuth, detectAuth } from './auth';
 import { AGENT_NAME, Runs } from './runs';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -36,11 +38,9 @@ export function main(): void {
   // The agent's environment: a copy of ours (PATH, HOME for the login), plus KIRO_API_KEY when the .env has one.
   // Runs adds ASBX_KIRO_MANDATORY_MCPS so Kiro's agent server shows the game tools to the model (runs.ts).
   const env: NodeJS.ProcessEnv = { ...process.env };
-  const apiKey = process.env.KIRO_API_KEY;
-  if (apiKey) {
-    env.KIRO_API_KEY = apiKey;
-    log('[kiro] KIRO_API_KEY set: passed to kiro-cli');
-  } else log('[kiro] no KIRO_API_KEY in .env: kiro-cli uses its own login (`kiro-cli login`)');
+  // The auth mode, one line at start-up (SYS-18, D-200): a key, the CLI's own login, or none (every run then plays
+  // offline, KIRO-09). Costs no credits; with a key nothing is run.
+  void detectAuth({ env, kiroCli }).then((a) => log(describeAuth(a)));
 
   // KI-193: the caps survive a restart in a small JSON file (gitignored), KIRO_STATE_FILE to move it.
   const stateFile = process.env.KIRO_STATE_FILE ?? join(gameDir, 'server', '.state', 'runs.json');
