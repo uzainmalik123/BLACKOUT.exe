@@ -9,7 +9,7 @@
 //
 // Rendered into an offscreen canvas only when the pose changes; the scene moves it each frame.
 
-import { GlyphAtlas, codes, edgeChar } from './atlas';
+import { GlyphAtlas, codes, edgeChar } from '../shared/atlas';
 import { clamp, hash2, lerp } from './curtain';
 
 export interface HandPose {

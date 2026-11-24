@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 250" width="1200" height="250" role="img" aria-label="Death's attack chain: scout, break in, become admin, harvest souls, dig in, strike.">
+<style>
+  text{font-family:Consolas, 'DejaVu Sans Mono', Menlo, 'Courier New', monospace}
+  .hd{font:700 13px Consolas, 'DejaVu Sans Mono', Menlo, 'Courier New', monospace;letter-spacing:4px;fill:#8b8f98}
+  .num{font:700 15px Consolas, 'DejaVu Sans Mono', Menlo, 'Courier New', monospace;fill:#f3ede2}
+  .nm{font:700 14px Consolas, 'DejaVu Sans Mono', Menlo, 'Courier New', monospace;letter-spacing:2px}
+  .wh{font:12px Consolas, 'DejaVu Sans Mono', Menlo, 'Courier New', monospace;fill:#9aa3ae}
+  .tt{font:11px Consolas, 'DejaVu Sans Mono', Menlo, 'Courier New', monospace;fill:#e3b25c}
+  .trail{fill:none;stroke:#e1182c;stroke-width:3;stroke-dasharray:1000;animation:trail 14s linear infinite;filter:drop-shadow(0 0 5px #e1182c)}
+  @keyframes trail{0%{stroke-dashoffset:1000}75.00%,92%{stroke-dashoffset:0}100%{stroke-dashoffset:1000}}
+  .reap{font:26px Consolas, 'DejaVu Sans Mono', Menlo, 'Courier New', monospace;fill:#f3ede2;animation:reap 14s linear infinite}
+  @keyframes reap{0%{transform:translateX(0);opacity:1}75.00%{transform:translateX(1000px);opacity:1}92%{transform:translateX(1000px);opacity:1}93%,100%{opacity:0}}
+  .ban{font:italic 15px Georgia, 'Times New Roman', serif;fill:#22ff88;opacity:0;animation:ban 14s infinite}
+  @keyframes ban{0%,75.00%{opacity:0}80.71%,92%{opacity:1}100%{opacity:0}}
+.n0{animation:n0 14s infinite}@keyframes n0{0%,0.00%{fill:#141a22;stroke:#3a4656}2.86%,92%{fill:#3a0610;stroke:#e1182c}100%{fill:#141a22;stroke:#3a4656}}
+.s0{animation:s0 14s infinite}@keyframes s0{0%,0.00%{fill:#8b8f98}2.86%,92%{fill:#f3ede2}100%{fill:#8b8f98}}
+.n1{animation:n1 14s infinite}@keyframes n1{0%,15.00%{fill:#141a22;stroke:#3a4656}17.86%,92%{fill:#3a0610;stroke:#e1182c}100%{fill:#141a22;stroke:#3a4656}}
+.s1{animation:s1 14s infinite}@keyframes s1{0%,15.00%{fill:#8b8f98}17.86%,92%{fill:#f3ede2}100%{fill:#8b8f98}}
+.n2{animation:n2 14s infinite}@keyframes n2{0%,30.00%{fill:#141a22;stroke:#3a4656}32.86%,92%{fill:#3a0610;stroke:#e1182c}100%{fill:#141a22;stroke:#3a4656}}
+.s2{animation:s2 14s infinite}@keyframes s2{0%,30.00%{fill:#8b8f98}32.86%,92%{fill:#f3ede2}100%{fill:#8b8f98}}
+.n3{animation:n3 14s infinite}@keyframes n3{0%,45.00%{fill:#141a22;stroke:#3a4656}47.86%,92%{fill:#3a0610;stroke:#e1182c}100%{fill:#141a22;stroke:#3a4656}}
+.s3{animation:s3 14s infinite}@keyframes s3{0%,45.00%{fill:#8b8f98}47.86%,92%{fill:#f3ede2}100%{fill:#8b8f98}}
+.n4{animation:n4 14s infinite}@keyframes n4{0%,60.00%{fill:#141a22;stroke:#3a4656}62.86%,92%{fill:#3a0610;stroke:#e1182c}100%{fill:#141a22;stroke:#3a4656}}
+.s4{animation:s4 14s infinite}@keyframes s4{0%,60.00%{fill:#8b8f98}62.86%,92%{fill:#f3ede2}100%{fill:#8b8f98}}
+.n5{animation:n5 14s infinite}@keyframes n5{0%,75.00%{fill:#141a22;stroke:#3a4656}77.86%,92%{fill:#3a0610;stroke:#e1182c}100%{fill:#141a22;stroke:#3a4656}}
+.s5{animation:s5 14s infinite}@keyframes s5{0%,75.00%{fill:#8b8f98}77.86%,92%{fill:#f3ede2}100%{fill:#8b8f98}}
+
+  @media (prefers-reduced-motion: reduce){*{animation:none!important}}
+</style>
+<rect width="1200" height="250" rx="10" fill="#07090d"/>
+<text class="hd" x="600" y="34" text-anchor="middle">DEATH'S ATTACK CHAIN · EVERY MOVE REALLY RUN, THEN RECORDED</text>
+<line x1="100" y1="105" x2="1100" y2="105" stroke="#263040" stroke-width="3"/>
+<path class="trail" d="M100 105 H1100"/>
+<circle class="n0" cx="100" cy="105" r="20" stroke-width="2"/>
+<text x="100" y="110" text-anchor="middle" class="num">1</text>
+<text class="s0 nm" x="100" y="155" text-anchor="middle">SCOUT</text>
+<text class="wh" x="100" y="175" text-anchor="middle">ffuf directory scan</text>
+<text class="tt" x="100" y="193" text-anchor="middle">T1595.003</text>
+<circle class="n1" cx="300" cy="105" r="20" stroke-width="2"/>
+<text x="300" y="110" text-anchor="middle" class="num">2</text>
+<text class="s1 nm" x="300" y="155" text-anchor="middle">BREAK IN</text>
+<text class="wh" x="300" y="175" text-anchor="middle">SQLi or Hydra on /login</text>
+<text class="tt" x="300" y="193" text-anchor="middle">T1190 · T1110</text>
+<circle class="n2" cx="500" cy="105" r="20" stroke-width="2"/>
+<text x="500" y="110" text-anchor="middle" class="num">3</text>
+<text class="s2 nm" x="500" y="155" text-anchor="middle">BECOME ADMIN</text>
+<text class="wh" x="500" y="175" text-anchor="middle">registers his own admin</text>
+<text class="tt" x="500" y="193" text-anchor="middle">T1136 · T1078</text>
+<circle class="n3" cx="700" cy="105" r="20" stroke-width="2"/>
+<text x="700" y="110" text-anchor="middle" class="num">4</text>
+<text class="s3 nm" x="700" y="155" text-anchor="middle">HARVEST SOULS</text>
+<text class="wh" x="700" y="175" text-anchor="middle">sqlmap dumps customers</text>
+<text class="tt" x="700" y="193" text-anchor="middle">T1190 · T1041</text>
+<circle class="n4" cx="900" cy="105" r="20" stroke-width="2"/>
+<text x="900" y="110" text-anchor="middle" class="num">5</text>
+<text class="s4 nm" x="900" y="155" text-anchor="middle">DIG IN</text>
+<text class="wh" x="900" y="175" text-anchor="middle">hidden admin + planted file</text>
+<text class="tt" x="900" y="193" text-anchor="middle">T1136 · T1098</text>
+<circle class="n5" cx="1100" cy="105" r="20" stroke-width="2"/>
+<text x="1100" y="110" text-anchor="middle" class="num">6</text>
+<text class="s5 nm" x="1100" y="155" text-anchor="middle">STRIKE</text>
+<text class="wh" x="1100" y="175" text-anchor="middle">ransom note, defaced shop</text>
+<text class="tt" x="1100" y="193" text-anchor="middle">T1491.002</text>
+
+<text class="reap" x="91" y="75">☠</text>
+<text class="ban" x="600" y="236" text-anchor="middle">…unless you close every route and pull out every foothold first. Then he's banished.</text>
+</svg>

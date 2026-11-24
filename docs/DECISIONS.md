@@ -710,6 +710,23 @@
 - **Name:** the screen uses **BLACKOUT.exe**, from App's `TITLE` constant, so it stays one edit to change (KI-01 stays open until the team confirms the name).
 - **Consequences:** `gsap` and `pixi.js` (added for an earlier attempt) are not used and not in `package.json`. UI-02's scenario list and difficulty pick come after ENTER and are not built yet.
 
+### D-181: The menu is a haunted forest where she hides behind a dead tree (UI-02's scenario and difficulty pick)
+- **Context:** (2026-11-24) D-180 left UI-02's scenario list and difficulty pick for the screen after ENTER. The team asked for that screen as an all-ASCII, live horror menu from a reference image (a twisted dead tree, a long-haired figure with two glowing eyes peeking out from behind it), with her as the main scare.
+- **Decision:** `game/src/frontend/screen2-menu/`. A night forest painted procedurally and redrawn as characters every frame, with no image or video files. Moonlit mist is the light, made of drifting character fog. The twisted dead tree on the right, its branches moving in the wind, the brambles and she are darkness carved out of it, and a ground mist drifts in front. Behind the trunk is an enchantress: a void-black head and long drifting hair with two glowing eyes. When she is out, a dim, bloodless face shows between the parted hair, with hollow black sockets and a long black mouth that slowly falls open. Her eyes are almonds of white light with trembling pinpoint pupils. As she comes out, two pale hands with long fingers curl round the edge of the trunk, one above her head. Her shroud hangs in faint dark folds, and the moon catches her outline. The tree is drawn the same way: black inside, with moonlit outlines and twigs. She is never on show for long. Her eyes come first, then she comes out fast, in a jerk, and tilts her head. Then she withdraws slowly with her eyes still lit, vanishes, or turns up somewhere else (in the fork of the branches, or low by the roots). Her motion goes stop-motion now and then, and the mist warps around her. Glitches and light dips are rare and small. She answers the menu:
+  - Moving the selection makes her peek further, shift or vanish.
+  - The difficulty sets how bold she is (Easy: she mostly hides; Hard: she leans right out).
+  - **Start Game** makes her lunge at the player before the screen cuts to black.
+
+  The title is **BLACKOUT.exe**, small in the top-left corner, as character type in bone white soaking into blood (a crisp letter plate under one even character texture, so it reads at that size), with live drips. The menu fills the left of the screen under it as a column of large **liquid-glass** pills (CSS and an SVG displacement filter: the forest behind them is bent with a little chromatic aberration, then frosted, tinted and bevelled; no new dependency). The pills hold real, readable text (Cinzel): **Start Game**, **Scenario: Juice Shop Breach** (the only one), **Difficulty: Easy / Medium / Hard** (three small glass pills) with SCENES §2's one-liners underneath, and **Exit**. They fade in once and then stay. Controls:
+  - Up and Down move between the items, and Left and Right change the difficulty.
+  - Enter confirms, and Escape (or Exit) goes back to the title screen, since a browser tab cannot close itself.
+  - Mouse and touchpad work by hover and click.
+  - No key hints or arrow glyphs appear on screen.
+
+  The selected pill glows with a slow red light inside the glass; nothing on the menu glitches. The screen is silent. The menu's state and her behaviour are pure modules with tests (`menu.ts`, `haunt.ts`).
+- **Folders:** `game/src/frontend/` is split by screen: `screen1-title/` holds D-180's files, `screen2-menu/` this screen, and `shared/` what both draw with (the glyph atlas and the small maths).
+- **Consequences:** Start Game hands the chosen scenario and difficulty to App. The briefing (UI-03) is not built, so App shows a placeholder after it. UI-02 is done.
+
 ### D-161: Kiro hooks run one folder's tests per save and the full health at stop (KDEV-03)
 - **Context:** (2026-11-24) KDEV-03 said "run `npm run health` when `game/src` files are saved". Health is typecheck, lint and the whole suite (the shell alone has 62 test files), so running it after every edit would make each save take a long time and the agent would wait on it constantly.
 - **Decision** (`.kiro/hooks/*.json`, helper `scripts/kiro-hook.mjs`):
