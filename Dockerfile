@@ -41,8 +41,8 @@ ENV NODE_ENV=production \
 
 WORKDIR /app
 # The custom agent the server copies into each run's temp folder (D-190).
-COPY .kiro/agents /app/.kiro/agents
-COPY .kiro/prompts /app/.kiro/prompts
+COPY .kiro/agents/kiro-game.json /app/.kiro/agents/kiro-game.json
+COPY .kiro/prompts/kiro-game.md /app/.kiro/prompts/kiro-game.md
 # The server runs from TypeScript with tsx (a runtime dependency) and imports the rails and the fallback texts
 # from src/, so src/ ships too; dist/ is the built page it serves.
 COPY --from=build /app/game/node_modules /app/game/node_modules
