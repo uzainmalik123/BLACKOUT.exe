@@ -282,7 +282,7 @@ The rules judge **how well we used Kiro**, and the write-up (SUB-07) may only cl
 |---|---|---|---|---|
 | KDEV-01 | **Steering** | `.kiro/steering/`: the project rules (pointing at `AGENTS.md`) and the shell's command list, always included | Files exist; a test checks the steering command list matches SYS-09's exported list | M |
 | KDEV-02 | **Spec-driven** | The shell (SYS-09) is built from a Kiro spec in `.kiro/specs/shell/` (requirements, design, tasks) made from its PRD row | The spec is in the repo and its tasks are done in Kiro | M |
-| KDEV-03 | **Hooks** | (a) run `npm run health` when `game/src` files are saved; (b) when `game/src/rules/` changes, remind to update the PRD row's status | Both hooks in `.kiro/hooks/` and seen working | M |
+| KDEV-03 | **Hooks** | (a) after an edit under `game/src/`, run the tests of that file's folder (D-161); (b) after an edit under `game/src/rules/` or `game/src/engine/`, remind to update the PRD row's status in §16 and add a decision if a rule changed; (c) when the agent stops, run `npm run health` and block the stop with "health is red" if it fails | The three hooks in `.kiro/hooks/` and seen working | M |
 | KDEV-04 | **Property-based testing** | The fast-check suites in SYS-09 and SYS-17, written with Kiro | They run in `npm test` | M |
 | KDEV-05 | **Kiro plays Death** | Kiro CLI writes and runs the recording scripts (REC-03) against the isolated rig only | Each recording script was made in a logged Kiro session | S |
 | KDEV-06 | **Custom agent + MCP + CLI in the product** | The in-game Kiro: a custom agent (KIRO-08 prompt) over `kiro-cli acp` using our MCP game tools (KIRO-07, SYS-12) | KIRO-07 and SYS-12 are done | M |
@@ -374,6 +374,7 @@ Rows not listed here are `planned`. A PR that moves a row adds or updates its li
 | TAP-02 | building | As TAP-01; TAP-02.a: 27.5 s, 10 requests (6,183 bytes each, the 5 posters' emails and hashes), 2.6 KB. Leaks only 5 of Juice Shop's own users, usually gone to the first harvest visit (KI-73) |
 | TAP-03 | building | As TAP-01; TAP-03.a: 55.9 s, 56 requests (products 1 to 56, the 12 reviewers' emails), 13.5 KB. Leaks only 12 of Juice Shop's own users (KI-73) |
 | KDEV-02 | done | The spec is in `.kiro/specs/shell/` (requirements, design, tasks); all its tasks are done (final checkpoint 23.2: `npm run health` green twice and under `--pool=threads --maxWorkers=1`) |
+| KDEV-03 | done | `.kiro/hooks/test-on-save.json`, `prd-status-reminder.json`, `health-before-stop.json` + `scripts/kiro-hook.mjs` (D-161). Each run by hand with a sample event and shown working; not yet seen firing inside a live Kiro session (KI-181) |
 | KDEV-04 | building | The fast-check suites for the shell (`game/src/shell/*.property.test.ts`, properties 1–27) run in `npm test`; SYS-17's suite is `rules/properties.test.ts` |
 | CON-01 | done | `game/src/content/briefing/`: system map, admins, normal traffic, playbook; a test checks the admin list and counts against the baseline DB |
 | CON-02 | done | `game/src/content/patches.ts`: for each of the 8 patches the real Juice Shop v20.4.0 lines (file, line range, quoted under its MIT licence) and a fix diff with a one-sentence why; a test checks every `Patch` value has an entry and that each diff's removed lines are the quoted ones (D-150) |

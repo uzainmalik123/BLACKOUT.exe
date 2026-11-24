@@ -1,0 +1,16 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "test-on-save",
+      "description": "After an edit under game/src/, run only that file's folder's tests and fail loudly if red (KDEV-03, D-161)",
+      "trigger": "PostToolUse",
+      "matcher": "^(fs_write|fs_append|str_replace)$",
+      "timeout": 300,
+      "action": {
+        "type": "command",
+        "command": "node scripts/kiro-hook.mjs test-folder"
+      }
+    }
+  ]
+}
