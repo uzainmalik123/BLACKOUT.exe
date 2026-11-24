@@ -11,43 +11,94 @@
   "resources": [
     "file://AGENTS.md"
   ],
-  "hooks": {
-    "postToolUse": [
-      {
-        "command": "node scripts/kiro-hook.mjs test-folder",
-        "matcher": "fs_write",
-        "description": "tests for the saved folder"
+  "hooks": [
+    {
+      "name": "postToolUse-0",
+      "trigger": "postToolUse",
+      "matcher": "write",
+      "action": {
+        "type": "command",
+        "command": "node scripts/kiro-hook.mjs test-folder"
       },
-      {
-        "command": "node scripts/kiro-hook.mjs test-folder",
-        "matcher": "str_replace"
+      "timeout": 300
+    },
+    {
+      "name": "postToolUse-1",
+      "trigger": "postToolUse",
+      "matcher": "str_replace",
+      "action": {
+        "type": "command",
+        "command": "node scripts/kiro-hook.mjs test-folder"
       },
-      {
-        "command": "node scripts/kiro-hook.mjs test-folder",
-        "matcher": "fs_append"
+      "timeout": 300
+    },
+    {
+      "name": "postToolUse-2",
+      "trigger": "postToolUse",
+      "matcher": "fs_append",
+      "action": {
+        "type": "command",
+        "command": "node scripts/kiro-hook.mjs test-folder"
       },
-      {
-        "command": "node scripts/kiro-hook.mjs prd-reminder",
-        "matcher": "fs_write",
-        "description": "PRD status reminder"
+      "timeout": 300
+    },
+    {
+      "name": "postToolUse-3",
+      "trigger": "postToolUse",
+      "matcher": "write",
+      "action": {
+        "type": "command",
+        "command": "node scripts/kiro-hook.mjs prd-reminder"
       },
-      {
-        "command": "node scripts/kiro-hook.mjs prd-reminder",
-        "matcher": "str_replace"
+      "timeout": 30
+    },
+    {
+      "name": "postToolUse-4",
+      "trigger": "postToolUse",
+      "matcher": "str_replace",
+      "action": {
+        "type": "command",
+        "command": "node scripts/kiro-hook.mjs prd-reminder"
       },
+      "timeout": 30
+    },
+    {
+      "name": "postToolUse-5",
+      "trigger": "postToolUse",
+      "matcher": "fs_append",
+      "action": {
+        "type": "command",
+        "command": "node scripts/kiro-hook.mjs prd-reminder"
+      },
+      "timeout": 30
+    },
+    {
+      "name": "stop-0",
+      "trigger": "stop",
+      "action": {
+        "type": "command",
+        "command": "cd game && if npm run health >/tmp/kiro-health.log 2>&1; then echo \"$(date -Is) stop HEALTH GREEN\" >> ../.kiro/hooks.log; echo 'health is green'; else echo \"$(date -Is) stop HEALTH RED\" >> ../.kiro/hooks.log; tail -n 40 /tmp/kiro-health.log >&2; printf '%s' '{\"decision\":\"block\",\"reason\":\"health is red\"}'; echo 'health is red' >&2; exit 1; fi"
+      },
+      "timeout": 900
+    }
+  ],
+  "toolsSettings": {},
+  "includeMcpJson": true,
+  "model": null,
+  "permissions": {
+    "rules": [
       {
-        "command": "node scripts/kiro-hook.mjs prd-reminder",
-        "matcher": "fs_append"
-      }
-    ],
-    "stop": [
-      {
-        "command": "cd game && if npm run health >/tmp/kiro-health.log 2>&1; then echo 'health is green' >&2; else tail -n 40 /tmp/kiro-health.log >&2; printf '%s' '{\"decision\":\"block\",\"reason\":\"health is red\"}'; echo 'health is red' >&2; exit 1; fi",
-        "description": "health at stop"
+        "capability": "fs_read",
+        "match": [
+          "./**"
+        ],
+        "effect": "allow"
       }
     ]
   },
-  "toolsSettings": {},
-  "includeMcpJson": true,
-  "model": null
+  "kiroUpgrade": {
+    "revision": 2,
+    "fingerprint": "sha256:436c9a34bc95c4f66215902be9d57510b5046268eebe390c828509951132964f",
+    "source": "sha256:e0be3498f729d24bf533be778ba0e8ca32637548d2abf8453a713329313ef5ee"
+  }
 }

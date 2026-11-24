@@ -8,7 +8,7 @@
       "timeout": 900,
       "action": {
         "type": "command",
-        "command": "cd game && if npm run health >/tmp/kiro-health.log 2>&1; then echo 'health is green' >&2; else tail -n 40 /tmp/kiro-health.log >&2; printf '%s' '{\"decision\":\"block\",\"reason\":\"health is red\"}'; echo 'health is red' >&2; exit 1; fi"
+        "command": "cd game && if npm run health >/tmp/kiro-health.log 2>&1; then echo \"$(date -Is) stop HEALTH GREEN\" >> ../.kiro/hooks.log; echo 'health is green'; else echo \"$(date -Is) stop HEALTH RED\" >> ../.kiro/hooks.log; tail -n 40 /tmp/kiro-health.log >&2; printf '%s' '{\"decision\":\"block\",\"reason\":\"health is red\"}'; echo 'health is red' >&2; exit 1; fi"
       }
     }
   ]

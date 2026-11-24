@@ -6,7 +6,7 @@
       "description": "After a change under game/src/rules/ or game/src/engine/, remind to update the PRD row status and add a decision (KDEV-03, AGENTS.md)",
       "trigger": "PostToolUse",
       "matcher": "write",
-      "timeout": 10,
+      "timeout": 30,
       "action": {
         "type": "command",
         "command": "node scripts/kiro-hook.mjs prd-reminder"
