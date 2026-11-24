@@ -84,6 +84,7 @@
 | D-120 | A soul door Death "got into" is one he started a harvest visit through, even if it was cut short; every such door needs its real fix for banished and for clean-handover (refines D-117) | Accepted |
 | D-121 | The idle check is "a do-nothing player never wins" on every level and seed (every soul lost, a flatline or walked away at the shift's end all pass), not "loses before the shift ends" (amends D-118) | Accepted |
 | D-122 | The event log keeps only what the judge needs of a read's `shown` lines (how many were passed, how many were Death's, what they were about, and `shownTotal`), never the text (amends D-115) | Accepted |
+| D-160 | The shell's read actions (DEF-01/02/03) carry `shown` and `shownTotal` = the Command_Line's final screen output (first 200 lines, and the line count), queued at first read and sent when the line finishes; empty for a `>` redirect (feeds D-115) | Accepted |
 | D-170 | Parked ideas get their limits fixed when they're parked (PRD §14.1): log rotation (PARK-01) and Death flooding the logs (PARK-02: one paced move, once per run, ≤ 60 s, Hard or after a tip-off, visible and stoppable) | Accepted |
 
 ### D-01: Pivot to an incident-response game
@@ -673,3 +674,12 @@
 - **Decision:** PRD §14.1 holds parked ideas with their rules. PARK-01 log rotation; PARK-02 a log flood only as one Death move under D-41's pacing, at most once per run, Hard or after a tip-off, a burst of at most 60 real seconds, from a real recording, visible in SYS-20's tools and stoppable by DEF-07/DEF-12. Parked rows use their own IDs so the PRD tests that read §3 and §5 don't expect them in code.
 - **Consequences:** promoting a parked idea is a PRD edit plus a decision. The engine's memory doesn't depend on PARK-01 (D-115 stores counts, not text).
 
+### D-160: The shell's read actions carry what reached the screen (feeds D-115)
+- **Context:** (2026-11-22) D-115 judges a read by the `shown` lines it passes. The first idea was to send the reading stage's own output, but players focus with pipelines (`cat log | grep IP`, `tail -n 1000 log | grep sqlmap`, `... | sort | uniq -c`), so the reading stage's output is often the unfocused one. The team ruled: `shown` is what the player saw.
+- **Decision** (`game/src/shell/tracker.ts`, `exec.ts`; R14.8):
+  1. DEF-01/02/03 stay queued once per kind per line, in first-read order (D-98), but are **sent when the whole Command_Line has finished**, not at the read.
+  2. Each carries the same `shown` (the first 200 lines, `SHOWN_LINES_MAX`, of the line's final stdout, what `run` prints before stderr, split as `splitLines` does) and `shownTotal` (that stdout's line count).
+  3. A line that redirects with `>` showed nothing: `shown: []`, `shownTotal: 0`. A failed line still sends its queued actions with the stdout it printed. A line that queued nothing sends nothing. stderr is never in `shown`.
+  4. A refused action prints `<cmd>: <message>` for the command that first queued that kind, and no further `Engine.act` call follows for the line (R14.6).
+- **Tests:** `tracker.test.ts`: `grep` that prints Death's lines sends them in `shown`; `cat access.log | grep <Death's IP>` sends only grep's lines; a 10,000-line `cat` sends 200 lines and `shownTotal` 10000; `grep X log > /tmp/o` sends `[]` and 0. The read-action property (Property 18) and other tests that assumed "sent at read time" are updated.
+- **Consequences:** R14.5's timing is refined, not its count or payload keys. The game time of a read action is that of the line's end; a stage-by-stage `act` order no longer interleaves with a later stage's writes (a pipeline never mixes reads and writes today).

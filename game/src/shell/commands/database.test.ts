@@ -75,16 +75,17 @@ describe('sqlite3 DEF-02 once per line (R7.2, R7.16, R7.17)', () => {
   it('a SELECT sends one DEF-02 carrying the SQL', async () => {
     const f = makeFixture();
     await f.shell.run(`sqlite3 ${DB} "SELECT 1"`);
-    expect(f.actsOfType('DEF-02')).toEqual([{ type: 'DEF-02', sql: 'SELECT 1' }]);
+    // The logged event keeps the D-122 summary of `shown`, not the text.
+    expect(f.actsOfType('DEF-02')).toMatchObject([{ type: 'DEF-02', sql: 'SELECT 1', shownCount: 1, shownTotal: 1 }]);
   }, 30_000);
 
   it('.tables and .schema each send one DEF-02', async () => {
     const f = makeFixture();
     await f.shell.run(`sqlite3 ${DB} .tables`);
     await f.shell.run(`sqlite3 ${DB} .schema`);
-    expect(f.actsOfType('DEF-02')).toEqual([
-      { type: 'DEF-02', sql: '.tables' },
-      { type: 'DEF-02', sql: '.schema' },
+    expect(f.actsOfType('DEF-02')).toMatchObject([
+      { type: 'DEF-02', sql: '.tables', shownCount: 1, shownTotal: 1 },
+      { type: 'DEF-02', sql: '.schema', shownTotal: expect.any(Number) },
     ]);
   }, 30_000);
 
@@ -92,7 +93,7 @@ describe('sqlite3 DEF-02 once per line (R7.2, R7.16, R7.17)', () => {
     const f = makeFixture();
     const r = await f.shell.run(`sqlite3 ${DB} "SELECT 1; SELECT 2"`);
     expect(r.output).toBe('1\n2');
-    expect(f.actsOfType('DEF-02')).toEqual([{ type: 'DEF-02', sql: 'SELECT 1' }]);
+    expect(f.actsOfType('DEF-02')).toMatchObject([{ type: 'DEF-02', sql: 'SELECT 1', shownCount: 2, shownTotal: 2 }]);
   }, 30_000);
 
   it('a pipeline of two sqlite3 stages sends one DEF-02', async () => {
@@ -150,7 +151,8 @@ describe('sqlite3 errors send no action (R7.7, R7.8, R7.9, R7.15, R7.17, R7.21, 
     const f = makeFixture();
     const r = await f.shell.run(`sqlite3 ${DB} "SELECT 1; SELECT * FROM nope; SELECT 3"`);
     expect(r).toEqual({ output: 'Error: no such table: nope\n1', exitCode: 1 });
-    expect(f.actsOfType('DEF-02')).toEqual([{ type: 'DEF-02', sql: 'SELECT 1' }]);
+    // `shown` is the final stdout only; the stderr line is not counted.
+    expect(f.actsOfType('DEF-02')).toMatchObject([{ type: 'DEF-02', sql: 'SELECT 1', shownCount: 1, shownTotal: 1 }]);
   }, 30_000);
 
   it('an Engine without a baseline prints Error: database is unavailable', async () => {

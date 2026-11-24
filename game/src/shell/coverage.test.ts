@@ -334,14 +334,15 @@ describe('R16.2: the read actions and the session examples', () => {
     const act = vi.spyOn(f.engine, 'act');
     act.mockClear();
     const line = `grep GET ${LOG}`;
-    await f.shell.run(line);
-    expect(actsOf(act)).toEqual([{ type: 'DEF-01', query: line }]);
+    const g = await f.shell.run(line);
+    const gl = g.output.split('\n');
+    expect(actsOf(act)).toEqual([{ type: 'DEF-01', query: line, shown: gl.slice(0, 200), shownTotal: gl.length }]);
     act.mockClear();
-    await f.shell.run(`sqlite3 ${DB} "SELECT id FROM Users LIMIT 1"`);
-    expect(actsOf(act)).toEqual([{ type: 'DEF-02', sql: 'SELECT id FROM Users LIMIT 1' }]);
+    const q = await f.shell.run(`sqlite3 ${DB} "SELECT id FROM Users LIMIT 1"`);
+    expect(actsOf(act)).toEqual([{ type: 'DEF-02', sql: 'SELECT id FROM Users LIMIT 1', shown: q.output.split('\n'), shownTotal: 1 }]);
     act.mockClear();
     expect((await f.shell.run(`cat ${UP}/complaints/rip.php`)).output).toBe('<?php echo 1;');
-    expect(actsOf(act)).toEqual([{ type: 'DEF-03', path: `${UP}/complaints/rip.php` }]);
+    expect(actsOf(act)).toEqual([{ type: 'DEF-03', path: `${UP}/complaints/rip.php`, shown: ['<?php echo 1;'], shownTotal: 1 }]);
   });
 
   it('clear returns the clear flag', { timeout: T }, async () => {

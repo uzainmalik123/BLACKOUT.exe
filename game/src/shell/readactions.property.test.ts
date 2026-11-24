@@ -1,7 +1,7 @@
 // Feature: shell, Property 18: One read action per kind per line
-// **Validates: Requirements 7.2, 7.5, 7.16, 14.4, 14.5, 14.7**
+// **Validates: Requirements 7.2, 7.5, 7.16, 14.4, 14.5, 14.7, 14.8**
 import fc from 'fast-check';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { makeFixture } from './test-fixtures/fixture';
 
 const UP = '/srv/juice-shop/uploads';
@@ -59,15 +59,23 @@ const arbReadPlan: fc.Arbitrary<Stage[]> = fc
 
 const join = (stages: Stage[]): string => stages.map((s) => s.text).join(' | ');
 
-function expectedActions(stages: Stage[], line: string): { type: string; [k: string]: unknown }[] {
+/** D-160: every read action of a line carries the first 200 lines of what the line printed, and their count. */
+function expectedActions(
+  stages: Stage[],
+  line: string,
+  shown: string[],
+  shownTotal: number,
+): { type: string; [k: string]: unknown }[] {
   const out: { type: string; [k: string]: unknown }[] = [];
-  if (stages.some((s) => s.kind === 'log')) out.push({ type: 'DEF-01', query: line });
+  if (stages.some((s) => s.kind === 'log')) out.push({ type: 'DEF-01', query: line, shown, shownTotal });
   const db = stages.find((s) => s.kind === 'db');
-  if (db) out.push({ type: 'DEF-02', sql: db.sql });
+  if (db) out.push({ type: 'DEF-02', sql: db.sql, shown, shownTotal });
   const up = stages.find((s) => s.kind === 'uploads');
-  if (up) out.push({ type: 'DEF-03', path: up.path });
+  if (up) out.push({ type: 'DEF-03', path: up.path, shown, shownTotal });
   return out;
 }
+
+const linesOf = (output: string): string[] => (output === '' ? [] : output.split('\n'));
 
 const byType = (a: { type: string }, b: { type: string }): number => (a.type < b.type ? -1 : a.type > b.type ? 1 : 0);
 
@@ -83,11 +91,14 @@ describe('Property 18: one read action per kind per line', () => {
       advanceMs: 60_000,
     });
     let tarCount = 0;
-    const sent = (): { type: string; [k: string]: unknown }[] => f.actions().map((e) => e.action as { type: string });
-    const run = async (line: string): Promise<{ type: string; [k: string]: unknown }[]> => {
-      const before = f.actions().length;
-      await f.shell.run(line);
-      return sent().slice(before);
+    // The raw actions the Shell sends (the logged events keep only the D-122 summary of `shown`).
+    const act = vi.spyOn(f.engine, 'act');
+    const run = async (
+      line: string,
+    ): Promise<{ sent: { type: string; [k: string]: unknown }[]; output: string }> => {
+      act.mockClear();
+      const r = await f.shell.run(line);
+      return { sent: act.mock.calls.map((c) => c[0] as { type: string }), output: r.output };
     };
 
     await fc.assert(
@@ -99,8 +110,14 @@ describe('Property 18: one read action per kind per line', () => {
         async (plan, how, at, tarSrc) => {
           // 1. Every read succeeds: exactly one action per kind read, with the D-98 payloads.
           const line = join(plan);
-          const got = (await run(line)).sort(byType);
-          expect(got).toEqual(expectedActions(plan, line));
+          const ok = await run(line);
+          const printed = linesOf(ok.output);
+          expect(ok.sent.sort(byType)).toEqual(expectedActions(plan, line, printed.slice(0, 200), printed.length));
+
+          // 1b. Redirecting the last stage's output means nothing reached the screen.
+          const redirected = `${line} > /tmp/p18`;
+          const red = await run(redirected);
+          expect(red.sent.sort(byType)).toEqual(expectedActions(plan, redirected, [], 0));
 
           // 2. A line that fails before reading sends nothing.
           let broken: string;
@@ -112,12 +129,12 @@ describe('Property 18: one read action per kind per line', () => {
           } else {
             broken = join([{ text: `cat ${UP}/nope` }, ...plan.slice(1).filter((s) => !s.kind)]);
           }
-          expect(await run(broken)).toEqual([]);
+          expect((await run(broken)).sent).toEqual([]);
 
           // 3. tar czf sends DEF-05 only, whatever it reads.
           const name = `ev${tarCount++}`;
           const t = await run(`tar czf /evidence/${name}.tgz ${tarSrc}`);
-          expect(t.map((a) => a.type)).toEqual(['DEF-05']);
+          expect(t.sent.map((a) => a.type)).toEqual(['DEF-05']);
         },
       ),
       { numRuns: 50 },

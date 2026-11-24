@@ -78,80 +78,91 @@ export async function runPipeline(sh: ShellInternals, pipeline: Pipeline, rawLin
   let stdin = '';
   let last: CommandResult = { stdout: '', stderr: '', code: 0 };
   let allOk = true;
+  let flushed = false;
+  // Sends the queued reads once per line (R14.8): after the last stage, or from `finally` if something threw.
+  const flushOnce = (finalStdout: string): void => {
+    if (flushed) return;
+    flushed = true;
+    reads.flush(finalStdout);
+  };
 
-  // 2. Stages left to right; stdout of one is stdin of the next.
-  for (const stage of pipeline.stages) {
-    const spec = lookup(commands, stage.name.text) as CommandSpec;
-    const noticesBefore = reads.notices.length;
-    let result: CommandResult;
+  try {
 
-    try {
-      const args = stage.args.flatMap((w) => expandWord(w, sh.session, sh.vfs, 'arg'));
-      const parsed = parseArgs(spec, args);
-      if (!parsed.ok) {
-        result = parsed.kind === 'unsupported' ? unsupportedFlag(spec, parsed.flag) : fail(spec.name, parsed.error);
-      } else if (parsed.operands.length < spec.operands.min || parsed.operands.length > spec.operands.max) {
-        result = usage(spec);
-      } else {
-        sh.vfs.beginInvocation();
-        try {
-          result = await spec.handler(
-            {
-              engine: sh.engine,
-              world: sh.engine.world as ReadonlyWorld,
-              vfs: sh.vfs,
-              session: sh.session,
-              reads,
-              name: spec.name,
-              spec,
-            },
-            args,
-            stdin,
-          );
-        } finally {
-          sh.vfs.endInvocation();
-        }
-      }
-    } catch (e) {
-      // Stage catch-all (R15.4): fixed text, the caught value goes to the hook only.
+    // 2. Stages left to right; stdout of one is stdin of the next.
+    for (const stage of pipeline.stages) {
+      const spec = lookup(commands, stage.name.text) as CommandSpec;
+      reads.stage = spec.name;
+      let result: CommandResult;
+
       try {
-        sh.onInternalError?.(e);
-      } catch {
-        // a failing hook must not break the line
+        const args = stage.args.flatMap((w) => expandWord(w, sh.session, sh.vfs, 'arg'));
+        const parsed = parseArgs(spec, args);
+        if (!parsed.ok) {
+          result = parsed.kind === 'unsupported' ? unsupportedFlag(spec, parsed.flag) : fail(spec.name, parsed.error);
+        } else if (parsed.operands.length < spec.operands.min || parsed.operands.length > spec.operands.max) {
+          result = usage(spec);
+        } else {
+          sh.vfs.beginInvocation();
+          try {
+            result = await spec.handler(
+              {
+                engine: sh.engine,
+                world: sh.engine.world as ReadonlyWorld,
+                vfs: sh.vfs,
+                session: sh.session,
+                reads,
+                name: spec.name,
+                spec,
+              },
+              args,
+              stdin,
+            );
+          } finally {
+            sh.vfs.endInvocation();
+          }
+        }
+      } catch (e) {
+        // Stage catch-all (R15.4): fixed text, the caught value goes to the hook only.
+        try {
+          sh.onInternalError?.(e);
+        } catch {
+          // a failing hook must not break the line
+        }
+        result = fail(spec.name, MSG.internalError);
       }
-      result = fail(spec.name, MSG.internalError);
+
+      if (result.stderr !== '') stderrs.push(result.stderr);
+
+      if (result.code !== 0) allOk = false;
+      last = result;
+      stdin = result.stdout;
     }
 
-    // Failed read notices (R14.6): `<cmd>: <message>`; the read itself still counts.
-    let stderr = result.stderr;
-    for (const message of reads.notices.slice(noticesBefore)) stderr += `${spec.name}: ${message}\n`;
-    if (stderr !== '') stderrs.push(stderr);
+    // 3. `clear` is honored only for a single-stage line.
+    const clear = pipeline.stages.length === 1 && last.clear === true;
 
-    if (result.code !== 0) allOk = false;
-    last = result;
-    stdin = result.stdout;
-  }
-
-  // 3. `clear` is honored only for a single-stage line.
-  const clear = pipeline.stages.length === 1 && last.clear === true;
-
-  // 4. Redirect: write the final stdout only when every stage exited 0 (R3.3); a failing stage
-  //    shows its stderr and writes nothing. The line then prints no stdout (R3.2).
-  let exitCode = last.code;
-  const redirected = redirectAbs !== undefined && allOk;
-  if (redirected) {
-    try {
-      sh.vfs.writeFile(redirectAbs as string, encodeUtf8(last.stdout));
-    } catch (e) {
-      // Validated above, so this is a race at most; still answer, never throw.
-      if (!(e instanceof FsError)) throw e;
-      stderrs.push(`${redirectTyped}: ${e.message}\n`);
-      exitCode = 1;
+    // 4. Redirect: write the final stdout only when every stage exited 0 (R3.3); a failing stage
+    //    shows its stderr and writes nothing. The line then prints no stdout (R3.2).
+    let exitCode = last.code;
+    const redirected = redirectAbs !== undefined && allOk;
+    if (redirected) {
+      try {
+        sh.vfs.writeFile(redirectAbs as string, encodeUtf8(last.stdout));
+      } catch (e) {
+        // Validated above, so this is a race at most; still answer, never throw.
+        if (!(e instanceof FsError)) throw e;
+        stderrs.push(`${redirectTyped}: ${e.message}\n`);
+        exitCode = 1;
+      }
     }
-  }
-  const shownStdout = pipeline.redirect !== undefined ? '' : last.stdout;
+    const shownStdout = pipeline.redirect !== undefined ? '' : last.stdout;
+    flushOnce(shownStdout);
+    for (const n of reads.notices) stderrs.push(`${n.cmd}: ${n.message}\n`);
 
-  // 5. stderr of all stages first, then the last stdout.
-  const output = finish(sanitize(stderrs.join('') + shownStdout));
-  return clear ? { output: '', exitCode, clear: true } : { output, exitCode };
+    // 5. stderr of all stages first, then the last stdout.
+    const output = finish(sanitize(stderrs.join('') + shownStdout));
+    return clear ? { output: '', exitCode, clear: true } : { output, exitCode };
+  } finally {
+    flushOnce('');
+  }
 }

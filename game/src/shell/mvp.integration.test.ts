@@ -33,7 +33,8 @@ describe('MVP session: investigate, then contain', () => {
 
     const c = await shell.run(`cat ${UP}/rip.php`);
     expect(c).toEqual({ output: '<?php echo 1;', exitCode: 0 });
-    expect(f.actsOfType('DEF-03')).toEqual([{ type: 'DEF-03', path: `${UP}/rip.php` }]);
+    // The logged event keeps the D-122 summary of `shown` (one line, none about Death), not the text.
+    expect(f.actsOfType('DEF-03')).toMatchObject([{ type: 'DEF-03', path: `${UP}/rip.php`, shownCount: 1, shownTotal: 1 }]);
 
     // 2. Contain: block, stop nginx, lock an account, remove the file.
     expect(await shell.run(`iptables -A INPUT -s ${IP} -j DROP`)).toEqual({ output: '', exitCode: 0 });

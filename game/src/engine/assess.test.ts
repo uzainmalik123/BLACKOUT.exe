@@ -315,7 +315,7 @@ describe('relevant actions by outcome (D-115)', () => {
     yes({ type: 'DEF-01', query: 'cat /var/log/nginx/access.log', shown: Array.from({ length: 200 }, (_, i) => (i % 5 === 0 ? HIS : SHOPPER)), shownTotal: 9000 }); // a fifth of the shown lines are his: focused
     no({ type: 'DEF-01', query: 'tail access.log', shown: [SHOPPER, SHOPPER] }); // nothing of his
     no({ type: 'DEF-01', query: 'ls -la /var/log/nginx', shown: ['access.log', 'error.log'] });
-    no({ type: 'DEF-01', query: `grep ${HIS_IP} access.log` }); // no shown lines yet (the shell sends them later): not judged relevant
+    no({ type: 'DEF-01', query: `grep ${HIS_IP} access.log` }); // no shown lines yet (the shell sends them when the line finishes, D-160): not judged relevant
     yes({ type: 'DEF-01', query: 'tail app.log', shown: ['Error: SQLITE_ERROR: near "(": syntax error'] }); // an app-log line his move wrote
   });
 

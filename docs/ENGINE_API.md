@@ -103,7 +103,7 @@ Every button, console and (later) shell command sends one of these. It returns `
 | Comms | `DEF-19` escalate · `DEF-20` notify | `{ type: 'DEF-20', to: 'customers' }` |
 | Terminal (via the shell) | `DEF-01`–`06`, `08`, `11`, `14`, `15`, `18` | The shell sends these for you (§5). On **Easy**, the consoles also get buttons for them |
 
-**What a read showed (D-115, D-122).** A `DEF-01`, `DEF-02` or `DEF-03` may carry `shown: string[]`, the lines the shell or console printed (at most 200: pass the first 200 and set `shownTotal` to the real count; the engine cuts longer lists). The judging engine decides from those lines whether the read was relevant (it showed something of Death's, and was focused): an accidental `tail` that shows his lines counts, a `cat` of the whole log does not. A read with no `shown` is never relevant. Pass the lines exactly as printed (access-log lines in `combined` format, SQL rows as the shell renders them, file names as listed). **The text is never stored:** the logged action keeps only `shownCount`, `shownHis` (lines of his), `shownAbout` and `shownTotal`.
+**What a read showed (D-115, D-122).** A `DEF-01`, `DEF-02` or `DEF-03` may carry `shown: string[]`, the lines the shell or console printed (at most 200: pass the first 200 and set `shownTotal` to the real count; the engine cuts longer lists). The judging engine decides from those lines whether the read was relevant (it showed something of Death's, and was focused): an accidental `tail` that shows his lines counts, a `cat` of the whole log does not. A read with no `shown` is never relevant. Pass the lines exactly as printed (access-log lines in `combined` format, SQL rows as the shell renders them, file names as listed). **What the shell passes (D-160):** it sends `DEF-01`/`02`/`03` when the Command_Line finishes, with `shown` = the first 200 lines of the line's final screen output (stdout, not stderr; `[]` for a `>` redirect) and `shownTotal` = that output's line count. **The text is never stored:** the logged action keeps only `shownCount`, `shownHis` (lines of his), `shownAbout` and `shownTotal`.
 
 ## 4. Events: what to animate
 
@@ -153,6 +153,7 @@ interface Shell {
 - `output` is **plain text**. The terminal window must render it as text (e.g. a React text node), never as HTML (D-106).
 - `onInternalError` receives anything the shell's catch-alls swallowed. It never reaches `output`.
 - `COMMAND_LIST` (the 31 commands, in steering order) and `checkCommandLine(line): boolean` are exported for KIRO-08 and KDEV-01. Both are pure and need no Engine. `checkCommandLine` never throws; an empty line, a parse error or an unknown command name gives `false`.
+- A read's `DEF-01`/`02`/`03` is sent when the Command_Line finishes, not at the moment of the read, with `shown` = the first 200 lines of the line's final screen output (stdout, not stderr; `[]` for a `>` redirect) and `shownTotal` = its line count (D-160).
 - The shell reads logs, uploads and the database through the Engine, and sends DEF actions through `engine.act` itself, so the world updates by itself. It never calls `advance`, `pause` or `resume`; the screen owns the clock.
 
 | Shell command | Sends |

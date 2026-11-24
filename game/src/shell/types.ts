@@ -89,14 +89,19 @@ export interface VfsLister {
 
 /** Receives content reads so the ReadTracker can send DEF-01/02/03 (R14.4, R14.5). */
 export interface ReadSink {
-  /** Called when a log's content is read. Returns a notice when the Engine refused the action. */
-  log(): string | undefined;
+  /** Called when a log's content is read. Queues DEF-01; `flush` sends it (D-160). */
+  log(): void;
   /** Called when an uploads file is read; `absPath` is absolute. */
-  uploads(absPath: string): string | undefined;
+  uploads(absPath: string): void;
 }
 
 export interface ReadTrackerLike extends ReadSink {
-  db(sql: string): string | undefined;
+  db(sql: string): void;
+  /** Name of the command now running, recorded on each queued action. */
+  stage: string;
+  /** Sends the queued actions with the line's final stdout as `shown`; once per line. */
+  flush(finalStdout: string): void;
+  readonly notices: readonly { cmd: string; message: string }[];
   readonly sent: ReadonlySet<'log' | 'db' | 'uploads'>;
 }
 
