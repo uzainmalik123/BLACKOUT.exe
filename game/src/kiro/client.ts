@@ -5,6 +5,7 @@
 // "Kiro (offline)". The client checks the server's text once more (rails.ts) before showing it: belt and braces.
 // Nothing here calls `engine.advance`, `pause` or `resume`: the screen owns the clock. The game never waits for Kiro.
 import type { Report } from '../engine/report';
+import { explainLine } from '../content/explanations';
 import { DRAFTS, HINT_POLICY, OFFLINE_ANSWER, debriefTemplate, hintsFor, type Draft } from '../content/kiro-fallback';
 import type { Shell } from '../shell';
 import { gapWords } from './gaps';
@@ -164,7 +165,7 @@ export function createKiro(engine: Engine, opts: KiroClientOptions = {}): Kiro {
     async explain(line) {
       const res = await call<{ text: string; offline: boolean }>('explain', { line });
       if (res && !res.offline && typeof res.text === 'string' && replyIsClean(res.text)) return { text: res.text, offline: false };
-      return { text: OFFLINE_ANSWER, offline: true };
+      return { text: explainLine(line).text, offline: true }; // CON-05: the line type's own words, never the generic answer
     },
 
     async hint() {
