@@ -1,0 +1,33 @@
+name: Deploy
+
+# Deploys main to Fly.io (PRD SYS-18, D-200) with `flyctl deploy --remote-only`, only once the repo has a
+# `FLY_API_TOKEN` secret (`fly tokens create deploy -x 999999h`, then Settings → Secrets → Actions). Without it
+# every step is skipped and the job is green, so nothing breaks before the account exists. Not a required check.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+    steps:
+      - name: Skip when no FLY_API_TOKEN secret is set
+        if: env.FLY_API_TOKEN == ''
+        run: echo "FLY_API_TOKEN is not set; skipping the deploy (docs/HOSTING.md)"
+      - uses: actions/checkout@v4
+        if: env.FLY_API_TOKEN != ''
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+        if: env.FLY_API_TOKEN != ''
+      - name: flyctl deploy
+        if: env.FLY_API_TOKEN != ''
+        run: flyctl deploy --remote-only

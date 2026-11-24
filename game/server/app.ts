@@ -1,6 +1,7 @@
 // The Kiro server's HTTP surface (PRD SYS-12, KIRO-01..10, D-190): `POST /api/kiro/run` for a run token, then
 // `POST /api/kiro/ask|hint|explain|draft|debrief` with the token and the browser's snapshot; `POST /mcp/<token>`
-// is the MCP endpoint `kiro-cli acp` calls for that run's tools; in production it also serves `dist/` (SYS-18).
+// is the MCP endpoint `kiro-cli acp` calls for that run's tools; in production it also serves `dist/` and answers
+// the host's `GET /healthz` (SYS-18).
 // Every reply goes through the rails (src/kiro/rails.ts) before it leaves; a failed check, a timeout or a spent
 // cap answers with CON-03's rule-written text and `offline: true` (KIRO-09). Plain `node:http`, no framework.
 import { createReadStream, existsSync, statSync } from 'node:fs';
@@ -226,9 +227,17 @@ export function createHandler(opts: AppOptions): (req: IncomingMessage, res: Ser
     createReadStream(file).pipe(res);
   }
 
+  /** The host's health check (SYS-18, Fly's `/healthz`): 200 when the page is servable, 503 when `dist/` is missing. Never touches Kiro. */
+  function healthz(req: IncomingMessage, res: ServerResponse): void {
+    if (req.method !== 'GET' && req.method !== 'HEAD') return send(res, 405, { error: 'GET only' });
+    const page = opts.distDir === undefined || existsSync(join(opts.distDir, 'index.html'));
+    send(res, page ? 200 : 503, { ok: page, page, callsToday: runs.callsToday });
+  }
+
   return (req, res) => {
     const url = new URL(req.url ?? '/', 'http://localhost');
     const p = url.pathname;
+    if (p === '/healthz') return healthz(req, res);
     const done = (promise: Promise<void>) =>
       promise.catch((e: Error) => {
         opts.log?.(`[kiro] ${req.method} ${p}: ${e.message}`);

@@ -15,7 +15,12 @@ cd game
 npm install
 npm run dev      # http://localhost:5173
 npm run health   # typecheck + lint + tests, what CI runs
+npm run server -- --serve-dist   # the production shape: the Kiro server serving the built page (game/server/README.md)
 ```
+
+## Hosting
+
+One Fly.io machine runs the `Dockerfile` at the repo root (page + Kiro server, PRD SYS-18). Runbook: [docs/HOSTING.md](docs/HOSTING.md).
 
 ## Licence
 
