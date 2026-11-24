@@ -68,9 +68,9 @@ export function main(): void {
   const stop = () => {
     log('[kiro] shutting down');
     auth.stop();
-    runs.shutdown();
-    server.close(() => process.exit(0));
     setTimeout(() => process.exit(0), 2000).unref();
+    // The agents exit before their temp folders go (KI-195); the timer above still bounds the whole stop.
+    void runs.shutdown().then(() => server.close(() => process.exit(0)));
   };
   process.on('SIGINT', stop);
   process.on('SIGTERM', stop);

@@ -1,5 +1,5 @@
 // The Kiro server against the fake ACP agent (server/test/fake-acp.mjs): no Kiro, no credits (PRD SYS-12, KIRO-07..10).
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
@@ -9,6 +9,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { DRAFTS, OFFLINE_ANSWER, debriefTemplate } from '../src/content/kiro-fallback';
 import { GAP_WORDS } from '../src/kiro/gaps';
 import type { DebriefFacts } from '../src/kiro/rails';
+import { AcpAgent } from './acp';
 import { createHandler } from './app';
 import type { AuthMode } from './auth';
 import { handleMcp } from './mcp';
@@ -60,10 +61,23 @@ async function start(opts: { caps?: { perRun: number; perDay: number }; timeoutM
   return { server, runs, port, log, post, newRun, call };
 }
 
-function stop(h: Harness): Promise<void> {
-  h.runs.shutdown();
-  return new Promise((r) => h.server.close(() => r()));
+async function stop(h: Harness): Promise<void> {
+  await h.runs.shutdown();
+  await new Promise<void>((r) => h.server.close(() => r()));
 }
+
+/** True while a process with this pid exists (signal 0 only asks; EPERM means it exists but is not ours). */
+function alive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (e) {
+    return (e as NodeJS.ErrnoException).code === 'EPERM';
+  }
+}
+
+/** The fake agent's own pid and working folder, from its FAKE:WHOAMI reply. */
+const whoami = (text: unknown) => JSON.parse(String(text)) as { pid: number; cwd: string };
 
 describe('the Kiro server (SYS-12)', () => {
   let h: Harness;
@@ -205,10 +219,13 @@ describe('the Kiro server (SYS-12)', () => {
     expect(h.log.some((l) => /credits 0\.25/.test(l))).toBe(true);
   });
 
-  it('ending a run kills its agent and its token', async () => {
+  it('ending a run kills its agent, removes its temp folder and its token (KI-195)', async () => {
     const token = await h.newRun();
-    await h.call('ask', token, { question: 'FAKE:ECHO hi' });
-    expect((await h.post('/api/kiro/end', { token })).json).toEqual({ ok: true });
+    const me = whoami((await h.call('ask', token, { question: 'FAKE:WHOAMI' })).text);
+    expect(existsSync(me.cwd)).toBe(true);
+    expect((await h.post('/api/kiro/end', { token })).json).toEqual({ ok: true }); // was "server error" on Windows
+    expect(alive(me.pid)).toBe(false);
+    expect(existsSync(me.cwd)).toBe(false);
     expect((await h.post('/api/kiro/ask', { token, snapshot: SNAPSHOT, question: 'x' })).status).toBe(401);
     expect(h.log.some((l) => /ended after 1 calls/.test(l))).toBe(true);
   });
@@ -277,7 +294,7 @@ describe('the caps (KIRO-10, D-23)', () => {
       const { token } = first.create()!;
       expect((await first.call(token, 'ask', 'FAKE:ECHO one')).ok).toBe(true);
       expect((await first.call(token, 'ask', 'FAKE:ECHO two')).ok).toBe(true);
-      first.shutdown(); // a deploy or a crash: the processes go, the file stays
+      await first.shutdown(); // a deploy or a crash: the processes go, the file stays
       expect(JSON.parse(readFileSync(stateFile, 'utf8'))).toMatchObject({ dayCalls: 2, runs: [{ token, calls: 2 }] });
 
       const second = make();
@@ -287,12 +304,12 @@ describe('the caps (KIRO-10, D-23)', () => {
       const other = second.create()!;
       expect((await second.call(other.token, 'ask', 'FAKE:ECHO three')).ok).toBe(true); // a fresh agent for the new run
       expect(second.create()).toBeNull(); // 3 of 3 today
-      second.shutdown();
+      await second.shutdown();
 
       const third = make();
       expect(third.callsToday).toBe(3);
       expect(third.create()).toBeNull();
-      third.shutdown();
+      await third.shutdown();
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
@@ -315,7 +332,7 @@ describe('the caps (KIRO-10, D-23)', () => {
     }
   }, 20_000);
 
-  it('the day\'s counter rolls at midnight UTC', () => {
+  it('the day\'s counter rolls at midnight UTC', async () => {
     let t = Date.parse('2026-11-24T23:59:00Z');
     const runs = new Runs({ agentCommand: { command: 'true', args: [] }, agentDir: AGENT_DIR, mcpUrl: () => '', now: () => t, log: () => {}, caps: { perRun: 1, perDay: 1 } });
     expect(runs.create()).not.toBeNull();
@@ -323,7 +340,66 @@ describe('the caps (KIRO-10, D-23)', () => {
     expect(runs.create()).toBeNull();
     t += 2 * 60_000;
     expect(runs.create()).not.toBeNull();
-    runs.shutdown();
+    await runs.shutdown();
+  });
+});
+
+// KI-195: Windows will not delete a folder a live process sits in, and `kill()` only sends the signal. Every
+// clean-up therefore waits for the agent's exit before its run folder goes.
+describe('agent clean-up (KI-195)', () => {
+  it('kill() settles only once the process has exited, so its working folder can be removed straight away', async () => {
+    const cwd = mkdtempSync(join(tmpdir(), 'kiro-kill-'));
+    const agent = new AcpAgent({ command: process.execPath, args: [FAKE], cwd });
+    try {
+      await agent.start();
+      const { sessionId } = await agent.newSession({ cwd, mcpServers: [] });
+      const me = whoami((await agent.prompt(sessionId, 'FAKE:WHOAMI', 5000)).text);
+      expect(alive(me.pid)).toBe(true);
+      await agent.kill();
+      expect(agent.alive).toBe(false);
+      expect(alive(me.pid)).toBe(false);
+      expect(() => rmSync(cwd, { recursive: true })).not.toThrow(); // EPERM on Windows while the process was still in it
+    } finally {
+      await agent.kill();
+      rmSync(cwd, { recursive: true, force: true, maxRetries: 10 });
+    }
+  });
+
+  it('kill() force-kills an agent that ignores SIGTERM after the grace period, and still settles', async () => {
+    const cwd = mkdtempSync(join(tmpdir(), 'kiro-kill-'));
+    const agent = new AcpAgent({ command: process.execPath, args: [FAKE, '--ignore-sigterm'], cwd });
+    try {
+      await agent.start();
+      const { sessionId } = await agent.newSession({ cwd, mcpServers: [] });
+      const me = whoami((await agent.prompt(sessionId, 'FAKE:WHOAMI', 5000)).text);
+      await agent.kill(200);
+      expect(alive(me.pid)).toBe(false);
+      await agent.kill(200); // a second kill of a gone agent settles at once
+    } finally {
+      rmSync(cwd, { recursive: true, force: true, maxRetries: 10 });
+    }
+  });
+
+  it('ending a run and shutting down wait for each agent, then remove its folder; shutdown keeps the tokens', async () => {
+    const runs = new Runs({ agentCommand: { command: process.execPath, args: [FAKE] }, agentDir: AGENT_DIR, mcpUrl: () => 'http://127.0.0.1:1/mcp/x', modeId: 'kiro-game', log: () => {} });
+    const ask = async (token: string) => {
+      const r = await runs.call(token, 'ask', 'FAKE:WHOAMI');
+      if (!r.ok) throw new Error(`the fake agent did not answer: ${r.reason}`);
+      return whoami(r.result.text);
+    };
+    const a = runs.create()!;
+    const b = runs.create()!;
+    const ma = await ask(a.token);
+    const mb = await ask(b.token);
+    expect(ma.cwd).not.toBe(mb.cwd);
+    await runs.end(a.token);
+    expect(alive(ma.pid)).toBe(false);
+    expect(existsSync(ma.cwd)).toBe(false);
+    expect(existsSync(mb.cwd)).toBe(true); // the other run is untouched
+    await runs.shutdown();
+    expect(alive(mb.pid)).toBe(false);
+    expect(existsSync(mb.cwd)).toBe(false);
+    expect(runs.has(b.token)).toBe(true); // the tokens survive a restart (KI-193); only the processes and folders go
   });
 });
 
