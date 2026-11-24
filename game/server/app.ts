@@ -12,6 +12,7 @@ import { pickDraft } from '../src/kiro/client';
 import { gapWords } from '../src/kiro/gaps';
 import { debriefMatches, guardDraft, hintIsClean, replyIsClean, type DebriefFacts } from '../src/kiro/rails';
 import type { KiroSnapshot } from '../src/kiro/snapshot';
+import type { AuthMode } from './auth';
 import { handleMcp } from './mcp';
 import { INPUT_MAX, askPrompt, debriefPrompt, draftPrompt, explainPrompt, hintPrompt, type CallKind } from './prompt';
 import { CAPS, type Runs } from './runs';
@@ -20,6 +21,8 @@ export interface AppOptions {
   runs: Runs;
   /** The built game to serve at `/` (production); undefined in dev, where Vite serves the page and proxies `/api/kiro`. */
   distDir?: string;
+  /** The cached auth mode (`watchAuth`, D-201) for `/healthz`'s `kiroAuth`; undefined until the first probe finishes. */
+  auth?: () => AuthMode | undefined;
   log?: (line: string) => void;
 }
 
@@ -227,11 +230,15 @@ export function createHandler(opts: AppOptions): (req: IncomingMessage, res: Ser
     createReadStream(file).pipe(res);
   }
 
-  /** The host's health check (SYS-18, Fly's `/healthz`): 200 when the page is servable, 503 when `dist/` is missing. Never touches Kiro. */
+  /**
+   * The host's health check (SYS-18, Fly's `/healthz`): 200 when the page is servable, 503 when `dist/` is missing.
+   * `kiroAuth` (D-201) is the cached probe's answer: `key`, `cli-login`, or `none` (also before the first probe
+   * finishes). Kiro offline never fails the check (KIRO-09: the game plays on). Never touches Kiro itself.
+   */
   function healthz(req: IncomingMessage, res: ServerResponse): void {
     if (req.method !== 'GET' && req.method !== 'HEAD') return send(res, 405, { error: 'GET only' });
     const page = opts.distDir === undefined || existsSync(join(opts.distDir, 'index.html'));
-    send(res, page ? 200 : 503, { ok: page, page, callsToday: runs.callsToday });
+    send(res, page ? 200 : 503, { ok: page, page, callsToday: runs.callsToday, ...(opts.auth && { kiroAuth: opts.auth()?.mode ?? 'none' }) });
   }
 
   return (req, res) => {

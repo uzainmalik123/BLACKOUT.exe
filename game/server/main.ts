@@ -8,7 +8,7 @@ import { createServer } from 'node:http';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createHandler } from './app';
-import { describeAuth, detectAuth } from './auth';
+import { describeAuth, watchAuth } from './auth';
 import { AGENT_NAME, Runs } from './runs';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -39,8 +39,16 @@ export function main(): void {
   // Runs adds ASBX_KIRO_MANDATORY_MCPS so Kiro's agent server shows the game tools to the model (runs.ts).
   const env: NodeJS.ProcessEnv = { ...process.env };
   // The auth mode, one line at start-up (SYS-18, D-200): a key, the CLI's own login, or none (every run then plays
-  // offline, KIRO-09). Costs no credits; with a key nothing is run.
-  void detectAuth({ env, kiroCli }).then((a) => log(describeAuth(a)));
+  // offline, KIRO-09). Costs no credits; with a key nothing is run. Re-probed every AUTH_PROBE_MS for `/healthz`'s
+  // `kiroAuth` (D-201), with a line whenever the answer changes (a lapsed login, or a login done on the machine).
+  const auth = watchAuth({
+    env,
+    kiroCli,
+    onResult: (next, prev) => {
+      if (prev === undefined) log(describeAuth(next));
+      else if (prev.mode !== next.mode) log(`[kiro] auth changed: ${prev.mode} → ${next.mode}; ${describeAuth(next)}`);
+    },
+  });
 
   // KI-193: the caps survive a restart in a small JSON file (gitignored), KIRO_STATE_FILE to move it.
   const stateFile = process.env.KIRO_STATE_FILE ?? join(gameDir, 'server', '.state', 'runs.json');
@@ -54,11 +62,12 @@ export function main(): void {
   });
   const distDir = serveDist ? join(gameDir, 'dist') : undefined;
   if (distDir && !existsSync(join(distDir, 'index.html'))) log(`[kiro] WARNING: ${distDir}/index.html is missing: run \`npm run build\` first`);
-  const server = createServer(createHandler({ runs, distDir, log }));
+  const server = createServer(createHandler({ runs, distDir, auth: () => auth.current(), log }));
   server.listen(port, host, () => log(`[kiro] listening on http://${host}:${port}${distDir ? ` (serving ${distDir})` : ' (API only; Vite proxies /api/kiro)'}; agent ${AGENT_NAME} via ${kiroCli}`));
 
   const stop = () => {
     log('[kiro] shutting down');
+    auth.stop();
     setTimeout(() => process.exit(0), 2000).unref();
     // The agents exit before their temp folders go (KI-195); the timer above still bounds the whole stop.
     void runs.shutdown().then(() => server.close(() => process.exit(0)));

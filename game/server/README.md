@@ -18,17 +18,18 @@ Environment (read from the repo-root `.env`, see `.env.example`, or the shell):
 |---|---|---|
 | `PORT`, `HOST` | `8787`, `127.0.0.1` | Where to listen (`HOST=0.0.0.0` in a container) |
 | `KIRO_CLI` | `kiro-cli` | The Kiro CLI binary (2.37.1 is what this was built against) |
-| `KIRO_API_KEY` | unset | Passed to `kiro-cli` as its environment when set (on Fly: `fly secrets set KIRO_API_KEY=…`, docs/HOSTING.md). **Unset: `kiro-cli` uses its own login** (`kiro-cli login`), which is how the team's machines run it; kiro-cli 3.5.0's logged-out error names `KIRO_API_KEY` as accepted (KI-201 until a key has run) |
+| `KIRO_API_KEY` | unset | Passed to `kiro-cli` as its environment when set and wins over any login (on Fly: `fly secrets set KIRO_API_KEY=…`; the user's plan has none, D-201). **Unset: `kiro-cli` uses its own login** (`kiro-cli login`), which is how the team's machines and the Fly machine run it |
 | `KIRO_STATE_FILE` | `server/.state/runs.json` | The counters between restarts (KI-193); `/data/runs.json` in the Fly image |
+| `XDG_DATA_HOME` | unset (kiro-cli's own default, `~/.local/share`) | Not the server's: kiro-cli's data folder, `<XDG_DATA_HOME>/kiro-cli/`, holds its login; the Fly image sets `/data/xdg` so the login lives on the volume (D-201) |
 | `NODE_ENV=production` | | Same as `--serve-dist` |
 
-At start-up the server logs **which auth mode kiro-cli will use** (`server/auth.ts`, D-200; no credits: with a key nothing runs, else `kiro-cli whoami --format json`): `[kiro] auth: KIRO_API_KEY set …`, `[kiro] auth: kiro-cli login on this machine (<who>)`, or `[kiro] auth: none (<why>); every run plays offline …` (KIRO-09).
+At start-up the server logs **which auth mode kiro-cli will use** (`server/auth.ts`, D-200; no credits: with a key nothing runs, else `kiro-cli whoami --format json`): `[kiro] auth: KIRO_API_KEY set …`, `[kiro] auth: kiro-cli login on this machine (<who>)`, or `[kiro] auth: none (<why>); every run plays offline …` (KIRO-09). The same probe repeats every 10 minutes for `/healthz` (D-201).
 
 Logs go to stdout, one line per call: `[kiro] run <id> ask #3 (today 12/400): 7462 ms, credits 0.104, tools [@game/alerts @game/tail_logs], stop end_turn, 720 chars`. The credits are what Kiro's agent server reports per turn (`session_info_update` / `turn_completion`); KI-02 reads them from here.
 
 ## What it does
 
-- `GET /healthz` → 200 `{ ok, page, callsToday }` when the page is servable (in dev, with no `dist/`, the API alone is healthy), 503 when `dist/index.html` is missing. The host's check (Fly, SYS-18); it never starts Kiro. `/api/kiro/health` is the client's.
+- `GET /healthz` → 200 `{ ok, page, callsToday, kiroAuth }` when the page is servable (in dev, with no `dist/`, the API alone is healthy), 503 when `dist/index.html` is missing. The host's check (Fly, SYS-18); it never starts Kiro. `/api/kiro/health` is the client's.
 - `POST /api/kiro/run` → `{ token, callsLeft }`. A run token per game; refused with 429 once the day's cap is spent.
 - `POST /api/kiro/ask | hint | explain | draft | debrief` with `{ token, snapshot, … }` (`src/kiro/client.ts` sends them). The **snapshot** (`src/kiro/snapshot.ts`) is the browser's spoiler-free view of the world: meters, alerts (kind and time only), the newest 500 log lines as rendered, accounts, uploads, defences, the player's last 20 actions. The server keeps the latest one per run; that is what Kiro's tools read.
 - `POST /mcp/<token>`: the game tools (KIRO-07) as an **MCP server over HTTP**, inside this process. `kiro-cli acp` is given its URL in `session/new`. Nine read-only tools: `alerts`, `meters`, `search_logs`, `tail_logs`, `accounts`, `uploads`, `defences`, `recent_actions`, `command_list`. No write tool exists.
@@ -40,9 +41,11 @@ Logs go to stdout, one line per call: `[kiro] run <id> ask #3 (today 12/400): 74
 
 `npm test` runs `server/server.test.ts` against **a fake ACP agent** (`server/test/fake-acp.mjs`): no Kiro, no credits. `npm run test:kiro-live` (`KIRO_LIVE=1`) runs `server/live.test.ts` against the real `kiro-cli`: five calls, about half a credit; log it in `docs/KIRO_USAGE.md`.
 
-## Pointing `kiro-cli` at a key
+## Logging `kiro-cli` in
 
-Put `KIRO_API_KEY=…` in the repo-root `.env` (never in git; CI's secrets guard blocks it) and start the server. Without it, log the CLI in once on the machine (`kiro-cli login`) and the server inherits that session.
+Log the CLI in once on the machine (`kiro-cli login`; on a machine without a browser, `kiro-cli login --use-device-flow`, which prints a URL and a code to confirm on any device) and the server inherits that session: this is how the team's laptops and the Fly machine run it (D-201; `docs/HOSTING.md` §3 is the Fly runbook, with the session kept on a volume through `XDG_DATA_HOME`). A key, on a plan that has one, goes in the repo-root `.env` as `KIRO_API_KEY=…` (never in git; CI's secrets guard blocks it) and wins over the login.
+
+The server re-checks the login every 10 minutes (`server/auth.ts`, `watchAuth`: `kiro-cli whoami`, cached, no credits, no agent) and `GET /healthz` reports it as `kiroAuth`: `key`, `cli-login` or `none`; a change logs `[kiro] auth changed: cli-login → none`. A lapsed login means every run plays offline until `kiro-cli login` is run again (KI-203).
 
 ## Notes
 
