@@ -65,6 +65,9 @@ export class AcpAgent {
   /** A cancelled turn's `session/prompt`, still unanswered: the next turn waits for it (bounded by DRAIN_MS). */
   private draining: Promise<void> | undefined;
   readonly agentInfo: { name?: string; version?: string } = {};
+  /** The tool tags the agent says its model can see (Kiro's `_kiro/tools/didChange`): `@<server>/<tool>` for MCP tools. */
+  readonly toolTags = new Set<string>();
+  private toolWaiters: Array<() => void> = [];
 
   constructor(private readonly opts: AcpOptions) {}
 
@@ -153,6 +156,28 @@ export class AcpAgent {
     return this.draining !== undefined;
   }
 
+  /**
+   * True once every `tags` entry is in the agent's tool catalogue (D-191, KI-191): what proves the model can see
+   * our MCP tools, not just that the server connected. False when `timeoutMs` passes first.
+   */
+  waitForTools(tags: readonly string[], timeoutMs: number): Promise<boolean> {
+    const has = () => tags.every((t) => this.toolTags.has(t));
+    if (has()) return Promise.resolve(true);
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => {
+        this.toolWaiters = this.toolWaiters.filter((w) => w !== check);
+        resolve(false);
+      }, timeoutMs);
+      const check = () => {
+        if (!has()) return;
+        clearTimeout(timer);
+        this.toolWaiters = this.toolWaiters.filter((w) => w !== check);
+        resolve(true);
+      };
+      this.toolWaiters.push(check);
+    });
+  }
+
   kill(): void {
     if (this.proc && this.exited === undefined) {
       this.proc.kill();
@@ -225,6 +250,13 @@ export class AcpAgent {
       return;
     }
     if (method === 'session/update') this.onUpdate((params?.update ?? {}) as Json);
+    else if (method === '_kiro/tools/didChange') {
+      // Kiro's catalogue of what the model can see: tags such as `@game/alerts`. A notification replaces the set.
+      const tags = (params?.tags ?? []) as Array<{ tag?: string }>;
+      this.toolTags.clear();
+      for (const t of tags) if (typeof t.tag === 'string') this.toolTags.add(t.tag);
+      for (const w of [...this.toolWaiters]) w();
+    }
     this.opts.onNotification?.(method, params);
   }
 

@@ -1,25 +1,31 @@
-// The runs (PRD SYS-12, KIRO-10, D-190): one token per run, one `kiro-cli acp` process per run (started at the
-// run's first call, in an empty temp folder outside the repo holding only our custom agent), the caps (60 calls
-// a run, 400 a day, D-23), the 25 s timeout (KIRO-09) and the log line per call with the credits Kiro reported.
+// The runs (PRD SYS-12, KIRO-10, D-190, D-191): one token per run, one `kiro-cli acp` process per run (started at
+// the run's first call, in an empty temp folder outside the repo holding only our custom agent), the caps (60 calls
+// a run, 400 a day, D-23) persisted to a small JSON file so a restart keeps the day's count (KI-193), the 25 s
+// timeout (KIRO-09), a check at session start that the model can really see the game tools (KI-191), and the log
+// line per call with the credits Kiro reported.
 import { randomBytes } from 'node:crypto';
-import { cpSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { AcpAgent, AcpError, type PromptResult } from './acp';
 import type { CallKind } from './prompt';
+import { TOOLS } from './tools';
 import type { KiroSnapshot } from '../src/kiro/snapshot';
 
 export const CAPS = { perRun: 60, perDay: 400 } as const; // D-23 (tune)
 export const CALL_TIMEOUT_MS = 25_000; // KIRO-09 (tune)
 export const RUN_IDLE_MS = 20 * 60_000; // a run nobody has used for this long loses its agent process
+export const TOOLS_WAIT_MS = 8000; // how long a new session may take to list the game tools before the run goes offline (KI-191)
 export const AGENT_NAME = 'kiro-game';
 /** The MCP server's name as the agent sees it: the agent config's `tools: ["@game"]` names it. */
 export const MCP_SERVER_NAME = 'game';
+/** The catalogue entries that prove the model sees every game tool (Kiro tags MCP tools `@<server>/<tool>`). */
+export const TOOL_TAGS: readonly string[] = TOOLS.map((t) => `@${MCP_SERVER_NAME}/${t.name}`);
 
 export interface RunsOptions {
   /** How to start the agent: the real `kiro-cli acp --agent-engine v3`, or the fake one in tests. */
   agentCommand: { command: string; args: string[]; env?: NodeJS.ProcessEnv };
-  /** The folder holding `kiro-game.json` and `kiro-game.md` (the repo's `.kiro/agents/`), copied into each run's temp cwd. */
+  /** The folder holding `kiro-game.json` (the repo's `.kiro/agents/`); the prompt is in its sibling `prompts/`. Both are copied into each run's temp cwd. */
   agentDir: string;
   /** The MCP URL the agent gets for a run: the game server's own `/mcp/<token>` endpoint. */
   mcpUrl: (token: string) => string;
@@ -30,6 +36,9 @@ export interface RunsOptions {
   /** Tests lower these; the game uses CAPS and CALL_TIMEOUT_MS. */
   caps?: { perRun: number; perDay: number };
   timeoutMs?: number;
+  /** Where the counters live between restarts (KI-193): a JSON file, written on every change. Undefined: memory only. */
+  stateFile?: string;
+  toolsWaitMs?: number;
 }
 
 interface Run {
@@ -42,11 +51,20 @@ interface Run {
   sessionId?: string;
   cwd?: string;
   queue: Promise<unknown>;
+  /** The agent started but never listed the game tools (KI-191): every call of this run answers offline. */
+  noTools?: boolean;
+}
+
+/** What the state file holds: the day's counter and the live runs' counters (their agent processes are not kept). */
+interface PersistedState {
+  day: string;
+  dayCalls: number;
+  runs: Array<{ token: string; createdAt: number; lastUsedAt: number; calls: number }>;
 }
 
 export type CallOutcome =
   | { ok: true; result: PromptResult }
-  | { ok: false; reason: 'cap-run' | 'cap-day' | 'timeout' | 'agent-error' | 'busy'; detail?: string };
+  | { ok: false; reason: 'cap-run' | 'cap-day' | 'timeout' | 'agent-error' | 'busy' | 'no-tools'; detail?: string };
 
 export class Runs {
   private readonly runs = new Map<string, Run>();
@@ -57,12 +75,15 @@ export class Runs {
   private readonly sweeper: NodeJS.Timeout;
   readonly caps: { perRun: number; perDay: number };
   readonly timeoutMs: number;
+  readonly toolsWaitMs: number;
 
   constructor(private readonly opts: RunsOptions) {
     this.now = opts.now ?? (() => Date.now());
     this.log = opts.log ?? ((l) => console.log(l));
     this.caps = opts.caps ?? CAPS;
     this.timeoutMs = opts.timeoutMs ?? CALL_TIMEOUT_MS;
+    this.toolsWaitMs = opts.toolsWaitMs ?? TOOLS_WAIT_MS;
+    this.load();
     this.sweeper = setInterval(() => this.sweep(), 60_000);
     this.sweeper.unref();
   }
@@ -78,6 +99,44 @@ export class Runs {
     if (today !== this.day) {
       this.day = today;
       this.dayCalls = 0;
+      this.save();
+    }
+  }
+
+  /** KI-193: the counters come back from the state file, so a restart (a deploy, a crash) keeps the day's cap. */
+  private load(): void {
+    const file = this.opts.stateFile;
+    if (!file || !existsSync(file)) return;
+    try {
+      const s = JSON.parse(readFileSync(file, 'utf8')) as Partial<PersistedState>;
+      if (typeof s.day === 'string' && typeof s.dayCalls === 'number') {
+        this.day = s.day;
+        this.dayCalls = s.dayCalls;
+      }
+      for (const r of s.runs ?? []) {
+        if (typeof r.token === 'string' && typeof r.calls === 'number') this.runs.set(r.token, { token: r.token, createdAt: r.createdAt ?? this.now(), lastUsedAt: r.lastUsedAt ?? this.now(), calls: r.calls, queue: Promise.resolve() });
+      }
+      this.log(`[kiro] state restored from ${file}: ${this.dayCalls} calls on ${this.day}, ${this.runs.size} runs`);
+    } catch (e) {
+      this.log(`[kiro] state file ${file} unreadable (${(e as Error).message}); starting fresh`);
+    }
+  }
+
+  private save(): void {
+    const file = this.opts.stateFile;
+    if (!file) return;
+    const state: PersistedState = {
+      day: this.day,
+      dayCalls: this.dayCalls,
+      runs: [...this.runs.values()].map((r) => ({ token: r.token, createdAt: r.createdAt, lastUsedAt: r.lastUsedAt, calls: r.calls })),
+    };
+    try {
+      mkdirSync(dirname(file), { recursive: true });
+      const tmp = `${file}.${process.pid}.tmp`;
+      writeFileSync(tmp, JSON.stringify(state));
+      renameSync(tmp, file); // atomic: a crash mid-write never leaves half a file
+    } catch (e) {
+      this.log(`[kiro] state file ${file} not written: ${(e as Error).message}`);
     }
   }
 
@@ -88,6 +147,7 @@ export class Runs {
     const token = randomBytes(16).toString('hex');
     const t = this.now();
     this.runs.set(token, { token, createdAt: t, lastUsedAt: t, calls: 0, queue: Promise.resolve() });
+    this.save();
     this.log(`[kiro] run ${token.slice(0, 8)} created (${this.runs.size} live, ${this.dayCalls}/${this.caps.perDay} calls today)`);
     return { token, callsLeft: this.caps.perRun };
   }
@@ -117,9 +177,11 @@ export class Runs {
     this.rollDay();
     if (run.calls >= this.caps.perRun) return { ok: false, reason: 'cap-run' };
     if (this.dayCalls >= this.caps.perDay) return { ok: false, reason: 'cap-day' };
+    if (run.noTools) return { ok: false, reason: 'no-tools' }; // KI-191: not counted; Kiro never answered this run
     run.calls += 1;
     this.dayCalls += 1;
     run.lastUsedAt = this.now();
+    this.save();
     const n = run.calls;
     const job = run.queue.then(() => this.turn(run, kind, prompt));
     run.queue = job.catch(() => undefined);
@@ -135,6 +197,7 @@ export class Runs {
   private async turn(run: Run, kind: CallKind, prompt: string): Promise<CallOutcome> {
     try {
       if (!run.agent || !run.agent.alive || !run.sessionId) await this.startAgent(run);
+      if (run.noTools) return { ok: false, reason: 'no-tools' };
       const result = await run.agent!.prompt(run.sessionId!, prompt, this.timeoutMs);
       if (result.stopReason === 'cancelled' || result.stopReason === 'refusal') return { ok: false, reason: 'agent-error', detail: `stop ${result.stopReason}` };
       return { ok: true, result };
@@ -186,7 +249,16 @@ export class Runs {
     } else if (this.opts.modeId !== undefined && session.modes && !session.modes.includes(this.opts.modeId)) {
       throw new AcpError(`agent ${this.opts.modeId} not offered by the engine (modes: ${session.modes.join(', ')})`);
     }
-    this.log(`[kiro] run ${tag} agent ${agent.agentInfo.name ?? '?'} ${agent.agentInfo.version ?? ''} ready in ${Date.now() - started} ms, session ${session.sessionId}`);
+    // KI-191: the server connecting is not enough; the model must have the tools in its catalogue.
+    const seen = await agent.waitForTools(TOOL_TAGS, this.toolsWaitMs);
+    if (!seen) {
+      const missing = TOOL_TAGS.filter((t) => !agent.toolTags.has(t));
+      this.log(`[kiro] run ${tag} ERROR: the agent never listed the game tools (missing ${missing.join(' ')}); this run plays offline. Is ASBX_KIRO_MANDATORY_MCPS honoured by this kiro-cli? (KI-191)`);
+      run.noTools = true;
+      this.dropAgent(run);
+      return;
+    }
+    this.log(`[kiro] run ${tag} agent ${agent.agentInfo.name ?? '?'} ${agent.agentInfo.version ?? ''} ready in ${Date.now() - started} ms, session ${session.sessionId}, ${TOOL_TAGS.length} game tools listed`);
   }
 
   private dropAgent(run: Run): void {
@@ -205,6 +277,7 @@ export class Runs {
     if (!run) return;
     this.dropAgent(run);
     this.runs.delete(token);
+    this.save();
     this.log(`[kiro] run ${token.slice(0, 8)} ended after ${run.calls} calls`);
   }
 
@@ -215,6 +288,7 @@ export class Runs {
 
   shutdown(): void {
     clearInterval(this.sweeper);
-    for (const token of [...this.runs.keys()]) this.end(token);
+    for (const run of this.runs.values()) this.dropAgent(run);
+    this.save(); // the tokens survive a restart; only the processes go
   }
 }

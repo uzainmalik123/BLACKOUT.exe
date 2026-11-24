@@ -123,6 +123,12 @@ rl.on('line', (line) => {
       const sessionId = `fake-${sessions.size + 1}`;
       sessions.set(sessionId, { mcpServers: msg.params.mcpServers ?? [], cwd: msg.params.cwd, modeId: msg.params._meta?.kiro?.modeId });
       out({ jsonrpc: '2.0', id: msg.id, result: { sessionId, modes: { availableModes: [{ id: 'vibe' }, { id: 'kiro-game' }], currentModeId: msg.params._meta?.kiro?.modeId ?? 'vibe' } } });
+      // Kiro's tool catalogue (what the model can see), a moment after the session: `@<server>/<tool>` per MCP tool.
+      // `--no-tools` leaves it empty, the way Kiro does when its deferred catalogue hides them (KI-191).
+      if (!process.argv.includes('--no-tools')) {
+        const names = ['alerts', 'meters', 'search_logs', 'tail_logs', 'accounts', 'uploads', 'defences', 'recent_actions', 'command_list'];
+        setTimeout(() => out({ jsonrpc: '2.0', method: '_kiro/tools/didChange', params: { sessionId, tags: names.map((n) => ({ source: 'mcp', tag: `@game/${n}`, description: n })) } }), 20);
+      } else out({ jsonrpc: '2.0', method: '_kiro/tools/didChange', params: { sessionId, tags: [] } });
       break;
     }
     case 'session/set_mode':

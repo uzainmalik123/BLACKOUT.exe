@@ -106,6 +106,16 @@ describe('the debrief check (KIRO-06, D-190)', () => {
     expect(debriefMatches(ok + '\nSee PRD SYS-11.', report)).toBe(false);
   });
 
+  it('allows a number Kiro saw in the snapshot it was given, still refuses an invented one or a wrong grade (D-191, KI-194)', () => {
+    const snapshot = { logs: { access: ['203.0.113.9 - - [31/Oct/2026:22:01:00 +0000] "GET /ftp HTTP/1.1" 200 1234 "-" "Fuzz Faster U Fool"'], app: [] }, accounts: [], clock: { shown: '30 min' } };
+    const ok = debriefTemplate(report);
+    expect(debriefMatches(ok + '\nThe scan came from 203.0.113.9 and asked for /ftp, answered 200 with 1234 bytes.', report, snapshot)).toBe(true);
+    expect(debriefMatches(ok + '\nThe scan came from 203.0.113.9 and asked for /ftp, answered 200 with 1234 bytes.', report)).toBe(false); // without the snapshot those numbers are strangers
+    expect(debriefMatches(ok + '\nYou had 72 hours to notify.', report, snapshot)).toBe(false);
+    expect(debriefMatches(ok.replace('Detection: B', 'Detection: A') + '\n203.0.113.9', report, snapshot)).toBe(false);
+    expect(debriefMatches(ok.replace('12 of 325', '10 of 325'), report, snapshot)).toBe(false);
+  });
+
   it('holds for a real report from a simulated run (SYS-11)', async () => {
     const { world } = runSim({ seed: 1, difficulty: 'medium', player: () => [], maxRealMs: 90_000 });
     const r = await buildReport(world);

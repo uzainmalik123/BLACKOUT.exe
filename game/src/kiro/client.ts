@@ -110,18 +110,27 @@ export function createKiro(engine: Engine, opts: KiroClientOptions = {}): Kiro {
     return run;
   }
 
-  /** One call on the run: null when the server is unreachable, refused it or the run could not start. */
-  async function call<T extends { offline?: boolean }>(path: string, body: Record<string, unknown>): Promise<T | null> {
+  /** The snapshot sent with the latest call: the debrief rail may allow the numbers Kiro saw in it (D-191). */
+  let lastSnapshot: KiroSnapshot | undefined;
+
+  /**
+   * One call on the run: null when the server is unreachable, refused it or the run could not start. A call the
+   * server accepted is logged in the world (`engine.noteKiro`, D-191: the report counts them), with the credits
+   * Kiro reported when it answered; a fallback answer (`offline`) is still a call made.
+   */
+  async function call<T extends { offline?: boolean; credits?: number }>(path: string, body: Record<string, unknown>): Promise<T | null> {
     const handle = await getRun();
     if (!handle) {
       run = undefined; // try to start a run again next time
       return null;
     }
     const snapshot: KiroSnapshot = buildSnapshot(engine);
+    lastSnapshot = snapshot;
     const res = await post<T>(path, { token: handle.token, snapshot, ...body });
     if (res === null) return null;
     calls += 1;
     online = !res.offline;
+    engine.noteKiro(path === 'ask' ? 'chat' : (path as 'hint' | 'explain' | 'draft' | 'debrief'), typeof res.credits === 'number' ? res.credits : undefined);
     return res;
   }
 
@@ -198,7 +207,7 @@ export function createKiro(engine: Engine, opts: KiroClientOptions = {}): Kiro {
     async debrief(report) {
       const facts = { facts: report.facts, grades: report.grades, mistakes: report.mistakes, missed: report.missed };
       const res = await call<{ text: string; offline: boolean }>('debrief', { report: facts });
-      if (res && !res.offline && typeof res.text === 'string' && debriefMatches(res.text, facts)) return { text: res.text, offline: false };
+      if (res && !res.offline && typeof res.text === 'string' && debriefMatches(res.text, facts, lastSnapshot)) return { text: res.text, offline: false };
       return { text: debriefTemplate(facts), offline: true };
     },
 

@@ -10,3 +10,6 @@ graphify-out/
 
 # raw recording runs (recording/record.sh); only converted JSON is committed
 recording/runs/
+
+# the Kiro server's counters between restarts (KI-193, game/server/runs.ts)
+game/server/.state/

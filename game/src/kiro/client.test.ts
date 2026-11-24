@@ -140,6 +140,32 @@ describe('the Kiro client (SYS-12, KIRO-09, D-190)', () => {
     expect(refused.outputs).toEqual([]);
   });
 
+  it('logs every call the server accepted as a `kiro` event with its credits, and the report counts them (D-191, KI-190)', async () => {
+    const engine = new Engine({ seed: 2, difficulty: 'easy' });
+    engine.advance(20_000);
+    const { fetch } = fakeFetch({
+      run: ok({ token: 'tok' }),
+      ask: ok({ text: 'One address is busy.', offline: false, credits: 0.1 }),
+      explain: ok({ text: 'A shopper.', offline: false, credits: 0.05 }),
+      draft: ok({ lines: ['ls -la'], offline: false, credits: 0.15 }),
+      debrief: ok({ text: 'nope', offline: true, reason: 'timeout' }), // a fallback answer is still a call made
+    });
+    const kiro = createKiro(engine, { fetch });
+    await kiro.ask('?');
+    await kiro.explain('line');
+    await kiro.draft('look around');
+    await kiro.debrief(await buildReport(engine.world));
+    const events = engine.world.events.filter((e) => e.kind === 'kiro');
+    expect(events.map((e) => [e.call, e.credits])).toEqual([['chat', 0.1], ['explain', 0.05], ['draft', 0.15], ['debrief', undefined]]);
+    expect(kiro.calls).toBe(4);
+    const report = await buildReport(engine.world);
+    expect(report.facts.find((f) => f.label === 'Kiro calls')?.value).toBe('4 (0.3 credits)');
+
+    const down = createKiro(new Engine({ seed: 2, difficulty: 'easy' }), { fetch: fakeFetch({}).fetch, timeoutMs: 100 });
+    await down.ask('?');
+    expect(down.calls).toBe(0); // the server never took it: not a Kiro call
+  });
+
   it('pickDraft finds the offline draft nearest a goal', () => {
     expect(pickDraft('snapshot the evidence before I change anything').id).toBe('snapshot');
     expect(pickDraft('which user agents are the busiest').id).toBe('top-agents');

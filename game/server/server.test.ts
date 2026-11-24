@@ -228,6 +228,56 @@ describe('the caps (KIRO-10, D-23)', () => {
     }
   });
 
+  it('the counters survive a restart through the state file, and the tokens with them (KI-193, D-191)', async () => {
+    const { mkdtempSync, readFileSync, rmSync } = await import('node:fs');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    const dir = mkdtempSync(join(tmpdir(), 'kiro-state-'));
+    const stateFile = join(dir, 'nested', 'runs.json');
+    const make = () => new Runs({ agentCommand: { command: process.execPath, args: [FAKE] }, agentDir: AGENT_DIR, mcpUrl: () => 'http://127.0.0.1:1/mcp/x', modeId: 'kiro-game', log: () => {}, caps: { perRun: 2, perDay: 3 }, stateFile });
+    try {
+      const first = make();
+      const { token } = first.create()!;
+      expect((await first.call(token, 'ask', 'FAKE:ECHO one')).ok).toBe(true);
+      expect((await first.call(token, 'ask', 'FAKE:ECHO two')).ok).toBe(true);
+      first.shutdown(); // a deploy or a crash: the processes go, the file stays
+      expect(JSON.parse(readFileSync(stateFile, 'utf8'))).toMatchObject({ dayCalls: 2, runs: [{ token, calls: 2 }] });
+
+      const second = make();
+      expect(second.callsToday).toBe(2);
+      expect(second.has(token)).toBe(true);
+      expect(await second.call(token, 'ask', 'FAKE:ECHO three')).toMatchObject({ ok: false, reason: 'cap-run' }); // the run's own count came back too
+      const other = second.create()!;
+      expect((await second.call(other.token, 'ask', 'FAKE:ECHO three')).ok).toBe(true); // a fresh agent for the new run
+      expect(second.create()).toBeNull(); // 3 of 3 today
+      second.shutdown();
+
+      const third = make();
+      expect(third.callsToday).toBe(3);
+      expect(third.create()).toBeNull();
+      third.shutdown();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }, 20_000);
+
+  it('a run whose agent never lists the game tools plays offline with a clear error in the log (KI-191, D-191)', async () => {
+    const h = await start({ agentArgs: ['--no-tools'] });
+    try {
+      (h.runs as unknown as { toolsWaitMs: number }).toolsWaitMs = 300;
+      const token = await h.newRun();
+      const r = await h.call('ask', token, { question: 'FAKE:ECHO hello' });
+      expect(r).toMatchObject({ offline: true, reason: 'no-tools', text: OFFLINE_ANSWER });
+      expect(h.log.some((l) => /ERROR: the agent never listed the game tools \(missing @game\/alerts/.test(l))).toBe(true);
+      const again = await h.call('ask', token, { question: 'FAKE:ECHO hello' });
+      expect(again).toMatchObject({ offline: true, reason: 'no-tools' }); // and no second agent is started for it
+      expect(h.log.filter((l) => /never listed the game tools/.test(l))).toHaveLength(1);
+      expect((await h.post('/api/kiro/health', {})).json.callsToday).toBe(1); // only the first call counted; the rest never reached Kiro
+    } finally {
+      await stop(h);
+    }
+  }, 20_000);
+
   it('the day\'s counter rolls at midnight UTC', () => {
     let t = Date.parse('2026-11-24T23:59:00Z');
     const runs = new Runs({ agentCommand: { command: 'true', args: [] }, agentDir: AGENT_DIR, mcpUrl: () => '', now: () => t, log: () => {}, caps: { perRun: 1, perDay: 1 } });

@@ -177,7 +177,7 @@ export function createHandler(opts: AppOptions): (req: IncomingMessage, res: Ser
         return send(res, 200, { title, why: '', lines: guarded.lines, stripped: guarded.stripped.length, ...meta });
       }
       case 'debrief':
-        return debriefMatches(text, report!) ? send(res, 200, { text, ...meta }) : refused();
+        return debriefMatches(text, report!, snapshot) ? send(res, 200, { text, ...meta }) : refused(); // D-191: numbers Kiro saw in the snapshot are allowed
     }
   }
 

@@ -75,9 +75,11 @@ const NUMBER = /\d+(?:[.,:]\d+)*/g;
 /**
  * KIRO-06: Kiro writes around the report, never changes it. True when every fact's value appears verbatim, every
  * phase's grade is stated next to its name (`Detection: B`, `Detection (B)`, `Detection grade B`), and the text
- * holds no number the report does not (numbers in facts, mistakes and misses are the report's own).
+ * holds no number the report does not: numbers in facts, mistakes and misses are the report's own, and (D-191,
+ * KI-194) so are the ones in the snapshot Kiro was given (addresses, paths, status codes, times from the night).
+ * A wrong grade, a changed fact or an invented number is still refused.
  */
-export function debriefMatches(text: string, report: DebriefFacts): boolean {
+export function debriefMatches(text: string, report: DebriefFacts, snapshot?: unknown): boolean {
   if (text.trim() === '' || INTERNAL_ID.test(text)) return false;
   for (const f of report.facts) if (!text.includes(f.value)) return false;
   for (const [phase, name] of Object.entries(PHASE_NAMES) as Array<[keyof DebriefFacts['grades'], string]>) {
@@ -89,6 +91,7 @@ export function debriefMatches(text: string, report: DebriefFacts): boolean {
     ...report.facts.flatMap((f) => [f.label, f.value]),
     ...report.mistakes.flatMap((m) => [m.title, m.why]),
     ...report.missed,
+    snapshot === undefined ? '' : JSON.stringify(snapshot),
   ].join('\n');
   for (const n of own.match(NUMBER) ?? []) allowed.add(n);
   for (const n of text.match(NUMBER) ?? []) if (!allowed.has(n)) return false;

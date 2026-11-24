@@ -42,11 +42,14 @@ export function main(): void {
     log('[kiro] KIRO_API_KEY set: passed to kiro-cli');
   } else log('[kiro] no KIRO_API_KEY in .env: kiro-cli uses its own login (`kiro-cli login`)');
 
+  // KI-193: the caps survive a restart in a small JSON file (gitignored), KIRO_STATE_FILE to move it.
+  const stateFile = process.env.KIRO_STATE_FILE ?? join(gameDir, 'server', '.state', 'runs.json');
   const runs = new Runs({
     agentCommand: { command: kiroCli, args: ['acp', '--agent-engine', 'v3'], env },
     agentDir: join(repoRoot, '.kiro', 'agents'),
     mcpUrl: (token) => `http://127.0.0.1:${port}/mcp/${token}`,
     modeId: AGENT_NAME,
+    stateFile,
     log,
   });
   const distDir = serveDist ? join(gameDir, 'dist') : undefined;
