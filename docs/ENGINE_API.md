@@ -168,15 +168,31 @@ interface Shell {
 | `rm` in uploads | `DEF-15` |
 | `systemctl stop` / `start` / `restart` | `DEF-11` / `DEF-18` (`restart` sends both) |
 
-**Kiro** (SYS-12, KIRO-*):
+**Kiro** (SYS-12, KIRO-01..10, D-190): **built**, in `game/src/kiro/` (entry point `client.ts`); the server is `game/server/` (`npm run server`, see `game/server/README.md`).
 ```ts
+import { createKiro, type Kiro, type KiroReply, type KiroDraft } from '../kiro/client';   // game/src/kiro/client.ts
+
+const kiro = createKiro(engine);   // one per run; { baseUrl, timeoutMs } optional
+
 interface Kiro {
-  ask(question: string): Promise<{ text: string; offline: boolean }>;   // chat; takes 5–20 s on purpose
-  hint(): Promise<{ text: string; offline: boolean } | null>;           // rules decide when (null = none now)
-  explain(line: string): Promise<{ text: string; offline: boolean }>;   // "explain this log line"
+  ask(question: string): Promise<KiroReply>;        // chat (KIRO-01); 5–15 s on purpose, the game keeps running
+  hint(): Promise<KiroReply | null>;                // the rules decide when (KIRO-03, SYS-13): null = no hint now
+  explain(line: string): Promise<KiroReply>;        // "explain this log line" (KIRO-05)
+  draft(goal: string): Promise<KiroDraft>;          // a script the player runs themselves (KIRO-02)
+  debrief(report: Report): Promise<KiroReply>;      // the write-up around SYS-11's report, on the ending (KIRO-06)
+  applyDraft(shell: Shell, draft: KiroDraft): Promise<{ ok: boolean; outputs: string[]; message?: string }>;   // KIRO-04, Easy only
+  readonly online: boolean;                         // false once a call failed: label the panel "Kiro (offline)"
+  readonly calls: number;                           // calls accepted this run (the cap is 60, KIRO-10)
 }
+interface KiroReply { text: string; offline: boolean }                   // offline: the rule-written CON-03 text
+interface KiroDraft { title: string; why: string; lines: string[]; stripped: number; offline: boolean }
 ```
-Show a "Kiro is reading the logs…" state for the whole wait; the game keeps running. When `offline` is true, label the answer "Kiro (offline)". **Stub:** reply after 3 s with fixed text and `offline: true`.
+- Every call sends the server a **spoiler-free snapshot** of `engine.world` (`src/kiro/snapshot.ts`): no move ids, no `by`, no `createdBy`; a test proves it. The server runs the real Kiro on rails and the client checks the text again (`src/kiro/rails.ts`) before handing it over. Never show a `KiroReply` that did not come from this interface.
+- Show "Kiro is reading the logs…" for the whole wait; never `await` it inside the frame loop. When `offline` is true, label the answer "Kiro (offline)". `ask`, `explain`, `draft` and `debrief` always resolve (never reject, never null): the fallback is built in.
+- **`hint()`**: call it whenever the panel could show a hint (once a second is fine). On **Easy** it answers once per open alert (CON-03's `volunteered` policy); on **Medium/Hard** only while `world.struggle.suggestions` is above the hints already given (the `suggestion` event, §4). The text names the kind of gap, never the move. `null` means nothing to show.
+- **`draft()`**: `lines` are command lines that parse in our shell (every unsupported line Kiro wrote is stripped; `stripped` counts them). Placeholders look like `<ip>`; the player fills them in. Show the lines as text the player copies or types; **never run them** except through `applyDraft` on Easy (the "Kiro, apply it" button, KIRO-04), which refuses on Medium/Hard, refuses a draft with a placeholder left in, and runs each line through `shell.run`.
+- **`debrief(report)`**: call it once on the ending with `buildReport`'s result and put the text in `report.debrief` (the report's own `debrief` is the offline placeholder until then).
+- Without the server (or with it down), every call answers in well under a second with `offline: true` and the CON-03 text; the panel must look right either way (KIRO-09).
 
 **The report** (SYS-11, KIRO-06):
 ```ts

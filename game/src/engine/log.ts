@@ -4,6 +4,8 @@ import type { ActionId, Actor, Ending, Foothold, MinionId, MoveId, Patch, Player
 import type { GapType } from './assess';
 import type { World } from './state';
 
+export type KiroCall = 'chat' | 'draft' | 'hint' | 'explain' | 'debrief';
+
 export type GameEventBody =
   | { kind: 'move-started'; move: MoveId; variant: string; stage: Stage; ip: string }
   | { kind: 'move-landed'; move: MoveId; variant: string }
@@ -11,7 +13,7 @@ export type GameEventBody =
   | { kind: 'wave-started'; minion: MinionId; wave: number; ips: string[] }
   | { kind: 'wave-ended'; minion: MinionId; wave: number; closedBy?: ActionId }
   | { kind: 'action'; action: PlayerAction; ok: boolean; note?: string }
-  | { kind: 'kiro'; call: 'chat' | 'draft' | 'hint' | 'explain' | 'debrief'; credits?: number }
+  | { kind: 'kiro'; call: KiroCall; credits?: number } // D-191 (KI-190): logged by the Kiro client through engine.noteKiro, credits as the server reported them
   | { kind: 'souls-stolen'; by: Actor; count: number; stolen: number; total: number }
   | { kind: 'tip-off'; by: ActionId }
   | { kind: 'alert-opened'; alert: number; about: Actor }
