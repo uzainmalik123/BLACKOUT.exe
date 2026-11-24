@@ -1,6 +1,6 @@
 # Teammate tasks: everything the player sees
 
-> Updated 2026-11-21 (D-36). Deadline **2026-12-04**.
+> For **BLACKOUT.exe** (the Kiroween 2026 entry; named in D-210). Updated 2026-11-21 (D-36). Deadline **2026-12-04**.
 >
 > **Uzain builds the brain:** the engine, the shell's logic, Kiro's server, report grading, recordings, hosting. **You build everything the player sees and hears:** every scene, the dot-matrix renderer, art, sound, the terminal window.
 >

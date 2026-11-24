@@ -4,6 +4,8 @@ inclusion: always
 
 # Project rules
 
+The project is **BLACKOUT.exe** (the Kiroween 2026 entry): a horror-themed cyber incident-response game. Write the name exactly like that.
+
 Follow the repository's agent rules in full:
 
 #[[file:AGENTS.md]]

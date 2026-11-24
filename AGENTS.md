@@ -1,6 +1,6 @@
 # AGENTS.md — read this first
 
-This repository is the team's **Kiroween 2026** entry: a horror-themed **cyber incident-response game** (name still open). The plan is **`docs/GAME_PLAN.md`** (the why) and **`docs/PRD.md`** (exactly what gets built, the source of truth); read both before doing anything.
+This repository is the team's **Kiroween 2026** entry, **BLACKOUT.exe**: a horror-themed **cyber incident-response game** (named in D-210; written exactly `BLACKOUT.exe`). The plan is **`docs/GAME_PLAN.md`** (the why) and **`docs/PRD.md`** (exactly what gets built, the source of truth); read both before doing anything.
 
 ```
 <repo root>/
