@@ -3,8 +3,9 @@
 // source-scan tests (actions-surface.test.ts, determinism-source.test.ts).
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const SHELL_DIR = new URL('..', import.meta.url).pathname;
+const SHELL_DIR = fileURLToPath(new URL('..', import.meta.url));
 
 function walk(dir: string, out: string[]): void {
   for (const name of readdirSync(dir).sort()) {

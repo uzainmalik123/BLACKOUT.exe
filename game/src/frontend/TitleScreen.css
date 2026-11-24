@@ -1,0 +1,460 @@
+/* ============================================================
+   BLACKOUT.exe — Title Screen UI  (cinematic horror redesign)
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;900&family=Cinzel+Decorative:wght@700&family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400;1,500;1,600&family=Share+Tech+Mono&display=swap');
+
+.ts-root {
+  /* ── design tokens ── */
+  --ivory:        #ece5d3;
+  --ivory-dim:    #8a8070;
+  --ivory-muted:  rgba(236,229,211,0.45);
+  --crimson:      #c0121f;
+  --crimson-glow: rgba(192,18,31,0.65);
+  --crimson-soft: #a83840;
+  --green:        #26e07a;
+  --green-glow:   rgba(38,224,122,0.5);
+  --void:         #030404;
+
+  /* ── type stacks ── */
+  --mono:  "Share Tech Mono", "Cascadia Mono", Consolas, "Courier New", monospace;
+  --serif: "Cinzel", "Palatino Linotype", Georgia, serif;
+  --display: "Cinzel", "Palatino Linotype", Georgia, serif;
+  --italic: "Cormorant Garamond", "Palatino Linotype", Georgia, serif;
+
+  /* ── layout ── */
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: var(--void);
+  color: var(--ivory);
+  font-family: var(--mono);
+  cursor: default;
+  user-select: none;
+}
+
+/* ── canvas ── */
+
+.ts-canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+}
+
+/* ── screen-reader only ── */
+
+.ts-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* ── kbd chips ── */
+
+.ts-root kbd {
+  display: inline-block;
+  min-width: 1.6em;
+  padding: 0.05em 0.45em;
+  border: 1px solid rgba(236, 229, 211, 0.22);
+  border-bottom-width: 2px;
+  border-radius: 3px;
+  font-family: var(--mono);
+  font-size: 0.88em;
+  line-height: 1.35;
+  text-align: center;
+  color: rgba(236, 229, 211, 0.75);
+  background: rgba(236, 229, 211, 0.04);
+  box-shadow: 0 1px 0 rgba(192, 18, 31, 0.3);
+}
+
+.ts-dot {
+  margin: 0 0.55em;
+  color: var(--crimson-soft);
+  opacity: 0.7;
+}
+
+/* ================================================================
+   THE CHOICE  — no panel: written straight onto the dark, like an inscription
+   ================================================================ */
+
+.ts-choice {
+  --gold: #e2c98a;
+  --gold-dim: rgba(226, 201, 138, 0.5);
+  position: absolute;
+  left: 50%;
+  bottom: 4.5vh;
+  width: min(760px, 56vw);
+  transform: translate(-50%, 16px);
+  text-align: center;
+  opacity: 0;
+  filter: blur(6px);
+  transition: opacity 1.4s ease, transform 1.4s ease, filter 1.4s ease;
+}
+
+/* a pool of shadow under the words: light, not a box */
+.ts-choice::before,
+.ts-closed::before {
+  content: '';
+  position: absolute;
+  inset: -45% -20%;
+  z-index: -1;
+  background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0.94) 0%, rgba(0, 0, 0, 0.78) 45%, transparent 74%);
+  pointer-events: none;
+}
+
+.ts-choice.on {
+  opacity: 1;
+  transform: translate(-50%, 0);
+  filter: none;
+}
+
+/* "DESKTOP ACCESS REQUIRED", between two fading hairlines */
+.ts-rule {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin: 0 0 6px;
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: clamp(13px, 1.1vw, 17px);
+  letter-spacing: 0.36em;
+  text-transform: uppercase;
+  color: #f0d99c;
+  text-shadow: 0 1px 2px #000, 0 0 16px rgba(226, 201, 138, 0.3);
+}
+
+.ts-rule::before,
+.ts-rule::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--gold-dim));
+}
+
+.ts-rule::after {
+  background: linear-gradient(90deg, var(--gold-dim), transparent);
+}
+
+.ts-whisper {
+  margin: 0 0 18px;
+  font-family: var(--italic);
+  font-style: italic;
+  font-weight: 600;
+  font-size: clamp(16px, 1.3vw, 21px);
+  letter-spacing: 0.01em;
+  color: #ece6da;
+  text-shadow: 0 1px 2px #000;
+}
+
+/* the two paths, side by side */
+.ts-paths {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(18px, 3vw, 48px);
+}
+
+.ts-or {
+  font-family: var(--italic);
+  font-style: italic;
+  font-size: clamp(15px, 1.2vw, 19px);
+  color: rgba(236, 229, 211, 0.5);
+}
+
+.ts-path {
+  position: relative;
+  padding: 12px 6px;
+  border: 0;
+  background: none;
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: clamp(16px, 1.45vw, 23px);
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: rgba(236, 229, 211, 0.62);
+  text-shadow: 0 1px 2px #000;
+  cursor: pointer;
+  transition: color 0.35s ease, letter-spacing 0.35s ease, text-shadow 0.35s ease;
+}
+
+.ts-path:focus { outline: none; }
+
+/* the chosen path already glows, is underlined and wears the diamond: no box around it */
+.ts-path:focus-visible {
+  outline: none;
+}
+
+/* a thread of light drawn out from the centre under the chosen path */
+.ts-path::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  right: 50%;
+  bottom: 2px;
+  height: 1px;
+  background: currentColor;
+  box-shadow: 0 0 10px currentColor;
+  transition: left 0.5s ease, right 0.5s ease;
+}
+
+.ts-path.sel::after {
+  left: 6%;
+  right: 6%;
+}
+
+/* a small diamond hovering over the chosen path */
+.ts-sigil {
+  position: absolute;
+  left: 50%;
+  top: -6px;
+  font-size: 10px;
+  letter-spacing: 0;
+  opacity: 0;
+  transform: translate(-50%, 5px);
+  transition: opacity 0.35s ease, transform 0.35s ease;
+}
+
+.ts-path.sel .ts-sigil {
+  opacity: 1;
+  transform: translate(-50%, 0);
+  animation: ts-sigil 2.4s ease-in-out infinite;
+}
+
+.ts-path.enter.sel {
+  color: #fbecc0;
+  letter-spacing: 0.26em;
+  text-shadow: 0 1px 2px #000, 0 0 12px rgba(226, 201, 138, 0.6), 0 0 34px rgba(226, 201, 138, 0.22);
+}
+
+.ts-path.exit.sel {
+  color: #ff5a66;
+  letter-spacing: 0.26em;
+  text-shadow: 0 1px 2px #000, 0 0 12px rgba(220, 40, 55, 0.65), 0 0 34px rgba(220, 40, 55, 0.25);
+}
+
+@keyframes ts-sigil {
+  0%, 100% { opacity: 0.5; }
+  50%      { opacity: 1; }
+}
+
+.ts-keys {
+  margin: 14px 0 0;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: rgba(169, 160, 139, 0.5);
+}
+
+.ts-keys kbd { font-size: 9px; }
+
+/* ---- used by the phone gate ---- */
+
+.ts-heading {
+  margin: 0 0 8px;
+  font-family: var(--display);
+  font-size: clamp(11px, 1.05vw, 15px);
+  font-weight: 700;
+  letter-spacing: 0.38em;
+  text-transform: uppercase;
+  color: var(--ivory);
+  text-shadow: 0 0 18px rgba(192, 18, 31, 0.6), 1px 0 0 rgba(192, 18, 31, 0.5);
+}
+
+.ts-note {
+  margin: 0 0 16px;
+  font-family: var(--italic);
+  font-style: italic;
+  font-size: clamp(13px, 1vw, 16px);
+  line-height: 1.5;
+  color: rgba(236, 229, 211, 0.7);
+}
+
+/* ================================================================
+   AFTER EXIT
+   ================================================================ */
+
+.ts-closed {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  animation: ts-fade-in 1.8s ease both;
+}
+
+.ts-closed p:first-child {
+  margin: 0;
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: clamp(16px, 1.6vw, 24px);
+  letter-spacing: 0.4em;
+  text-transform: uppercase;
+  color: var(--ivory);
+  text-shadow: 0 0 24px rgba(192, 18, 31, 0.45);
+}
+
+/* ================================================================
+   DESKTOP GATE — mobile / narrow-window block
+   ================================================================ */
+
+.ts-gate {
+  position: absolute;
+  left: 50%;
+  bottom: 7vh;
+  width: min(90vw, 480px);
+  transform: translateX(-50%);
+  padding: 22px 20px 18px;
+  text-align: center;
+
+  background: linear-gradient(
+    170deg,
+    rgba(4, 4, 6, 0.9) 0%,
+    rgba(10, 2, 2, 0.95) 100%
+  );
+  border: 1px solid rgba(192, 18, 31, 0.28);
+  border-top-color: rgba(236, 229, 211, 0.12);
+  box-shadow:
+    0 0 0 1px rgba(0,0,0,0.6),
+    0 8px 80px 20px rgba(0,0,0,0.9),
+    inset 0 0 60px rgba(192,18,31,0.05);
+
+  animation: ts-gate-in 2s cubic-bezier(.22,.68,0,1.2) 0.5s both;
+}
+
+.ts-gate::before {
+  content: '';
+  display: block;
+  height: 1px;
+  margin: 0 0 16px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(192,18,31,0.6) 30%,
+    rgba(192,18,31,0.6) 70%,
+    transparent
+  );
+  box-shadow: 0 0 10px rgba(192,18,31,0.5);
+}
+
+@keyframes ts-gate-in {
+  from { opacity: 0; transform: translateX(-50%) translateY(16px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+.ts-gate-title {
+  margin: 0 0 14px;
+  font-family: var(--serif);
+  font-weight: 900;
+  font-size: clamp(28px, 8.5vw, 44px);
+  letter-spacing: 0.06em;
+  color: var(--ivory);
+  text-shadow:
+    2px 1px 0 rgba(192,18,31,0.65),
+    0 0 30px rgba(192,18,31,0.25);
+  animation: ts-title-pulse 4s ease-in-out infinite;
+}
+
+@keyframes ts-title-pulse {
+  0%, 100% { text-shadow: 2px 1px 0 rgba(192,18,31,0.65), 0 0 30px rgba(192,18,31,0.25); }
+  50%       { text-shadow: 2px 1px 0 rgba(192,18,31,0.9), 0 0 50px rgba(192,18,31,0.45); }
+}
+
+.ts-gate-whisper {
+  margin: 10px 0 0;
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  color: var(--crimson-soft);
+  opacity: 0.85;
+}
+
+/* ================================================================
+   SHARED ANIMATIONS
+   ================================================================ */
+
+@keyframes ts-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* ================================================================
+   CINEMATIC OVERLAYS  (vignette, scanlines, chromatic aberration)
+   ================================================================ */
+
+/* Deep radial vignette — burns the edges darker than the canvas alone */
+.ts-overlay-vignette {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse 80% 80% at 50% 50%,
+    transparent 30%,
+    rgba(0, 0, 0, 0.45) 70%,
+    rgba(0, 0, 0, 0.88) 100%
+  );
+  mix-blend-mode: multiply;
+}
+
+/* Fine scanline texture */
+.ts-overlay-scanlines {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.14) 2px,
+    rgba(0, 0, 0, 0.14) 4px
+  );
+  animation: ts-scan-drift 8s linear infinite;
+}
+
+@keyframes ts-scan-drift {
+  from { background-position: 0 0; }
+  to   { background-position: 0 160px; }
+}
+
+/* Subtle RGB-channel split on the top 20% and bottom 20% of the frame */
+.ts-overlay-aberration {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  /* red ghost slightly to the left at top-edge */
+  box-shadow:
+    inset  2px  0 0 rgba(192,  18,  31, 0.06),
+    inset -2px  0 0 rgba(38, 224, 122, 0.04),
+    inset  0   40px 60px rgba(192, 18, 31, 0.07),
+    inset  0  -40px 60px rgba(10, 4, 4, 0.5);
+}
+
+/* ================================================================
+   SHORT SCREENS  — the choice tightens so it clears the tagline
+   ================================================================ */
+
+@media (max-height: 860px) {
+  .ts-choice { bottom: 2vh; }
+  .ts-rule { margin-bottom: 2px; }
+  .ts-whisper { margin-bottom: 8px; font-size: 13px; }
+  .ts-path { padding: 8px 6px; }
+  .ts-keys { margin-top: 6px; }
+}
+
+/* ================================================================
+   REDUCED MOTION
+   ================================================================ */
+
+@media (prefers-reduced-motion: reduce) {
+  .ts-path.sel .ts-sigil,
+  .ts-gate-title,
+  .ts-overlay-scanlines {
+    animation: none;
+  }
+}
