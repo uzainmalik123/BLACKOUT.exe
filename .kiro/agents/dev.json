@@ -1,0 +1,53 @@
+{
+  "name": "dev",
+  "description": "Project agent with the KDEV-03 hooks (tests per save, PRD reminder, health at stop)",
+  "prompt": null,
+  "mcpServers": {},
+  "tools": [
+    "*"
+  ],
+  "toolAliases": {},
+  "allowedTools": [],
+  "resources": [
+    "file://AGENTS.md"
+  ],
+  "hooks": {
+    "postToolUse": [
+      {
+        "command": "node scripts/kiro-hook.mjs test-folder",
+        "matcher": "fs_write",
+        "description": "tests for the saved folder"
+      },
+      {
+        "command": "node scripts/kiro-hook.mjs test-folder",
+        "matcher": "str_replace"
+      },
+      {
+        "command": "node scripts/kiro-hook.mjs test-folder",
+        "matcher": "fs_append"
+      },
+      {
+        "command": "node scripts/kiro-hook.mjs prd-reminder",
+        "matcher": "fs_write",
+        "description": "PRD status reminder"
+      },
+      {
+        "command": "node scripts/kiro-hook.mjs prd-reminder",
+        "matcher": "str_replace"
+      },
+      {
+        "command": "node scripts/kiro-hook.mjs prd-reminder",
+        "matcher": "fs_append"
+      }
+    ],
+    "stop": [
+      {
+        "command": "cd game && if npm run health >/tmp/kiro-health.log 2>&1; then echo 'health is green' >&2; else tail -n 40 /tmp/kiro-health.log >&2; printf '%s' '{\"decision\":\"block\",\"reason\":\"health is red\"}'; echo 'health is red' >&2; exit 1; fi",
+        "description": "health at stop"
+      }
+    ]
+  },
+  "toolsSettings": {},
+  "includeMcpJson": true,
+  "model": null
+}
