@@ -7,6 +7,7 @@ import { advance } from './advance';
 import { pause, resume } from './clock';
 import { errorRate, topTalkers, type ErrorRatePoint, type Talker } from './detection';
 import { libraryFrom, type RecordingLibrary } from './library';
+import { emit, type KiroCall } from './log';
 import { notificationClock, type NotificationClock } from './notification';
 import { renderAccessLog, renderAppLog } from './replay';
 import { openBaseline, syncDb, type GameDb } from './sqldb';
@@ -51,6 +52,12 @@ export class Engine {
     advance(this.world, this.library, 0); // let a cut or an ending show on the same call
     this.notify();
     return result;
+  }
+
+  /** SYS-10, KIRO-10 (D-191, KI-190): the Kiro client logs every call the server accepted, with the credits it reported. */
+  noteKiro(call: KiroCall, credits?: number): void {
+    emit(this.world, { kind: 'kiro', call, ...(credits !== undefined && { credits }) });
+    this.notify();
   }
 
   pause(): boolean {

@@ -9,7 +9,7 @@ import { TAP_BY_ID } from '../rules/taps';
 import { FOOTHOLDS, type ActionId, type Feature, type Foothold, type MoveId, type Patch, type PlayerAction, type Stage, type TapId } from '../rules/vocabulary';
 import { CONFIG } from './config';
 import { footholds } from './facts';
-import type { GameEvent } from './log';
+import { eventsOfKind, type GameEvent } from './log';
 import { confirmBreach } from './notification';
 import type { World } from './state';
 
@@ -599,6 +599,10 @@ export function evaluate(world: World): Assessment {
     mistakes.push({ phase: 'recover', title: `${churned} customers gave up and left`, why: 'A customer whose errand fails twice leaves for good: a feature left off, a rule that matches shoppers or a blocked address is a bill the business keeps paying (containment has a business cost: NIST SP 800-61r2).' });
   }
   facts.push({ label: ending ? 'Heartbeat at the end' : 'Heartbeat', value: `${Math.round(ending?.heartbeat ?? world.heartbeat)}` });
+  // D-191 (KI-190): how often Kiro was used, from the `kiro` events the client logs (engine.noteKiro), with the credits it reported.
+  const kiroCalls = eventsOfKind(world, 'kiro');
+  const credits = kiroCalls.reduce((sum, e) => sum + (e.credits ?? 0), 0);
+  facts.push({ label: 'Kiro calls', value: kiroCalls.length === 0 ? 'none' : `${kiroCalls.length}${credits > 0 ? ` (${Math.round(credits * 100) / 100} credits)` : ''}` });
   if (phases.recover.evidence.length > 0) phases.recover.status = 'degraded';
 
   // --- Grades: the base from timing, minus a letter per point; the ending fails the phase that lost it.

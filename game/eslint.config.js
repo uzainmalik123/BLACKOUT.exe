@@ -14,7 +14,7 @@ export default tseslint.config(
     rules: reactHooks.configs.recommended.rules,
   },
   {
-    files: ['*.config.{js,ts}'],
+    files: ['*.config.{js,ts}', 'server/**/*.{ts,mjs}'], // server/: the Kiro server (SYS-12) runs under Node
     languageOptions: { globals: globals.node },
   },
 );

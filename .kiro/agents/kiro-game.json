@@ -1,0 +1,26 @@
+{
+  "name": "kiro-game",
+  "description": "The in-game Kiro (PRD KDEV-06, SYS-12, KIRO-07, KIRO-08): a familiar helping a lone defender. No built-in tools at all; only the game server's read-only MCP tools, supplied per session. Run by game/server/ in an empty temp folder outside the repo (KI-13). Its prompt is .kiro/prompts/kiro-game.md (a .md in this folder would be read as another agent).",
+  "prompt": "file://../prompts/kiro-game.md",
+  "mcpServers": {},
+  "tools": ["@game"],
+  "excludedTools": ["@builtin", "read", "write", "shell", "web", "subagent", "spec", "context", "@powers"],
+  "allowedTools": ["@game"],
+  "permissions": {
+    "rules": [
+      { "capability": "mcp", "match": ["game/*"], "effect": "allow" },
+      { "capability": "fs_read", "effect": "deny" },
+      { "capability": "fs_write", "effect": "deny" },
+      { "capability": "shell", "effect": "deny" },
+      { "capability": "web_fetch", "effect": "deny" },
+      { "capability": "web_search", "effect": "deny" },
+      { "capability": "subagent", "effect": "deny" },
+      { "capability": "skill", "effect": "deny" },
+      { "capability": "power", "effect": "deny" },
+      { "capability": "context", "effect": "deny" }
+    ]
+  },
+  "resources": [],
+  "includeMcpJson": false,
+  "includePowers": false
+}
