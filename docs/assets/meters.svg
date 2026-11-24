@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 230" width="1000" height="230" role="img" aria-label="Two meters pull against each other: Souls (customer data) and Heartbeat (the business). Pulling the plug saves souls but stops the heartbeat.">
+<style>
+  text{font-family:Consolas, 'DejaVu Sans Mono', Menlo, 'Courier New', monospace}
+  .lb{font:700 15px Consolas, 'DejaVu Sans Mono', Menlo, 'Courier New', monospace;letter-spacing:3px;fill:#f3ede2}
+  .sub{font:12px Consolas, 'DejaVu Sans Mono', Menlo, 'Courier New', monospace;fill:#8b8f98}
+  .souls{animation:souls 16s infinite}
+  @keyframes souls{0%{transform:scaleX(1)}31.25%{transform:scaleX(.62)}93%{transform:scaleX(.62)}100%{transform:scaleX(1)}}
+  .heart{animation:heart 16s infinite}
+  @keyframes heart{0%,31.25%{transform:scaleX(1)}68.75%{transform:scaleX(.14)}93%{transform:scaleX(.14)}100%{transform:scaleX(1)}}
+  .bar{transform-box:fill-box;transform-origin:left center}
+  .cap{font:italic 16px Georgia, 'Times New Roman', serif;opacity:0}
+  .c1{fill:#ff4d5e;animation:c1 16s infinite}@keyframes c1{0%,1%{opacity:0}4%,31.25%{opacity:1}33.75%,100%{opacity:0}}
+  .c2{fill:#e3b25c;animation:c2 16s infinite}@keyframes c2{0%,33.75%{opacity:0}36.25%,65.63%{opacity:1}68.13%,100%{opacity:0}}
+  .c3{fill:#f3ede2;animation:c3 16s infinite}@keyframes c3{0%,68.13%{opacity:0}70.63%,92%{opacity:1}94%,100%{opacity:0}}
+  .plug{animation:plug 16s steps(1,end) infinite}@keyframes plug{0%,31.25%{fill:#22ff88}31.25%,93%{fill:#e1182c}}
+  .on{animation:on 16s steps(1,end) infinite}@keyframes on{0%{opacity:1}31.25%{opacity:0}93%{opacity:1}}
+  .off{opacity:0;fill:#e1182c;animation:off 16s steps(1,end) infinite}@keyframes off{0%{opacity:0}31.25%{opacity:1}93%{opacity:0}}
+  .ekg{fill:none;stroke:#22ff88;stroke-width:2;stroke-dasharray:120 900;animation:ekg 1.4s linear infinite}
+  @keyframes ekg{from{stroke-dashoffset:120}to{stroke-dashoffset:-900}}
+  @media (prefers-reduced-motion: reduce){*{animation:none!important}}
+</style>
+<rect width="1000" height="230" rx="10" fill="#07090d"/>
+<text class="lb" x="30" y="62">💀 SOULS</text><text class="sub" x="30" y="80">customer records</text>
+<rect x="200" y="46" width="640" height="26" rx="3" fill="#141a22" stroke="#263040"/>
+<rect class="bar souls" x="203" y="49" width="634" height="20" rx="2" fill="#c9cfd8"/>
+<text class="lb" x="30" y="132">🫀 HEARTBEAT</text><text class="sub" x="30" y="150">the business, alive</text>
+<rect x="200" y="116" width="640" height="26" rx="3" fill="#141a22" stroke="#263040"/>
+<rect class="bar heart" x="203" y="119" width="634" height="20" rx="2" fill="#e1182c"/>
+<circle class="plug" cx="890" cy="94" r="9"/><text class="sub on" x="890" y="122" text-anchor="middle">ONLINE</text><text class="sub off" x="890" y="122" text-anchor="middle">OFFLINE</text>
+<text class="cap c1" x="500" y="196" text-anchor="middle">Death is harvesting. Every record he steals is a soul.</text>
+<text class="cap c2" x="500" y="196" text-anchor="middle">You pull the plug. The souls are safe… and the business stops breathing.</text>
+<text class="cap c3" x="500" y="196" text-anchor="middle">Overreact and you kill it yourself. Underreact and Death feeds.</text>
+</svg>

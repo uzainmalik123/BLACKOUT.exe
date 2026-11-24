@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 386" width="1000" height="386" role="img" aria-label="A real session in the game's terminal: find the scanner, save evidence, block his IP, find the admin account Death planted.">
+<style>
+  text{font:13px Consolas, 'DejaVu Sans Mono', Menlo, 'Courier New', monospace}
+  .pr{fill:#22ff88} .cm{fill:#e8ecf1} .ot{fill:#b8c0cc} .dim{fill:#7d8794}
+  .hot{fill:#ff4d5e;font-weight:700}
+  .nt{fill:#e3b25c;font-style:italic}
+  .dt{fill:#e1182c;font-weight:700;letter-spacing:.5px}
+  .bar{font:12px Consolas, 'DejaVu Sans Mono', Menlo, 'Courier New', monospace;fill:#7d8794}
+  .cur{animation:cur 1s steps(1,end) infinite}@keyframes cur{50%{opacity:0}}
+.l0{animation:l0 30s infinite}@keyframes l0{0%,0.80%{opacity:0}0.83%,96.00%{opacity:1}98.67%,100%{opacity:0}}
+.c0{animation:c0 30s infinite}@keyframes c0{0%,0.83%{transform:translateX(0);animation-timing-function:steps(82,end)}8.03%,100%{transform:translateX(598.3px)}}
+.k0{animation:k0 30s infinite}@keyframes k0{0%,0.83%{opacity:1}9.03%,100%{opacity:0}}
+.l1{animation:l1 30s infinite}@keyframes l1{0%,9.83%{opacity:0}9.86%,96.00%{opacity:1}98.67%,100%{opacity:0}}
+.l2{animation:l2 30s infinite}@keyframes l2{0%,10.43%{opacity:0}10.46%,96.00%{opacity:1}98.67%,100%{opacity:0}}
+.l3{animation:l3 30s infinite}@keyframes l3{0%,11.03%{opacity:0}11.06%,96.00%{opacity:1}98.67%,100%{opacity:0}}
+.l4{animation:l4 30s infinite}@keyframes l4{0%,11.63%{opacity:0}11.66%,96.00%{opacity:1}98.67%,100%{opacity:0}}
+.c4{animation:c4 30s infinite}@keyframes c4{0%,11.66%{transform:translateX(0);animation-timing-function:steps(63,end)}17.19%,100%{transform:translateX(462.5px)}}
+.k4{animation:k4 30s infinite}@keyframes k4{0%,11.66%{opacity:1}18.19%,100%{opacity:0}}
+.l5{animation:l5 30s infinite}@keyframes l5{0%,18.99%{opacity:0}19.02%,96.00%{opacity:1}98.67%,100%{opacity:0}}
+.l6{animation:l6 30s infinite}@keyframes l6{0%,19.59%{opacity:0}19.62%,96.00%{opacity:1}98.67%,100%{opacity:0}}
+.c6{animation:c6 30s infinite}@keyframes c6{0%,19.62%{transform:translateX(0);animation-timing-function:steps(43,end)}23.39%,100%{transform:translateX(319.4px)}}
+.k6{animation:k6 30s infinite}@keyframes k6{0%,19.62%{opacity:1}24.39%,100%{opacity:0}}
+.l7{animation:l7 30s infinite}@keyframes l7{0%,25.19%{opacity:0}25.22%,96.00%{opacity:1}98.67%,100%{opacity:0}}
+.c7{animation:c7 30s infinite}@keyframes c7{0%,25.22%{transform:translateX(0);animation-timing-function:steps(41,end)}28.82%,100%{transform:translateX(305.2px)}}
+.k7{animation:k7 30s infinite}@keyframes k7{0%,25.22%{opacity:1}29.82%,100%{opacity:0}}
+.l8{animation:l8 30s infinite}@keyframes l8{0%,30.62%{opacity:0}30.65%,96.00%{opacity:1}98.67%,100%{opacity:0}}
+.l9{animation:l9 30s infinite}@keyframes l9{0%,35.95%{opacity:0}35.99%,96.00%{opacity:1}98.67%,100%{opacity:0}}
+.c9{animation:c9 30s infinite}@keyframes c9{0%,35.99%{transform:translateX(0);animation-timing-function:steps(23,end)}38.01%,100%{transform:translateX(176.5px)}}
+.k9{animation:k9 30s infinite}@keyframes k9{0%,35.99%{opacity:1}39.01%,100%{opacity:0}}
+.l10{animation:l10 30s infinite}@keyframes l10{0%,39.81%{opacity:0}39.84%,96.00%{opacity:1}98.67%,100%{opacity:0}}
+.c10{animation:c10 30s infinite}@keyframes c10{0%,39.84%{transform:translateX(0);animation-timing-function:steps(106,end)}49.14%,100%{transform:translateX(769.9px)}}
+.k10{animation:k10 30s infinite}@keyframes k10{0%,39.84%{opacity:1}50.14%,100%{opacity:0}}
+.l11{animation:l11 30s infinite}@keyframes l11{0%,50.94%{opacity:0}50.97%,96.00%{opacity:1}98.67%,100%{opacity:0}}
+.l12{animation:l12 30s infinite}@keyframes l12{0%,51.54%{opacity:0}51.57%,96.00%{opacity:1}98.67%,100%{opacity:0}}
+.l13{animation:l13 30s infinite}@keyframes l13{0%,52.14%{opacity:0}52.17%,96.00%{opacity:1}98.67%,100%{opacity:0}}
+
+  @media (prefers-reduced-motion: reduce){g[class^="l"],g[class^="c"],rect{animation:none!important}}
+</style>
+<rect x="1" y="1" width="998" height="384" rx="10" fill="#0a0d12" stroke="#1f2a36"/>
+<rect x="1" y="1" width="998" height="34" rx="10" fill="#121820"/><rect x="1" y="24" width="998" height="11" fill="#121820"/>
+<circle cx="24" cy="18" r="6" fill="#ff5f57"/><circle cx="44" cy="18" r="6" fill="#febc2e"/><circle cx="64" cy="18" r="6" fill="#28c840"/>
+<text class="bar" x="500" y="22" text-anchor="middle">BLACKOUT.exe · night shift · terminal (a real session, seed 42)</text>
+<g class="l0"><text x="22" y="70" xml:space="preserve"><tspan class="pr">soc@juice-shop:~$ </tspan><tspan class="cm">awk '{print $1}' /var/log/nginx/access.log | sort | uniq -c | sort -rn | head -n 3</tspan></text><g class="c0"><rect x="150.70000000000002" y="57" width="598.3000000000001" height="21" fill="#0a0d12"/><rect class="k0" x="150.70000000000002" y="59" width="7.15" height="15" fill="#22ff88"/></g><text x="978" y="70" class="nt" text-anchor="end">← who is knocking?</text></g>
+<g class="l1"><text x="22" y="91" class="ot hot" xml:space="preserve">   4756 203.0.113.11</text></g>
+<g class="l2"><text x="22" y="112" class="ot" xml:space="preserve">    155 203.0.113.85</text></g>
+<g class="l3"><text x="22" y="133" class="ot" xml:space="preserve">     67 198.51.100.204</text></g>
+<g class="l4"><text x="22" y="154" xml:space="preserve"><tspan class="pr">soc@juice-shop:~$ </tspan><tspan class="cm">grep 'Fuzz Faster U Fool' /var/log/nginx/access.log | head -n 1</tspan></text><g class="c4"><rect x="150.70000000000002" y="141" width="462.45000000000005" height="21" fill="#0a0d12"/><rect class="k4" x="150.70000000000002" y="143" width="7.15" height="15" fill="#22ff88"/></g></g>
+<g class="l5"><text x="22" y="175" class="ot dim" xml:space="preserve">203.0.113.11 - - [31/Oct/2026:22:01:46 +0000] &quot;GET /.cache HTTP/1.1&quot; 200 3257 &quot;-&quot; &quot;<tspan class="hot">Fuzz Faster U Fool v2.1.0-dev</tspan>&quot;</text></g>
+<g class="l6"><text x="22" y="196" xml:space="preserve"><tspan class="pr">soc@juice-shop:~$ </tspan><tspan class="cm">tar czf /evidence/night1.tgz /var/log/nginx</tspan></text><g class="c6"><rect x="150.70000000000002" y="183" width="319.45" height="21" fill="#0a0d12"/><rect class="k6" x="150.70000000000002" y="185" width="7.15" height="15" fill="#22ff88"/></g><text x="978" y="196" class="nt" text-anchor="end">← evidence first</text></g>
+<g class="l7"><text x="22" y="217" xml:space="preserve"><tspan class="pr">soc@juice-shop:~$ </tspan><tspan class="cm">iptables -A INPUT -s 203.0.113.11 -j DROP</tspan></text><g class="c7"><rect x="150.70000000000002" y="204" width="305.15000000000003" height="21" fill="#0a0d12"/><rect class="k7" x="150.70000000000002" y="206" width="7.15" height="15" fill="#22ff88"/></g><text x="978" y="217" class="nt" text-anchor="end">← cut him off</text></g>
+<g class="l8"><text x="22" y="238" class="dt" xml:space="preserve">☠  DEATH  ›  You closed a door. I have others.</text></g>
+<g class="l9"><text x="22" y="259" xml:space="preserve"><tspan class="pr">soc@juice-shop:~$ </tspan><tspan class="cm">cd /srv/juice-shop/data</tspan></text><g class="c9"><rect x="150.70000000000002" y="246" width="176.45000000000002" height="21" fill="#0a0d12"/><rect class="k9" x="150.70000000000002" y="248" width="7.15" height="15" fill="#22ff88"/></g></g>
+<g class="l10"><text x="22" y="280" xml:space="preserve"><tspan class="pr">soc@juice-shop:~$ </tspan><tspan class="cm">sqlite3 juiceshop.sqlite &quot;SELECT id, email, role FROM Users WHERE role = 'admin' ORDER BY id DESC LIMIT 2&quot;</tspan></text><g class="c10"><rect x="150.70000000000002" y="267" width="769.9000000000001" height="21" fill="#0a0d12"/><rect class="k10" x="150.70000000000002" y="269" width="7.15" height="15" fill="#22ff88"/></g></g>
+<g class="l11"><text x="22" y="301" class="ot hot" xml:space="preserve">326|reaper@example.org|admin</text><text x="978" y="301" class="nt" text-anchor="end">← an admin nobody hired</text></g>
+<g class="l12"><text x="22" y="322" class="ot" xml:space="preserve">23|cloud-admin@juice-sh.op|admin</text></g>
+<g class="l13"><text x="22" y="343" xml:space="preserve"><tspan class="pr">soc@juice-shop:~$ </tspan><tspan class="cm"></tspan></text><rect class="cur" x="150.70000000000002" y="332" width="7.15" height="15" fill="#22ff88"/></g>
+</svg>
