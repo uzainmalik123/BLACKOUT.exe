@@ -1,0 +1,22 @@
+# What the Dockerfile never needs (and must never see: .env).
+.env
+.env.*
+!.env.example
+.git
+.github
+.claude
+.superpowers
+.kiro/specs
+.kiro/hooks
+.kiro/steering
+docs
+recording
+scripts
+graphify-out
+game/node_modules
+game/dist
+game/coverage
+game/server/.state
+**/*.test.ts
+**/*.test.tsx
+game/server/test

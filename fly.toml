@@ -1,0 +1,51 @@
+# Fly.io app for the game (PRD SYS-18, D-20, D-200): one small machine that never sleeps, serving the page and
+# the Kiro server from the Dockerfile at the repo root. Runbook: docs/HOSTING.md.
+#
+# Placeholders to set once: `app` (the public name, <app>.fly.dev) and `primary_region` (fly platform regions).
+app = "blackout-exe"
+primary_region = "ams"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  NODE_ENV = "production"
+  HOST = "0.0.0.0"
+  PORT = "8080"
+  # The counters (KI-193). On the container disk they reset on every deploy; mount the volume below to keep them.
+  KIRO_STATE_FILE = "/data/runs.json"
+  KIRO_NO_AUTO_UPDATE = "1"
+
+# The secret, never here: `fly secrets set KIRO_API_KEY=ksk_…`
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  # D-20: judges must never hit a cold start, so the machine is never stopped (the user accepts the cost).
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+  processes = ["app"]
+
+  [http_service.concurrency]
+    type = "requests"
+    soft_limit = 50
+    hard_limit = 100
+
+  [[http_service.checks]]
+    grace_period = "15s"
+    interval = "15s"
+    method = "GET"
+    timeout = "5s"
+    path = "/healthz"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "1gb"
+  processes = ["app"]
+
+# Optional: a 1 GB volume so the day's Kiro counter survives deploys (KI-193). Create it first in the same region
+# (`fly volumes create data --size 1 --region <primary_region>`), then uncomment:
+# [mounts]
+#   source = "data"
+#   destination = "/data"
