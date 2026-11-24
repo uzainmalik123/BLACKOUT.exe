@@ -103,8 +103,7 @@ export function MenuScreen({ title, initialDifficulty = 'medium', onStart, onBac
     const scene = sceneRef.current;
     live.current.menu = r.state;
     setMenu(r.state);
-    if (r.changed === 'item') scene?.react('move');
-    else if (r.changed === 'difficulty') scene?.react({ difficulty: r.state.difficulty });
+    // she moves on her own: changing the selection or the difficulty never reaches her (only Start Game does)
     switch (r.action.kind) {
       case 'start':
         live.current.leaving = true;
@@ -118,8 +117,6 @@ export function MenuScreen({ title, initialDifficulty = 'medium', onStart, onBac
         scene?.leave();
         break;
       case 'scenario':
-        scene?.react('scenario');
-        break;
       case 'none':
         break;
     }
@@ -140,12 +137,15 @@ export function MenuScreen({ title, initialDifficulty = 'medium', onStart, onBac
 
   const hover = (item: MenuItem) => apply(select(live.current.menu, item));
   const click = (item: MenuItem) => apply(activate({ ...live.current.menu, item }));
-  const rowClass = (item: MenuItem) => `ms-item ms-glass${menu.item === item ? ' sel' : ''}`;
+  // the same paths as the title screen's choice: engraved capitals, a diamond and a thread of light on the chosen one
+  const rowClass = (item: MenuItem) => `ms-item ${item}${menu.item === item ? ' sel' : ''}`;
   const inside = (item: MenuItem) => (
-    <>
-      <span className="ms-glow" aria-hidden="true" />
-      <span className="ms-label">{LABEL[item]}</span>
-    </>
+    <span className="ms-label">
+      <span className="ms-sigil" aria-hidden="true">
+        ◆
+      </span>
+      {LABEL[item]}
+    </span>
   );
   const whisper = whisperFor(menu);
 
@@ -156,23 +156,6 @@ export function MenuScreen({ title, initialDifficulty = 'medium', onStart, onBac
       <div className="ms-grain" aria-hidden="true" />
       <div className="ms-vignette" aria-hidden="true" />
       <div className="ms-scanlines" aria-hidden="true" />
-
-      {/* Liquid glass: what is behind a pill is bent (a displacement map from soft noise), split into its red,
-          green and blue at slightly different strengths (chromatic aberration), then frosted in the CSS. */}
-      <svg className="ms-defs" aria-hidden="true" focusable="false">
-        <filter id="ms-liquid" x="-5%" y="-5%" width="110%" height="110%" colorInterpolationFilters="sRGB">
-          <feTurbulence type="fractalNoise" baseFrequency="0.007 0.011" numOctaves={2} seed={11} result="noise" />
-          <feGaussianBlur in="noise" stdDeviation={3} result="map" />
-          <feDisplacementMap in="SourceGraphic" in2="map" scale={34} xChannelSelector="R" yChannelSelector="G" result="dr" />
-          <feDisplacementMap in="SourceGraphic" in2="map" scale={48} xChannelSelector="R" yChannelSelector="G" result="dg" />
-          <feDisplacementMap in="SourceGraphic" in2="map" scale={62} xChannelSelector="R" yChannelSelector="G" result="db" />
-          <feColorMatrix in="dr" type="matrix" values="1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0" result="r" />
-          <feColorMatrix in="dg" type="matrix" values="0 0 0 0 0  0 1 0 0 0  0 0 0 0 0  0 0 0 1 0" result="g" />
-          <feColorMatrix in="db" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 1 0 0  0 0 0 1 0" result="b" />
-          <feBlend in="r" in2="g" mode="screen" result="rg" />
-          <feBlend in="rg" in2="b" mode="screen" />
-        </filter>
-      </svg>
 
       <h1 className="ms-sr">{title}</h1>
 
@@ -190,7 +173,7 @@ export function MenuScreen({ title, initialDifficulty = 'medium', onStart, onBac
           {inside('difficulty')}
           <span className="ms-levels">
             {DIFFICULTIES.map((d) => (
-              <button key={d} type="button" className={`ms-level ms-glass${menu.difficulty === d ? ' on' : ''}`} aria-pressed={menu.difficulty === d} onFocus={() => hover('difficulty')} onClick={() => apply(pick(live.current.menu, d))}>
+              <button key={d} type="button" className={`ms-level${menu.difficulty === d ? ' on' : ''}`} aria-pressed={menu.difficulty === d} onFocus={() => hover('difficulty')} onClick={() => apply(pick(live.current.menu, d))}>
                 {DIFFICULTY_LABEL[d]}
               </button>
             ))}

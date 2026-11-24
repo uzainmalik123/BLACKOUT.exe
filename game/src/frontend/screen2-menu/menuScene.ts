@@ -10,7 +10,7 @@ import { FACES, GlyphAtlas, MONO, codes, strokeChar } from '../shared/atlas';
 import { clamp, hash2, lerp, mulberry32, smoothstep } from '../shared/math';
 import { CoverLayer, NoiseField } from './field';
 import { Forest } from './forest';
-import { Haunt, type HauntEvent } from './haunt';
+import { Haunt } from './haunt';
 import { LogoArt } from './logoArt';
 import { Wraith, type WraithPose } from './wraith';
 
@@ -37,7 +37,7 @@ const C_DOT = 46;
 const TONES = 5;
 const STEPS = 16;
 function tone(tn: number, q: number): string {
-  const v = 10 + q * 15;
+  const v = 8 + q * 12;
   switch (tn) {
     case 4:
       // bloodless, faintly green-grey, like something drowned
@@ -98,7 +98,7 @@ export class MenuScene {
   private readonly wraith = new Wraith();
   private readonly haunt: Haunt;
   private readonly logo: LogoArt;
-  private pose: WraithPose = { x: 0, y: 0, hw: 1, tilt: 0, lean: 0, crouch: 0, ground: 0, face: 0, mouth: 0, grip: 0, edgeAt: () => 0, t: 0, wind: 0 };
+  private pose: WraithPose = { x: 0, y: 0, hw: 1, tilt: 0, lean: 0, crouch: 0, ground: 0, face: 0, mouth: 0, grip: 0, bend: 0, part: 0, edgeAt: () => 0, t: 0, wind: 0 };
   private front = false;
 
   private readonly rnd = mulberry32(0xc01d);
@@ -139,11 +139,6 @@ export class MenuScene {
   }
 
   // ------------------------------------------------------------------ controls
-
-  /** The menu moved, the difficulty changed, the scenario was poked: she answers. */
-  react(e: HauntEvent): void {
-    if (this.phase === 'live') this.haunt.react(e);
-  }
 
   /** Start Game: she lunges, the screen goes black, then `onLunged`. */
   start(): void {
@@ -217,7 +212,7 @@ export class MenuScene {
         const my = (y - H * 0.32) / (H * 0.55);
         const hx = (x - W * 0.62) / (W * 0.6);
         const hy = (y - H * 0.12) / (H * 0.32);
-        this.sky[k] = 0.1 + 0.64 * Math.exp(-(mx * mx + my * my)) + 0.26 * Math.exp(-(hx * hx + hy * hy));
+        this.sky[k] = 0.08 + 0.46 * Math.exp(-(mx * mx + my * my)) + 0.16 * Math.exp(-(hx * hx + hy * hy));
         const lx = (x - W * 0.2) / (W * 0.3);
         const ly = (y - H * 0.55) / (H * 0.5);
         // the menu's side is dimmer, but keeps enough mist for its glass to bend
@@ -283,10 +278,13 @@ export class MenuScene {
 
     // where she is and how she holds herself
     const place = this.forest.spot(h.spot);
-    let hw = this.H * 0.092 * place.scale;
+    let hw = this.H * 0.125 * place.scale;
     const lean = h.shown;
     let x = lerp(place.edge + 0.7 * hw, place.edge - 0.95 * hw, lean);
     let y = place.y + Math.sin(t * 1.1) * 0.012 * hw + lean * 0.05 * hw;
+    // bent sideways, her head hangs out past her shoulders and lower
+    x -= h.bend * 0.4 * hw;
+    y += h.bend * 0.35 * hw;
     let k = 0;
     if (this.phase === 'lunge' && !rm) {
       // she comes for the player: out from the tree and straight at the glass
@@ -305,7 +303,7 @@ export class MenuScene {
     const grip = this.front || h.spot === 'fork' ? 0 : smoothstep(0.15, 0.55, lean);
     const f = this.forest;
     const edgeAt = (yy: number) => f.centre(yy) - f.half(yy);
-    this.pose = { x, y, hw, tilt: h.tilt, lean, crouch: h.spot === 'roots' ? 1 : 0, ground: f.groundY(x), face, mouth: this.mouth, grip, edgeAt, t, wind: this.wind(t) };
+    this.pose = { x, y, hw, tilt: h.tilt, lean, crouch: h.spot === 'roots' ? 1 : 0, ground: f.groundY(x), face, mouth: this.mouth, grip, bend: this.front ? 0 : h.bend, part: this.front ? 0 : h.part, edgeAt, t, wind: this.wind(t) };
 
     // overall light: the opening fade, the flickers, the lunge's dark, the exit's fade
     const intro = smoothstep(0.25, 2, t);
@@ -402,7 +400,7 @@ export class MenuScene {
       }
       // an edge: the moon catches the outermost hairs
       const w = Math.max(wb, wh);
-      const rim = 0.5 * w * (1 - w) * 4;
+      const rim = 0.36 * w * (1 - w) * 4;
       if (w > 0.25) herC = strokeChar((wh >= wb ? hair : her).angle[k]!);
       return L * (1 - w) * 0.6 + rim;
     };
@@ -518,8 +516,9 @@ export class MenuScene {
         // her fingers, pale over the dark bark
         const sk = skin.cover[k]!;
         if (sk > 0.12) {
-          L = 0.2 + 0.4 * sk;
-          c = sk > 0.75 ? 61 : strokeChar(skin.angle[k]!); // '='
+          const neckSkin = skin.tone[k]! < 0.7;
+          L = neckSkin ? 0.12 + 0.24 * sk : 0.2 + 0.36 * sk;
+          c = sk > 0.75 ? (neckSkin ? 58 : 61) : strokeChar(skin.angle[k]!); // ':' '='
           tt = 4;
         }
 

@@ -28,6 +28,10 @@ export interface WraithPose {
   mouth: number;
   /** 0 no hands .. 1 her fingers wrapped round the trunk. */
   grip: number;
+  /** 0 upright .. 1 bent sideways out of the tree: her shoulders stay back, her head hangs out and down. */
+  bend: number;
+  /** 0 hair down .. 1 the hair on her near side swept back off a long pale neck. */
+  part: number;
   /** The trunk's left edge at a height, css px (where her fingers curl). */
   edgeAt: (y: number) => number;
   t: number;
@@ -69,7 +73,8 @@ export class Wraith {
       const root = front ? -Math.PI / 2 + Math.sign(u - 0.5 || 1) * (0.55 + rnd() * 0.25) : -Math.PI + u * Math.PI * 1.08 - 0.04;
       return {
         root,
-        len: (front ? 2.2 : 3) + rnd() * 1.6,
+        // very long: most of it reaches the ground and spreads there
+        len: (front ? 3.2 : 4.2) + rnd() * 2.4,
         r: 0.045 + rnd() * 0.035,
         phase: rnd() * 6.28,
         sway: 0.6 + rnd() * 0.8,
@@ -168,8 +173,9 @@ export class Wraith {
     const hw = p.hw;
     // body first (it trails behind the head when she leans out), then the head
     const neck = this.toWorld(p, 0, NECK);
-    const trail = Math.min(1, p.lean) * 0.55 * hw;
-    const shoulderY = neck.y + 0.42 * hw * (1 - 0.4 * p.crouch);
+    // bent, her shoulders stay back and high while her head hangs out past them
+    const trail = Math.min(1, p.lean) * 0.55 * hw + p.bend * 0.6 * hw;
+    const shoulderY = neck.y + 0.42 * hw * (1 - 0.4 * p.crouch) - p.bend * 0.45 * hw;
     const sx = neck.x + trail;
     body.ellipse(sx + 0.1 * hw, shoulderY, 0.95 * hw, 0.42 * hw, 0.12, 1);
     const footY = p.crouch > 0.5 ? Math.min(p.ground, shoulderY + 0.9 * hw) : p.ground + hw;
@@ -178,6 +184,15 @@ export class Wraith {
     const head = this.toWorld(p, 0, 0);
     body.ellipse(head.x, head.y, 0.5 * hw, 0.64 * hw, p.tilt, 1);
     this.hands(body, skin, p, { x: sx + 0.2 * hw, y: shoulderY });
+
+    // her neck, bared when the hair is swept off it: long, thin, pale, a dark cord down its side
+    if (p.part > 0.2 && p.lean > 0.55) {
+      const jaw = this.toWorld(p, -0.16, 0.52);
+      const base = { x: sx - 0.25 * hw, y: shoulderY - 0.05 * hw };
+      const a = Math.min(1, (p.part - 0.2) / 0.5);
+      skin.capsule(jaw.x, jaw.y, base.x, base.y, 0.12 * hw * a, 0.17 * hw * a, 0.6);
+      body.capsule(jaw.x + 0.05 * hw, jaw.y + 0.05 * hw, base.x + 0.08 * hw, base.y, 0.015 * hw, 0.02 * hw, 1);
+    }
 
     // hair: each strand leaves the crown, curves out, then hangs straight down under its own weight, the ends
     // lifting and drifting; strands that reach the ground spread along it
@@ -191,11 +206,13 @@ export class Wraith {
       const start = this.toWorld(p, rx, ry);
       let x = start.x;
       let y = start.y;
-      const outX = Math.cos(s.root) * 0.9 + Math.sin(p.tilt) * 0.5;
+      // the near side's hair, when swept, is thrown back over her shoulder, behind her
+      const swept = rx < -0.15 ? p.part : 0;
+      const outX = Math.cos(s.root) * 0.9 * (1 - swept) + swept * 1.6 + Math.sin(p.tilt) * 0.5;
       const step = (s.len * hw) / seg;
       for (let k = 0; k < seg; k++) {
         const f = (k + 1) / seg;
-        const pull = Math.min(1, f * 2.4);
+        const pull = Math.min(1, f * (2.4 - swept * 1.4));
         const drift = (0.06 * Math.sin(p.t * 0.7 * s.sway + s.phase + k * 0.55) + p.wind * 0.07) * f * f * 1.6;
         let dx = outX * (1 - pull) * 0.55 + drift;
         let dy = pull;

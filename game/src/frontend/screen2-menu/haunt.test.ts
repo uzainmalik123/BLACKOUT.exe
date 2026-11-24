@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Haunt, LUNGE_SECONDS, REACT_COOLDOWN } from './haunt';
+import { Haunt, LUNGE_SECONDS } from './haunt';
 
 const run = (h: Haunt, seconds: number, each?: (h: Haunt) => void) => {
   for (let s = 0; s < seconds; s += 1 / 60) {
@@ -9,7 +9,7 @@ const run = (h: Haunt, seconds: number, each?: (h: Haunt) => void) => {
 };
 
 describe('screen 2: how she haunts the menu (D-181)', () => {
-  it('opens with her eyes first: dark for a moment, then eyes at the trunk before any lean', () => {
+  it('opens with her eyes first: dark for a moment, then eyes at the trunk, then she comes out', () => {
     const h = new Haunt(1);
     expect(h.visible).toBe(false);
     run(h, 0.5);
@@ -18,69 +18,73 @@ describe('screen 2: how she haunts the menu (D-181)', () => {
     expect(h.mode).toBe('eyes');
     expect(h.spot).toBe('trunk');
     expect(h.eyes).toBeGreaterThan(0.9);
-    expect(h.lean).toBeLessThan(0.2);
+    run(h, 2);
+    expect(h.revealed).toBe(true);
+    expect(h.lean).toBeGreaterThan(0.4);
   });
 
-  it('never stays on show: over two minutes she hides again and again, and turns up in more than one place', () => {
+  it('hides only that once: for two minutes after the opening she stays on show, and keeps changing place', () => {
     const h = new Haunt(7);
-    let hides = 0;
-    let was = false;
-    const spots = new Set<string>();
+    run(h, 3);
+    let minLean = Infinity;
+    let minEyes = Infinity;
+    let moves = 0;
+    let last = h.spot;
     run(h, 120, (x) => {
-      if (x.visible) spots.add(x.spot);
-      if (was && !x.visible) hides++;
-      was = x.visible;
+      minLean = Math.min(minLean, x.lean);
+      minEyes = Math.min(minEyes, x.eyes);
+      if (x.spot !== last) moves++;
+      last = x.spot;
     });
-    expect(hides).toBeGreaterThanOrEqual(5);
-    expect(spots.size).toBeGreaterThan(1);
+    expect(minLean).toBeGreaterThan(0.2);
+    expect(minEyes).toBeGreaterThan(0.9);
+    expect(moves).toBeGreaterThanOrEqual(8);
   });
 
-  it('comes out fast and withdraws slowly', () => {
+  it('is restless: she tilts her head both ways, bends out, and sweeps her hair off her neck', () => {
     const h = new Haunt(3, 'hard', false);
-    h.react({ difficulty: 'hard' }); // lean out at the trunk
-    let out = 0;
-    while (h.lean < 0.8 && out < 20) {
-      h.update(1 / 60);
-      out += 1 / 60;
-    }
-    expect(h.lean).toBeGreaterThanOrEqual(0.8);
-    expect(out).toBeLessThan(0.6);
-    run(h, REACT_COOLDOWN + 0.05);
-    h.react({ difficulty: 'easy' }); // withdraw
-    let back = 0;
-    while (h.lean > 0.05 && back < 20) {
-      h.update(1 / 60);
-      back += 1 / 60;
-    }
-    expect(back).toBeGreaterThan(out * 4);
-    expect(h.eyes).toBeGreaterThan(0.5); // her eyes stayed on you the whole way back
+    let lo = 0;
+    let hi = 0;
+    let bend = 0;
+    let part = 0;
+    run(h, 90, (x) => {
+      lo = Math.min(lo, x.tilt);
+      hi = Math.max(hi, x.tilt);
+      bend = Math.max(bend, x.bend);
+      part = Math.max(part, x.part);
+    });
+    expect(lo).toBeLessThan(-0.5);
+    expect(hi).toBeGreaterThan(0.2);
+    expect(bend).toBeGreaterThan(0.9);
+    expect(part).toBeGreaterThan(0.9);
   });
 
-  it('answers each menu move: hidden to eyes, eyes to a peek, a peek to a lean; a burst of keys gets one answer', () => {
+  it('changes place on her own: she darts in and is out again fast at the new place', () => {
     const h = new Haunt(5, 'medium', false);
-    run(h, 0.1);
-    h.react('move');
-    expect(h.mode).toBe('eyes');
-    h.react('move'); // inside the cooldown: ignored
-    expect(h.mode).toBe('eyes');
-    run(h, REACT_COOLDOWN);
-    h.react('move');
-    expect(h.mode).toBe('peek');
-    run(h, REACT_COOLDOWN);
-    h.react('move');
-    expect(h.mode).toBe('lean');
+    const from = h.spot;
+    let t = 0;
+    while (h.spot === from && t < 20) {
+      h.update(1 / 60);
+      t += 1 / 60;
+    }
+    expect(h.spot).not.toBe(from);
+    expect(t).toBeLessThan(12);
+    run(h, 0.6);
+    expect(h.lean).toBeGreaterThan(0.35);
   });
 
-  it('is bolder on Hard than on Easy: on show far more of the time', () => {
-    const shownFor = (d: 'easy' | 'hard') => {
+  it('is bolder on Hard than on Easy: further out on average', () => {
+    const mean = (d: 'easy' | 'hard') => {
       const h = new Haunt(11, d, false);
-      let on = 0;
+      let sum = 0;
+      let n = 0;
       run(h, 180, (x) => {
-        if (x.shown > 0.3) on++;
+        sum += x.shown + x.bend * 0.5;
+        n++;
       });
-      return on;
+      return sum / n;
     };
-    expect(shownFor('hard')).toBeGreaterThan(shownFor('easy') * 1.5);
+    expect(mean('hard')).toBeGreaterThan(mean('easy') * 1.15);
   });
 
   it('Start Game makes her lunge from wherever she is; it finishes in its time and nothing else reaches her', () => {
@@ -89,7 +93,7 @@ describe('screen 2: how she haunts the menu (D-181)', () => {
     h.react('start');
     expect(h.mode).toBe('lunge');
     expect(h.spot).toBe('trunk');
-    h.react('move');
+    h.react('dark');
     expect(h.mode).toBe('lunge');
     run(h, LUNGE_SECONDS * 0.5);
     expect(h.done).toBe(false);
@@ -103,6 +107,6 @@ describe('screen 2: how she haunts the menu (D-181)', () => {
     const b = new Haunt(42);
     run(a, 30);
     run(b, 30);
-    expect([a.mode, a.spot, a.lean, a.tilt]).toEqual([b.mode, b.spot, b.lean, b.tilt]);
+    expect([a.mode, a.spot, a.lean, a.tilt, a.bend]).toEqual([b.mode, b.spot, b.lean, b.tilt, b.bend]);
   });
 });
