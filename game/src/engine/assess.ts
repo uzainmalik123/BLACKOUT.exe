@@ -240,7 +240,7 @@ export function showedOfHis(a: PlayerAction, ctx: RelevanceContext): { about: Se
   if (a.type !== 'DEF-01' && a.type !== 'DEF-02' && a.type !== 'DEF-03') return undefined;
   // the lines themselves (a crafted test, or a read judged before it was logged), else the summary the event kept (D-122)
   const sum: ShownSummary | undefined = a.shown && a.shown.length > 0 ? summariseLines(a.shown, ctx) : a.shownCount !== undefined ? { shownCount: a.shownCount, shownHis: a.shownHis ?? 0, shownAbout: (a.shownAbout ?? []) as HisThing[] } : undefined;
-  if (!sum || sum.shownCount === 0 || sum.shownHis === 0) return undefined; // a read with no shown lines can't be judged (the shell sends them later)
+  if (!sum || sum.shownCount === 0 || sum.shownHis === 0) return undefined; // a read with no shown lines can't be judged (the shell sends them when the line finishes, D-160)
   const total = a.shownTotal ?? sum.shownCount;
   return { about: new Set(sum.shownAbout), focused: total <= FOCUS.max || sum.shownHis / sum.shownCount >= FOCUS.share };
 }

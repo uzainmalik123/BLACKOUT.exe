@@ -470,6 +470,37 @@ Rules that apply to every task:
     - Ensure all tests pass, ask the user if questions arise.
     - _Requirements: 16.5, 16.6_
 
+- [x] 24. Read actions carry `shown` and `shownTotal` (R14.8, D-160)
+  - [x] 24.1 Queue reads in `tracker.ts` and `types.ts`, send them in `flush`
+    - `log()`, `db()` and `uploads()` mark the kind, queue `{kind, action, cmd}` (`cmd` is the name of the first command that queued it) and return nothing.
+    - Add `flush(finalStdout)`: send the queue in order, with `shown` the first `SHOWN_LINES_MAX` (200, import the value from the engine/rules where D-115 defines it) lines of `splitLines(finalStdout)` and `shownTotal` the number of those lines. Stop after the first refusal (R14.6). `notices` become `{cmd, message}`.
+    - Update `ReadSink`, `ReadTrackerLike` and every call site that used the returned notice.
+    - Write unit tests in `tracker.test.ts`: queue order, once per kind, flush payload, the 200-line cut, a refusal stops further actions.
+    - _Requirements: 14.4, 14.5, 14.6, 14.7, 14.8_
+    - _Design: Read tracking (`tracker.ts`) and DEF-01/02/03, D-98, D-160_
+    - Verification: `cd game && npx vitest run src/shell`
+  - [x] 24.2 Flush once per line in `exec.ts`
+    - Call `flush` exactly once per line after the last stage, and after a catch-all failure in a `finally`. Pass `last.stdout` before stderr is added, or `''` when the line has a `>` redirect.
+    - Append `<cmd>: <message>` for refused answers, using the recorded `cmd`. Remove the per-stage notice handling.
+    - Write tests through `createShell` with a recording Engine: `grep` that prints Death's lines sends exactly those lines in `shown`; `cat access.log | grep <Death's IP>` sends only grep's lines; a 10,000-line `cat` sends 200 lines and `shownTotal` 10000; `grep X log > /tmp/o` sends `shown: []` and `shownTotal: 0`; a failing line still sends; a line that reads nothing sends nothing.
+    - _Requirements: 14.4, 14.6, 14.8_
+    - _Design: Read tracking (`tracker.ts`) and DEF-01/02/03, D-160_
+    - Verification: `cd game && npx vitest run src/shell`
+  - [x] 24.3 Update the tests that assumed an action is sent at read time
+    - Update the read-action property, Property 18, and the pipeline, tracker, coverage and actions-surface tests. Update every assertion of action payload equality for DEF-01/02/03 so it includes `shown` and `shownTotal`, and every assertion of an action's order relative to a later stage.
+    - Run `npx vitest run src/shell` until green.
+    - _Requirements: 14.4, 14.7, 14.8, 16.1_
+    - Verification: `cd game && npx vitest run src/shell`
+  - [x] 24.4 Update the docs and log the session
+    - `docs/ENGINE_API.md` section 5 shell note, and the tracker lines in the shell docs wherever they say "at the moment of the read": the action is sent when the line finishes, with `shown` and `shownTotal`.
+    - Log this Kiro session in `docs/KIRO_USAGE.md` (date, Kiro feature used, what it built, credits used, or `not measured`). Claim only what happened (D-13). Do not edit `docs/DECISIONS.md` or `docs/PRD.md`; both are already updated.
+    - _Requirements: 14.8, 16.6_
+    - Verification: `cd game && npx vitest run src/shell`
+  - [x] 24.5 Final checkpoint: run `npm run health` in `game/` and fix until green
+    - Run `cd game && npm run health` (typecheck, lint, tests) and fix anything it reports.
+    - Ensure all tests pass, ask the user if questions arise.
+    - _Requirements: 16.5, 16.6_
+
 ## Notes
 
 - Tasks marked with `*` are optional property-based tests; each property of the design (1 to 27) appears exactly once, except Property 5, which has two variants (200 runs without a baseline, 50 with it). The example and unit tests are not optional because R16.1 and R16.2 require them and `npm run health` must prove the shell.
@@ -579,7 +610,12 @@ Rules that apply to every task:
     { "id": 92, "tasks": ["22.1", "22.2", "22.3"] },
     { "id": 93, "tasks": ["22.4"] },
     { "id": 94, "tasks": ["23.1"] },
-    { "id": 95, "tasks": ["23.2"] }
+    { "id": 95, "tasks": ["23.2"] },
+    { "id": 96, "tasks": ["24.1"] },
+    { "id": 97, "tasks": ["24.2"] },
+    { "id": 98, "tasks": ["24.3"] },
+    { "id": 99, "tasks": ["24.4"] },
+    { "id": 100, "tasks": ["24.5"] }
   ]
 }
 ```

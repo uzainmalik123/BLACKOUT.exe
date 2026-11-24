@@ -346,34 +346,40 @@ export const COMMANDS: Record<CommandName, CommandSpec>;
 - Grammar commands (`iptables`, `systemctl`, `tar`, `sqlite3`, `awk`) declare `forms` such as `-A INPUT -s <ip> -j DROP`, `-D INPUT -s <ip> -j DROP`, `-L`, or `<status|stop|start|restart> <unit>`. `parseForms(forms, argv)` is a small matcher whose placeholders are `<ip>`, `<name>`, `<unit>`, `<path>`, `<sql>`, `<count>`. The handlers get the matched form and its captured values, so the text that `man` prints and the grammar the handler accepts come from the same strings.
 - `help` prints, for each name in `COMMAND_NAMES` sorted by `compareCodePoints`, `<name>  <summary>`. `man <command>` prints NAME, USAGE, one line per `flags` entry (or per `forms` entry), and `examples`. Both read only `COMMANDS`. A test (Property 15) scans the `man` text for flag-looking tokens and checks that each is in `flags`.
 
-### Read tracking (`tracker.ts`) and DEF-01/02/03 (R14.4, R14.5, R14.7, D-98)
+### Read tracking (`tracker.ts`) and DEF-01/02/03 (R14.4, R14.5, R14.7, R14.8, D-98, D-160)
 
 ```ts
 export class ReadTracker {
   constructor(engine: Engine, line: string);
-  log(): string | undefined;                  // DEF-01 { query: line }; returns a notice when act answered ok:false
-  db(sql: string): string | undefined;        // DEF-02 { sql }
-  uploads(absPath: string): string | undefined;   // DEF-03 { path: absolute }
+  log(): void;                                // DEF-01 { query: line }; queues the action
+  db(sql: string): void;                      // DEF-02 { sql }
+  uploads(absPath: string): void;             // DEF-03 { path: absolute }
+  flush(finalStdout: string): void;           // sends the queued actions; called ONCE by exec.ts per line
   readonly sent: ReadonlySet<'log' | 'db' | 'uploads'>;
+  readonly notices: readonly { cmd: string; message: string }[]; // refused answers, read by exec after flush
 }
 ```
 
-One tracker is created per `run` call with the raw line. Each method marks its kind as sent **before** it calls `act`, so a kind is never sent twice even when `act` is refused. The VFS read paths take an optional `ReadSink`; handlers pass `ctx.reads` for content reads and `untracked` for the cases below.
+One tracker is created per `run` call with the raw line. `log()`, `db()` and `uploads()` mark their kind as sent **before** anything else, so a kind is never queued twice, and they do not call `act`: each queues an entry `{ kind, action, cmd }` in the order the kinds were first read, where `cmd` is the name of the command that first queued that kind (R14.8, D-160).
+
+`exec.ts` calls `flush(finalStdout)` exactly once, when the whole Command_Line has finished, after the last stage and the stage catch-all. The call sits in a `finally`-style position, so a failed line still flushes. `finalStdout` is what `run` prints before stderr is added: `last.stdout`, or `''` when the line redirects with `>` (nothing reached the screen). `flush` sends every queued action in queue order. Each action carries the same `shown` = the first 200 (`SHOWN_LINES_MAX`) of `splitLines(finalStdout)` and `shownTotal` = `splitLines(finalStdout).length`, so `shownTotal` can exceed `shown.length`. A line that queued nothing sends nothing. `shown` is the line's final screen output, so `cat log | grep IP` shows only grep's lines; stderr is never part of it.
+
+A refused answer (possible only after an ending, G7) goes to `notices` with the `cmd` recorded in its queue entry. After `flush`, exec appends one `<cmd>: <message>` line per notice to the output's stderr part, attributed to the command that first queued that kind. After a refusal `flush` makes no further `act` calls for the command (R14.6), so the remaining queued actions are dropped. As a consequence the action is queued at first read and sent when the line finishes, a refinement of the R14.5 timing. The VFS read paths take an optional `ReadSink`; handlers pass `ctx.reads` for content reads and `untracked` for the cases below.
 
 | Operation | Kind | When it fires |
 |---|---|---|
-| `cat head tail grep awk sort uniq wc cut file sha256sum cp` reading a log file's content | DEF-01 | first log read in the line, at read time |
+| `cat head tail grep awk sort uniq wc cut file sha256sum cp` reading a log file's content | DEF-01 | queued at first read, sent when the line finishes |
 | `ls` on `/var/log/...` | none | listing names and sizes is not reading content |
-| `ls`, `cat head tail grep file sha256sum cp` on a path at or below `/srv/juice-shop/uploads` | DEF-03 with the first such absolute path | first uploads read in the line |
+| `ls`, `cat head tail grep file sha256sum cp` on a path at or below `/srv/juice-shop/uploads` | DEF-03 with the first such absolute path | queued at first read, sent when the line finishes |
 | `glob` expansion, `cd`, `rm`, `complete`, `mkdir` | none | names only |
-| `sqlite3` SELECT (first one that succeeds), `.tables`, `.schema` | DEF-02 with the first read statement's text (the dot-command text for `.tables`) | after the statement ran without error |
+| `sqlite3` SELECT (first one that succeeds), `.tables`, `.schema` | DEF-02 with the first read statement's text (the dot-command text for `.tables`) | queued at first read (after the statement ran without error), sent when the line finishes |
 | the internal WHERE-clause probe of an UPDATE or DELETE | none (R7.5) | uses `readRaw`, not the tracker |
 | `tar czf` source reads | none (R14.7) | tar reads through `readBytes` with no sink and sends DEF-05 only |
 | stdin data | none | data came from an earlier stage and was tracked there |
 
-`cp` from a log or from `uploads/` reads through the tracker, so it sends DEF-01 or DEF-03 (R14.7). A line that fails before reading (unknown command, bad flag, missing operand) never reaches a read, so it sends nothing (R14.7). Because the tracker is consulted at read time, a pipeline of two log readers sends one DEF-01, and `grep x log | cat uploads/f` style lines send one DEF-01 and one DEF-03 (R16.2).
+`cp` from a log or from `uploads/` reads through the tracker, so it sends DEF-01 or DEF-03 (R14.7). A line that fails before reading (unknown command, bad flag, missing operand) never reaches a read, so it sends nothing (R14.7). Because the tracker is consulted at read time and queues each kind once, a pipeline of two log readers sends one DEF-01, and `grep x log | cat uploads/f` style lines send one DEF-01 and one DEF-03 (R16.2).
 
-A tracker notice (the `message` of an `ok: false` answer, possible only after an ending, G7) is appended to the current stage's stderr as `<cmd>: <message>`.
+Test note (`tracker.test.ts`, R14.8): (1) `cat access.log | grep <Death's IP>` sends one DEF-01 whose `shown` holds only grep's lines; (2) `cat` of a 10,000-line log sends `shown` of 200 lines and `shownTotal` 10000; (3) `grep X log > /tmp/o` sends `shown: []` and `shownTotal: 0`.
 
 ### Command groups
 

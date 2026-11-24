@@ -2179,6 +2179,98 @@
         "chatSessionId": "sess_ff0251d1-8b26-4e67-ba56-05a0ac369eca",
         "timestamp": 1795337788962
       }
+    ],
+    "24.1 Queue reads in `tracker.ts` and `types.ts`, send them in `flush`": [
+      {
+        "executionId": "22587786-0874-445b-ac2b-ac54c57dab33",
+        "chatSessionId": "sess_9f6de7ac-0c1b-4db7-a604-bd5cb8b3e8fc",
+        "timestamp": 1795347465005
+      },
+      {
+        "executionId": "22587786-0874-445b-ac2b-ac54c57dab33",
+        "chatSessionId": "sess_9f6de7ac-0c1b-4db7-a604-bd5cb8b3e8fc",
+        "timestamp": 1795347474472
+      },
+      {
+        "executionId": "22587786-0874-445b-ac2b-ac54c57dab33",
+        "chatSessionId": "sess_9f6de7ac-0c1b-4db7-a604-bd5cb8b3e8fc",
+        "timestamp": 1795347593677
+      }
+    ],
+    "24.2 Flush once per line in `exec.ts`": [
+      {
+        "executionId": "22587786-0874-445b-ac2b-ac54c57dab33",
+        "chatSessionId": "sess_9f6de7ac-0c1b-4db7-a604-bd5cb8b3e8fc",
+        "timestamp": 1795347465010
+      },
+      {
+        "executionId": "22587786-0874-445b-ac2b-ac54c57dab33",
+        "chatSessionId": "sess_9f6de7ac-0c1b-4db7-a604-bd5cb8b3e8fc",
+        "timestamp": 1795347594369
+      },
+      {
+        "executionId": "22587786-0874-445b-ac2b-ac54c57dab33",
+        "chatSessionId": "sess_9f6de7ac-0c1b-4db7-a604-bd5cb8b3e8fc",
+        "timestamp": 1795347781694
+      }
+    ],
+    "24.3 Update the tests that assumed an action is sent at read time": [
+      {
+        "executionId": "22587786-0874-445b-ac2b-ac54c57dab33",
+        "chatSessionId": "sess_9f6de7ac-0c1b-4db7-a604-bd5cb8b3e8fc",
+        "timestamp": 1795347465016
+      },
+      {
+        "executionId": "22587786-0874-445b-ac2b-ac54c57dab33",
+        "chatSessionId": "sess_9f6de7ac-0c1b-4db7-a604-bd5cb8b3e8fc",
+        "timestamp": 1795347781691
+      },
+      {
+        "executionId": "22587786-0874-445b-ac2b-ac54c57dab33",
+        "chatSessionId": "sess_9f6de7ac-0c1b-4db7-a604-bd5cb8b3e8fc",
+        "timestamp": 1795347893736
+      }
+    ],
+    "24.4 Update the docs and log the session": [
+      {
+        "executionId": "22587786-0874-445b-ac2b-ac54c57dab33",
+        "chatSessionId": "sess_9f6de7ac-0c1b-4db7-a604-bd5cb8b3e8fc",
+        "timestamp": 1795347465020
+      },
+      {
+        "executionId": "22587786-0874-445b-ac2b-ac54c57dab33",
+        "chatSessionId": "sess_9f6de7ac-0c1b-4db7-a604-bd5cb8b3e8fc",
+        "timestamp": 1795347894067
+      },
+      {
+        "executionId": "22587786-0874-445b-ac2b-ac54c57dab33",
+        "chatSessionId": "sess_9f6de7ac-0c1b-4db7-a604-bd5cb8b3e8fc",
+        "timestamp": 1795347952093
+      }
+    ],
+    "24.5 Final checkpoint: run `npm run health` in `game/` and fix until green": [
+      {
+        "executionId": "22587786-0874-445b-ac2b-ac54c57dab33",
+        "chatSessionId": "sess_9f6de7ac-0c1b-4db7-a604-bd5cb8b3e8fc",
+        "timestamp": 1795347465032
+      },
+      {
+        "executionId": "22587786-0874-445b-ac2b-ac54c57dab33",
+        "chatSessionId": "sess_9f6de7ac-0c1b-4db7-a604-bd5cb8b3e8fc",
+        "timestamp": 1795347952845
+      },
+      {
+        "executionId": "22587786-0874-445b-ac2b-ac54c57dab33",
+        "chatSessionId": "sess_9f6de7ac-0c1b-4db7-a604-bd5cb8b3e8fc",
+        "timestamp": 1795348001532
+      }
+    ],
+    "24. Read actions carry `shown` and `shownTotal` (R14.8, D-160)": [
+      {
+        "executionId": "22587786-0874-445b-ac2b-ac54c57dab33",
+        "chatSessionId": "sess_9f6de7ac-0c1b-4db7-a604-bd5cb8b3e8fc",
+        "timestamp": 1795348001535
+      }
     ]
   }
 }
