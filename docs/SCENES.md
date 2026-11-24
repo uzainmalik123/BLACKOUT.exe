@@ -36,7 +36,7 @@
 ## 2. Title and menu (UI-02)
 
 - **For:** the first impression, then picking a scenario and difficulty.
-- **Contains:** the title (the name is still open, KI-01: make it easy to swap); the scenario list (one for now: *the Juice Shop breach*); difficulty pick with one line each:
+- **Contains:** the title, **BLACKOUT.exe** (D-210; it comes from App's `TITLE` constant, so it stays one edit); the scenario list (one for now: *the Juice Shop breach*); difficulty pick with one line each:
   - **Easy:** never seen a server log. Kiro explains everything.
   - **Medium:** you know your way around. Kiro hints when you're stuck.
   - **Hard:** a real shift. Raw logs, Kiro stays quiet.

@@ -2,7 +2,7 @@
 
 | ID | Issue | Severity | Status |
 |---|---|---|---|
-| KI-01 | The game has no confirmed name; the title screen and page title use the working name **BLACKOUT.exe** (D-180, App's `TITLE`) until the team confirms it | Minor | Open |
+| KI-01 | The game has no confirmed name; the title screen and page title use the working name **BLACKOUT.exe** (D-180, App's `TITLE`) until the team confirms it | Minor | Closed (D-210: the name is **BLACKOUT.exe**) |
 | KI-02 | Kiro's credit cost per call is unknown, so the per-run cap (KIRO-10) can't be set yet. **Latency measured** 2026-11-20 (kiro-cli 2.37.1, one-shot `chat --no-interactive`, process start included): 5.9–18.0 s per answer, median ≈ 10.7 s; within KIRO-09's 25 s timeout. Credits (Kiro usage page): about 1 credit for all 5 answers, so ≈ 0.2 per call. Caps set in PRD §6 (D-23). **Measured again 2026-11-24 over ACP** (`kiro-cli acp --agent-engine v3`, the `kiro-game` agent, the game tools over MCP, D-190): 18 calls, 4.4–13.8 s per call (median ≈ 7 s), 0.06–0.19 credits per call as reported by Kiro's agent server (≈ 0.11 on average; a draft or debrief costs the most), plus ≈ 1.5–2.4 s to start the process and its session on a run's first call. D-23's 0.2 estimate holds with margin | Major | Closed (D-23) |
 | KI-03 | Some Juice Shop behaviours in PRD §3/§5 are unconfirmed; per-fact status below (checked 2026-11-17 and 2026-11-20 against v20.4.0) | Major | Open |
 | KI-04 | No host picked for the page and the Kiro server (SYS-18); the rules require a working URL. Ruled: Fly.io (D-20) | Major | Closed (D-20) |

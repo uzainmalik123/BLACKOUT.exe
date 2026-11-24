@@ -1,6 +1,6 @@
 # The engine, from the screens' side
 
-> For whoever builds the screens (`docs/SCENES.md`). Written 2026-11-21 against `main`.
+> For whoever builds the screens of **BLACKOUT.exe** (`docs/SCENES.md`). Written 2026-11-21 against `main`.
 >
 > The game's brain is **already running headless** in `game/src/engine/`. You don't need fake data: create a real `Engine`, call `advance()` every frame, and draw what's in `engine.world`. The parts that don't exist yet (the shell, Kiro, the report) have a small agreed interface below; build against a stub of it until the real one lands.
 
