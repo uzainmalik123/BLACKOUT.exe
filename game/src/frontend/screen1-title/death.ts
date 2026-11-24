@@ -8,7 +8,7 @@
 // strand they belong to. Every frame the cells are re-read with breathing, a slow melt and
 // glitches, and the eyes are drawn live: glowing halftone irises clipped by the lids.
 
-import { GlyphAtlas, codes, edgeChar, strokeChar } from './atlas';
+import { GlyphAtlas, codes, edgeChar, strokeChar } from '../shared/atlas';
 import { clamp, hash2, lerp, mulberry32 } from './curtain';
 
 const DU = 100; // design units across

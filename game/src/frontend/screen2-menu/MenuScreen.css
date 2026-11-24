@@ -1,0 +1,342 @@
+/* Screen 2: the title and menu (D-181). The forest is a canvas of characters; the menu is a column of liquid-glass
+   pills over it, filling the left of the screen under the logo. The pills appear once and stay: no hiding, no
+   fading out, no glitching. Fonts come from the title screen's import. */
+
+.ms-root {
+  --display: "Cinzel", "Trajan Pro", "Palatino Linotype", Georgia, serif;
+  --italic: "Cormorant Garamond", "Palatino Linotype", "Book Antiqua", Georgia, serif;
+  --bone: #f4efe5;
+  --ash: rgba(232, 226, 215, 0.72);
+  --blood: #c0141f;
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: #020203;
+  color: var(--bone);
+  cursor: default;
+  user-select: none;
+}
+
+.ms-canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+}
+
+/* her eyes and the bleeding logo, above the forest */
+.ms-fx {
+  pointer-events: none;
+}
+
+.ms-defs {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}
+
+.ms-vignette,
+.ms-scanlines {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* film grain: a still noise tile the compositor jitters, so the canvas never repaints for it */
+.ms-grain {
+  position: absolute;
+  inset: -20%;
+  pointer-events: none;
+  opacity: 0.07;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  animation: ms-grain 0.5s steps(5, end) infinite;
+}
+
+@keyframes ms-grain {
+  0% {
+    transform: translate(0, 0);
+  }
+  20% {
+    transform: translate(-4%, 3%);
+  }
+  40% {
+    transform: translate(3%, -5%);
+  }
+  60% {
+    transform: translate(-2%, -2%);
+  }
+  80% {
+    transform: translate(5%, 4%);
+  }
+  100% {
+    transform: translate(0, 0);
+  }
+}
+
+.ms-vignette {
+  background: radial-gradient(ellipse 80% 75% at 58% 45%, rgba(0, 0, 0, 0) 60%, rgba(0, 0, 0, 0.5) 100%);
+}
+
+.ms-scanlines {
+  background: repeating-linear-gradient(to bottom, rgba(0, 0, 0, 0.2) 0 1px, rgba(0, 0, 0, 0) 1px 3px);
+  opacity: 0.3;
+}
+
+.ms-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* ------------------------------------------------------------------ liquid glass */
+
+.ms-glass {
+  position: relative;
+  isolation: isolate;
+  border: 0;
+  border-radius: 999px;
+  /* tint */
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.03));
+  /* frost and a soft lift; browsers that cannot bend the backdrop through the SVG keep this */
+  backdrop-filter: blur(4px) saturate(1.5) brightness(1.15);
+  /* bent light with chromatic aberration (Chromium) */
+  backdrop-filter: url(#ms-liquid) blur(1.6px) saturate(1.6) brightness(1.18);
+  box-shadow:
+    0 14px 42px rgba(0, 0, 0, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    inset 0 -1px 1px rgba(255, 255, 255, 0.12),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.1),
+    inset 0 0 28px rgba(255, 255, 255, 0.05);
+  transition:
+    box-shadow 0.35s ease,
+    background 0.35s ease,
+    transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* the bevel: a bright rim at the top left and bottom right, as thick glass catches light */
+.ms-glass::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1.5px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.6), rgba(255, 255, 255, 0.08) 28%, rgba(255, 255, 255, 0) 50%, rgba(255, 255, 255, 0.08) 72%, rgba(255, 255, 255, 0.4));
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* the sheen across the top of the glass */
+.ms-glass::after {
+  content: "";
+  position: absolute;
+  inset: 1px;
+  border-radius: inherit;
+  background: radial-gradient(120% 90% at 22% -10%, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0) 55%);
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* ------------------------------------------------------------------ the menu */
+
+.ms-menu {
+  position: absolute;
+  left: 3vw;
+  top: 21vh;
+  bottom: 6vh;
+  width: min(44vw, 860px);
+  display: flex;
+  flex-direction: column;
+  gap: clamp(12px, 2.1vh, 26px);
+}
+
+/* each piece fades in once, then stays: nothing else ever animates these elements' opacity */
+.ms-menu > * {
+  animation: ms-in 0.9s ease both;
+  animation-delay: calc(0.9s + var(--i, 0) * 0.12s);
+}
+
+.ms-item {
+  flex: 1 1 0;
+  min-height: 58px;
+  max-height: 124px;
+  margin: 0;
+  padding: 0 clamp(26px, 3.2vw, 56px);
+  display: flex;
+  align-items: center;
+  font: 600 clamp(19px, 3vh, 36px) / 1 var(--display);
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  text-align: left;
+  color: var(--ash);
+  cursor: pointer;
+  text-shadow: 0 1px 12px rgba(0, 0, 0, 0.9);
+}
+
+.ms-item:focus-visible,
+.ms-level:focus-visible {
+  outline: none;
+}
+
+.ms-label,
+.ms-value,
+.ms-levels {
+  position: relative;
+  z-index: 3;
+}
+
+.ms-row {
+  justify-content: space-between;
+  gap: 1.2em;
+}
+
+.ms-value {
+  font: italic 500 clamp(20px, 3.1vh, 36px) / 1 var(--italic);
+  letter-spacing: 0.02em;
+  text-transform: none;
+  color: rgba(238, 230, 216, 0.8);
+}
+
+/* the selected pill: a red light pooled inside the glass, breathing slowly */
+.ms-glow {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(90% 140% at 12% 50%, rgba(205, 22, 40, 0.42), rgba(205, 22, 40, 0.08) 55%, rgba(205, 22, 40, 0) 80%);
+  opacity: 0;
+  transition: opacity 0.4s ease;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.ms-item.sel {
+  color: var(--bone);
+  transform: translateX(0.6vw) scale(1.012);
+  box-shadow:
+    0 16px 50px rgba(0, 0, 0, 0.6),
+    0 0 34px rgba(200, 18, 36, 0.32),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6),
+    inset 0 -1px 1px rgba(255, 255, 255, 0.14),
+    inset 0 0 0 1px rgba(255, 90, 100, 0.32),
+    inset 0 0 30px rgba(255, 255, 255, 0.06);
+}
+
+.ms-item.sel .ms-glow {
+  opacity: 1;
+  animation: ms-breathe 2.8s ease-in-out infinite;
+}
+
+.ms-item.sel .ms-label {
+  text-shadow:
+    0 0 14px rgba(255, 236, 214, 0.4),
+    0 0 30px rgba(210, 20, 38, 0.55);
+}
+
+.ms-levels {
+  display: flex;
+  gap: clamp(8px, 0.8vw, 14px);
+}
+
+.ms-level {
+  padding: 0.75em 1.3em;
+  font: 600 clamp(12px, 1.6vh, 18px) / 1 var(--display);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(225, 218, 206, 0.55);
+  cursor: pointer;
+  box-shadow:
+    0 6px 18px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.35),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.ms-level:hover {
+  color: rgba(245, 238, 226, 0.85);
+}
+
+.ms-level.on {
+  color: var(--bone);
+  background: linear-gradient(180deg, rgba(230, 40, 55, 0.4), rgba(150, 10, 25, 0.28));
+  box-shadow:
+    0 6px 22px rgba(0, 0, 0, 0.5),
+    0 0 20px rgba(220, 24, 42, 0.45),
+    inset 0 1px 0 rgba(255, 200, 200, 0.55),
+    inset 0 0 0 1px rgba(255, 110, 120, 0.4);
+  text-shadow: 0 0 10px rgba(255, 220, 220, 0.5);
+}
+
+.ms-whisper {
+  margin: 0;
+  padding: 0 clamp(26px, 3.2vw, 56px);
+  min-height: 2.6em;
+  font: italic 500 clamp(17px, 2.5vh, 28px) / 1.3 var(--italic);
+  color: rgba(236, 228, 214, 0.88);
+  text-shadow: 0 0 14px rgba(0, 0, 0, 0.95);
+}
+
+/* only the words change, softly; the line itself never goes */
+.ms-whisper-text {
+  display: inline-block;
+  animation: ms-word 0.45s ease both;
+}
+
+/* ------------------------------------------------------------------ motion */
+
+/* `translate`, not `transform`: the selected pill's own transform must not be held down by this */
+@keyframes ms-in {
+  from {
+    opacity: 0;
+    translate: 0 8px;
+  }
+  to {
+    opacity: 1;
+    translate: 0 0;
+  }
+}
+
+@keyframes ms-word {
+  from {
+    opacity: 0.25;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes ms-breathe {
+  0%,
+  100% {
+    opacity: 0.75;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* short screens: tighter pills */
+@media (max-height: 760px) {
+  .ms-menu {
+    top: 19vh;
+    bottom: 4vh;
+  }
+  .ms-item {
+    min-height: 48px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ms-grain,
+  .ms-menu > *,
+  .ms-whisper-text,
+  .ms-item.sel .ms-glow {
+    animation: none;
+  }
+}

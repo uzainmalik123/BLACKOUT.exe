@@ -5,7 +5,7 @@
 // tagline, dust and torn threads, the curtains (dark backing, then glowing strands), the
 // sleeves and hands, then glitches, grain, scanlines and the vignette.
 
-import { CINZEL, CORMORANT, FACES, GlyphAtlas, codes } from './atlas';
+import { CINZEL, CORMORANT, FACES, GlyphAtlas, codes } from '../shared/atlas';
 import {
   type CurtainFrame,
   type CurtainMotion,

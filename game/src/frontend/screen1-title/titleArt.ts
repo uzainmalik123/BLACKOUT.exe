@@ -4,7 +4,7 @@
 // ".exe" uses the same face: Cinzel's lowercase letters are small capitals, crisp at any size.
 // Cells assemble out of the dark as the curtains part, and fall back into it as they close.
 
-import { CINZEL, GlyphAtlas, codes, edgeChar } from './atlas';
+import { CINZEL, GlyphAtlas, codes, edgeChar } from '../shared/atlas';
 import { clamp, hash2, mulberry32 } from './curtain';
 
 const DENSE = codes('@#&%$8');
