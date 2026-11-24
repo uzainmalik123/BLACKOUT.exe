@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { explainLine } from '../content/explanations';
 import { DRAFTS, OFFLINE_ANSWER, debriefTemplate, hintsFor } from '../content/kiro-fallback';
 import { Engine } from '../engine/engine';
 import { buildReport } from '../engine/report';
@@ -35,7 +36,8 @@ describe('the Kiro client (SYS-12, KIRO-09, D-190)', () => {
     const { fetch, calls } = fakeFetch({});
     const kiro = createKiro(engine, { fetch, timeoutMs: 500 });
     expect(await kiro.ask('who is that?')).toEqual({ text: OFFLINE_ANSWER, offline: true });
-    expect(await kiro.explain('1.2.3.4 - - [x] "GET / HTTP/1.1" 200 1 "-" "-"')).toEqual({ text: OFFLINE_ANSWER, offline: true });
+    const line = '1.2.3.4 - - [22/Nov/2026:03:14:15 +0000] "GET / HTTP/1.1" 200 1 "-" "curl/8.23.0"';
+    expect(await kiro.explain(line)).toEqual({ text: explainLine(line).text, offline: true }); // CON-05's words, not OFFLINE_ANSWER
     const d = await kiro.draft('who is making the most requests');
     expect(d.offline).toBe(true);
     expect(d.lines).toEqual([...DRAFTS[0]!.lines]);
