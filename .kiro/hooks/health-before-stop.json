@@ -1,0 +1,15 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "health-before-stop",
+      "description": "Run npm run health in game/ when the agent tries to stop; if red, keep it working with the reason 'health is red' (KDEV-03, D-161)",
+      "trigger": "Stop",
+      "timeout": 900,
+      "action": {
+        "type": "command",
+        "command": "cd game && if npm run health >/tmp/kiro-health.log 2>&1; then echo \"$(date -Is) stop HEALTH GREEN\" >> ../.kiro/hooks.log; echo 'health is green'; else echo \"$(date -Is) stop HEALTH RED\" >> ../.kiro/hooks.log; tail -n 40 /tmp/kiro-health.log >&2; printf '%s' '{\"decision\":\"block\",\"reason\":\"health is red\"}'; echo 'health is red' >&2; exit 1; fi"
+      }
+    }
+  ]
+}

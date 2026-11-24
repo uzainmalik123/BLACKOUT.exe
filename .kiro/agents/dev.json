@@ -1,0 +1,33 @@
+{
+  "name": "dev",
+  "description": "Project agent for development sessions: AGENTS.md as a resource. The KDEV-03 hooks live in .kiro/hooks/ (loaded by the CLI for every agent; D-161).",
+  "prompt": null,
+  "mcpServers": {},
+  "tools": [
+    "*"
+  ],
+  "toolAliases": {},
+  "allowedTools": [],
+  "resources": [
+    "file://AGENTS.md"
+  ],
+  "toolsSettings": {},
+  "includeMcpJson": true,
+  "model": null,
+  "permissions": {
+    "rules": [
+      {
+        "capability": "fs_read",
+        "match": [
+          "./**"
+        ],
+        "effect": "allow"
+      }
+    ]
+  },
+  "kiroUpgrade": {
+    "revision": 2,
+    "fingerprint": "sha256:436c9a34bc95c4f66215902be9d57510b5046268eebe390c828509951132964f",
+    "source": "sha256:e0be3498f729d24bf533be778ba0e8ca32637548d2abf8453a713329313ef5ee"
+  }
+}
