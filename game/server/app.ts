@@ -100,7 +100,7 @@ export function createHandler(opts: AppOptions): (req: IncomingMessage, res: Ser
     const token = typeof body.token === 'string' ? body.token : '';
     if (!token || !runs.has(token)) return send(res, 401, { error: 'no run token' });
     if (path === 'end') {
-      runs.end(token);
+      await runs.end(token);
       return send(res, 200, { ok: true });
     }
     if (!CALLS.has(path)) return send(res, 404, { error: 'unknown call' });

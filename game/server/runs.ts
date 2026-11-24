@@ -4,7 +4,8 @@
 // timeout (KIRO-09), a check at session start that the model can really see the game tools (KI-191), and the log
 // line per call with the credits Kiro reported.
 import { randomBytes } from 'node:crypto';
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { AcpAgent, AcpError, type PromptResult } from './acp';
@@ -206,13 +207,13 @@ export class Runs {
       if (err instanceof AcpError && /^timeout/.test(err.message)) return { ok: false, reason: 'timeout', detail: err.message };
       if (err instanceof AcpError && /already in flight/.test(err.message)) return { ok: false, reason: 'busy' };
       // A dead agent, or one that would not cancel a timed-out turn, is dropped so the next call starts a fresh one.
-      if (run.agent && (!run.agent.alive || /did not cancel/.test(err.message))) this.dropAgent(run);
+      if (run.agent && (!run.agent.alive || /did not cancel/.test(err.message))) await this.dropAgent(run);
       return { ok: false, reason: 'agent-error', detail: err.message };
     }
   }
 
   private async startAgent(run: Run): Promise<void> {
-    this.dropAgent(run);
+    await this.dropAgent(run);
     // An empty folder outside the repo, holding only the custom agent (KI-13): nothing to read even with a tool.
     const cwd = mkdtempSync(join(tmpdir(), 'kiro-game-'));
     mkdirSync(join(cwd, '.kiro', 'agents'), { recursive: true });
@@ -255,40 +256,51 @@ export class Runs {
       const missing = TOOL_TAGS.filter((t) => !agent.toolTags.has(t));
       this.log(`[kiro] run ${tag} ERROR: the agent never listed the game tools (missing ${missing.join(' ')}); this run plays offline. Is ASBX_KIRO_MANDATORY_MCPS honoured by this kiro-cli? (KI-191)`);
       run.noTools = true;
-      this.dropAgent(run);
+      await this.dropAgent(run);
       return;
     }
     this.log(`[kiro] run ${tag} agent ${agent.agentInfo.name ?? '?'} ${agent.agentInfo.version ?? ''} ready in ${Date.now() - started} ms, session ${session.sessionId}, ${TOOL_TAGS.length} game tools listed`);
   }
 
-  private dropAgent(run: Run): void {
-    run.agent?.kill();
+  /**
+   * Stops a run's agent and removes its temp folder (KI-195). The run lets go of both at once, so a new agent can
+   * start meanwhile; the folder goes only after the process has exited (Windows refuses to delete a live
+   * process's cwd), and a folder that still will not go is logged, never thrown: clean-up must not fail a call.
+   */
+  private async dropAgent(run: Run): Promise<void> {
+    const { agent, cwd } = run;
     run.agent = undefined;
     run.sessionId = undefined;
-    if (run.cwd) {
-      rmSync(run.cwd, { recursive: true, force: true });
-      run.cwd = undefined;
+    run.cwd = undefined;
+    if (agent) await agent.kill();
+    if (!cwd) return;
+    try {
+      // The retries cover a virus scanner or indexer still holding a file for a moment after the exit.
+      await rm(cwd, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+    } catch (e) {
+      this.log(`[kiro] run ${run.token.slice(0, 8)} temp folder ${cwd} not removed: ${(e as Error).message}`);
     }
   }
 
-  /** Ends a run: its agent process and temp folder go. The token stops working. */
-  end(token: string): void {
+  /** Ends a run: the token stops working at once; settles when its agent process and temp folder are gone. */
+  async end(token: string): Promise<void> {
     const run = this.runs.get(token);
     if (!run) return;
-    this.dropAgent(run);
     this.runs.delete(token);
     this.save();
+    await this.dropAgent(run);
     this.log(`[kiro] run ${token.slice(0, 8)} ended after ${run.calls} calls`);
   }
 
   private sweep(): void {
     const t = this.now();
-    for (const run of this.runs.values()) if (t - run.lastUsedAt > RUN_IDLE_MS) this.end(run.token);
+    for (const run of this.runs.values()) if (t - run.lastUsedAt > RUN_IDLE_MS) void this.end(run.token);
   }
 
-  shutdown(): void {
+  /** Stops every agent and removes every temp folder; the tokens survive a restart (KI-193), only the processes go. */
+  async shutdown(): Promise<void> {
     clearInterval(this.sweeper);
-    for (const run of this.runs.values()) this.dropAgent(run);
-    this.save(); // the tokens survive a restart; only the processes go
+    this.save(); // first: the counters are safe even if the process is killed while the agents exit
+    await Promise.all([...this.runs.values()].map((run) => this.dropAgent(run)));
   }
 }

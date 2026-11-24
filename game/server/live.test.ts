@@ -39,7 +39,7 @@ describe.skipIf(!LIVE)('live: kiro-cli acp with the kiro-game agent (KIRO_LIVE=1
   });
 
   afterAll(async () => {
-    runs.shutdown();
+    await runs.shutdown();
     await new Promise<void>((r) => server.close(() => r()));
     console.log('\n--- live log ---\n' + log.filter((l) => /\[kiro\] run/.test(l)).join('\n'));
   });

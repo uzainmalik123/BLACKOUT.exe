@@ -35,6 +35,8 @@ type Json = Record<string, unknown>;
 
 /** How long the next turn waits for a cancelled one to settle before the agent is given up. */
 export const DRAIN_MS = 3000;
+/** How long `kill()` waits for the agent to exit after SIGTERM before it sends SIGKILL (KI-195). */
+export const KILL_GRACE_MS = 1500;
 
 interface Turn {
   text: string[];
@@ -60,6 +62,9 @@ export class AcpAgent {
   private readonly pending = new Map<number, Pending>();
   private buffer = '';
   private exited: Error | undefined;
+  /** Settles when the OS process is really gone (`exit`, or a spawn that failed): what `kill()` waits for (KI-195). */
+  private gone: Promise<void> = Promise.resolve();
+  private procGone = true;
   /** The turn in flight, if any: chunks and usage land here. */
   private turn: Turn | undefined;
   /** A cancelled turn's `session/prompt`, still unanswered: the next turn waits for it (bounded by DRAIN_MS). */
@@ -78,6 +83,17 @@ export class AcpAgent {
   async start(): Promise<void> {
     const proc = spawn(this.opts.command, this.opts.args, { cwd: this.opts.cwd, env: this.opts.env, stdio: ['pipe', 'pipe', 'pipe'] });
     this.proc = proc;
+    this.procGone = false;
+    this.gone = new Promise<void>((resolve) => {
+      const settle = () => {
+        this.procGone = true;
+        resolve();
+      };
+      proc.once('exit', settle);
+      proc.once('error', () => {
+        if (proc.pid === undefined) settle(); // never started, so there is no exit to wait for
+      });
+    });
     proc.stdout.setEncoding('utf8');
     proc.stdout.on('data', (chunk: string) => this.onData(chunk));
     proc.stderr.setEncoding('utf8');
@@ -178,10 +194,34 @@ export class AcpAgent {
     });
   }
 
-  kill(): void {
-    if (this.proc && this.exited === undefined) {
-      this.proc.kill();
-      this.fail(new AcpError('agent killed'));
+  /**
+   * Ends the agent and settles once its process has really exited (KI-195): a signal is only a request, and
+   * Windows will not delete a folder a live process sits in, so a caller removing the agent's cwd must await this.
+   * An agent still there after `graceMs` gets SIGKILL; one that outlives that too is given up after another
+   * `graceMs`, so this never hangs. Safe to call again: a later call waits for the same exit.
+   */
+  async kill(graceMs = KILL_GRACE_MS): Promise<void> {
+    const proc = this.proc;
+    if (!proc) return;
+    if (this.exited === undefined) this.fail(new AcpError('agent killed'));
+    if (this.procGone) return;
+    proc.kill();
+    if (await this.exitWithin(graceMs)) return;
+    this.opts.log?.(`[agent] still running ${graceMs} ms after SIGTERM; sending SIGKILL`);
+    proc.kill('SIGKILL');
+    if (!(await this.exitWithin(graceMs))) this.opts.log?.(`[agent] did not exit after SIGKILL; giving up on it`);
+  }
+
+  /** True when the process exits within `ms`. */
+  private async exitWithin(ms: number): Promise<boolean> {
+    let timer: NodeJS.Timeout | undefined;
+    const timedOut = new Promise<false>((r) => {
+      timer = setTimeout(() => r(false), ms);
+    });
+    try {
+      return await Promise.race([this.gone.then(() => true as const), timedOut]);
+    } finally {
+      clearTimeout(timer);
     }
   }
 

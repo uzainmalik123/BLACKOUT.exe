@@ -10,8 +10,12 @@
 //   FAKE:CREDITS <n>       report <n> credits for the turn the way Kiro does (session_info_update / turn_completion)
 //   FAKE:NEXT <text>       reply "queued" now and <text> to the NEXT prompt of this session, whatever it says
 //                          (how a test scripts a hint or a debrief, whose prompts carry no free text)
+//   FAKE:WHOAMI            reply with this process's `{"pid":…,"cwd":…}` as JSON (the KI-195 clean-up tests)
 // With no directive it replies "fake: <first 60 chars of the prompt>".
+// `--ignore-sigterm` makes it ignore SIGTERM, like an agent that will not stop when asked (KI-195).
 import { createInterface } from 'node:readline';
+
+if (process.argv.includes('--ignore-sigterm')) process.on('SIGTERM', () => {});
 
 const out = (msg) => process.stdout.write(JSON.stringify(msg) + '\n');
 let nextId = 1000;
@@ -91,6 +95,8 @@ async function prompt(id, params) {
     out({ jsonrpc: '2.0', method: 'session/update', params: { sessionId: params.sessionId, update: { sessionUpdate: 'tool_call', toolCallId: 'c2', title: name, name, kind: 'other', status: 'pending' } } });
     chunk(await callTool(session, name, args));
   }
+  const whoami = directive('WHOAMI');
+  if (whoami) chunk(JSON.stringify({ pid: process.pid, cwd: process.cwd() }));
   const echo = directive('ECHO');
   if (echo) {
     // The question sits inside quotes in the prompt; drop the closing quote the match picked up.
@@ -98,7 +104,7 @@ async function prompt(id, params) {
     // Two chunks, to prove chunks are joined.
     chunk(t.slice(0, 5));
     chunk(t.slice(5));
-  } else if (!tool && !files) chunk(`fake: ${text.slice(0, 60)}`);
+  } else if (!tool && !files && !whoami) chunk(`fake: ${text.slice(0, 60)}`);
   const credits = directive('CREDITS');
   if (credits) {
     out({ jsonrpc: '2.0', method: 'session/update', params: { sessionId: params.sessionId, update: { sessionUpdate: 'session_info_update', _meta: { kiro: { kind: 'turn_completion', promptTurnSummaries: [{ unit: 'credit', unitPlural: 'credits', usage: number(credits) }], elapsedTime: 1, status: 'success' } } } } });
