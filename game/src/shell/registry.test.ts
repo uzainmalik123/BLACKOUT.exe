@@ -52,6 +52,20 @@ describe('steering list (R2.6, KDEV-01)', () => {
   });
 });
 
+describe('steering files (KDEV-01)', () => {
+  const read = (name: string) => readFileSync(new URL(`../../../.kiro/steering/${name}`, import.meta.url), 'utf8');
+
+  it('both files exist and are always included', () => {
+    for (const name of ['project.md', 'game-shell.md']) expect(read(name), name).toMatch(/^---\ninclusion: always\n---\n/);
+  });
+
+  it('the project rules point at AGENTS.md and the PRD', () => {
+    const project = read('project.md');
+    expect(project).toContain('#[[file:AGENTS.md]]');
+    expect(project).toContain('docs/PRD.md');
+  });
+});
+
 describe('parseArgs (R5.19)', () => {
   it('accepts every flag in each command flags list', () => {
     for (const name of names) {
