@@ -1,7 +1,7 @@
 # Recording rig (PRD REC-01 to REC-05)
 
-Death's moves are real attacks, recorded once here and replayed by the game. Players never trigger
-a real attack (AGENTS.md).
+Death's moves are real attacks, recorded once here and replayed by the game (BLACKOUT.exe). Players
+never trigger a real attack (AGENTS.md).
 
 - **Target:** OWASP Juice Shop `v20.4.0` behind nginx, on the Docker-internal network `10.66.0.0/24`
   (no route out, no published ports). nginx writes the real `combined` access log plus a JSON copy

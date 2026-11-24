@@ -1,4 +1,4 @@
-# The game plan (working title: TBD)
+# The game plan (BLACKOUT.exe)
 
 > **Status:** 2026-11-09: the build spec is now **`docs/PRD.md`**; where this plan and the PRD differ, the PRD wins. Draft for the team, 2026-11-08. The ideas below come from one long design conversation. Things marked **✅ Decided** were agreed; things marked **💡 Proposal** are suggestions waiting for the team's yes or no. Nothing is built yet.
 
@@ -257,7 +257,7 @@ Our teammate's "Hands and Grimoire" piece already shows the answer. **Nothing in
 
 ## 13. Open questions for the team
 
-1. **Name.** "RE:Animator" no longer fits. Ideas welcome.
+1. **Name.** "RE:Animator" no longer fits. **Settled 2026-11-24: BLACKOUT.exe** (D-210).
 2. **Deadline and hours.** When is the Kiroween submission due, and how many hours a day can we each put in? This decides how much of §12 is realistic.
 3. **Kiro in the game.** Is it powered by a live LLM during play (needs a key, or a free model) or by pre-written hints? Should the character be called Kiro?
 4. **Minions.** Are Death's minions visible characters, the small noise attacks Kiro swats, or both?

@@ -1,4 +1,4 @@
-# PRD: scenario one, end to end
+# PRD: BLACKOUT.exe, scenario one, end to end
 
 > **This file is the source of truth for what gets built.** `docs/GAME_PLAN.md` explains the *why*; this file says *exactly what*. If code and this file disagree, the code is wrong.
 >
@@ -318,7 +318,7 @@ Ideas the team wants to keep, with their limits fixed now so nobody builds a dif
 
 ## 15. Still open (doesn't block building)
 
-- **Name** (KI-01): the team decides.
+- **Name**: settled, **BLACKOUT.exe** (D-210, closes KI-01).
 - **Who does what**: the team decides once both are online.
 
 ## 16. Status
