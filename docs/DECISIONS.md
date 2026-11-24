@@ -85,7 +85,7 @@
 | D-121 | The idle check is "a do-nothing player never wins" on every level and seed (every soul lost, a flatline or walked away at the shift's end all pass), not "loses before the shift ends" (amends D-118) | Accepted |
 | D-122 | The event log keeps only what the judge needs of a read's `shown` lines (how many were passed, how many were Death's, what they were about, and `shownTotal`), never the text (amends D-115) | Accepted |
 | D-160 | The shell's read actions (DEF-01/02/03) carry `shown` and `shownTotal` = the Command_Line's final screen output (first 200 lines, and the line count), queued at first read and sent when the line finishes; empty for a `>` redirect (feeds D-115) | Accepted |
-| D-161 | Kiro hooks (KDEV-03): tests of the saved file's own folder on every edit under `game/src/`, a PRD-status reminder for `rules/` and `engine/`, and the full `npm run health` once when the agent stops, instead of "health on every save" | Accepted |
+| D-161 | KDEV-03 hooks in `.kiro/hooks/` (V3 file format, which CLI 2.37.1 also loads for every agent): per-folder tests on save, a PRD-status reminder on rules/engine edits, full `npm run health` at stop; each leaves a line in `.kiro/hooks.log`; stdout carries the result to the agent | Accepted |
 | D-170 | Parked ideas get their limits fixed when they're parked (PRD §14.1): log rotation (PARK-01) and Death flooding the logs (PARK-02: one paced move, once per run, ≤ 60 s, Hard or after a tip-off, visible and stoppable) | Accepted |
 
 ### D-01: Pivot to an incident-response game
