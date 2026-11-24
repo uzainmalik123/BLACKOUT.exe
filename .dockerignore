@@ -12,6 +12,7 @@
 docs
 recording
 scripts
+!scripts/container
 graphify-out
 game/node_modules
 game/dist

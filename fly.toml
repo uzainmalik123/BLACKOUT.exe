@@ -1,5 +1,6 @@
-# Fly.io app for the game (PRD SYS-18, D-20, D-200): one small machine that never sleeps, serving the page and
-# the Kiro server from the Dockerfile at the repo root. Runbook: docs/HOSTING.md.
+# Fly.io app for the game (PRD SYS-18, D-20, D-200, D-201): one small machine that never sleeps, serving the page
+# and the Kiro server from the Dockerfile at the repo root, with a 1 GB volume at /data that keeps kiro-cli's
+# login and the day's counters across restarts and deploys. Runbook: docs/HOSTING.md.
 #
 # Placeholders to set once: `app` (the public name, <app>.fly.dev) and `primary_region` (fly platform regions).
 app = "blackout-exe"
@@ -12,11 +13,24 @@ primary_region = "ams"
   NODE_ENV = "production"
   HOST = "0.0.0.0"
   PORT = "8080"
-  # The counters (KI-193). On the container disk they reset on every deploy; mount the volume below to keep them.
+  # Both on the volume (D-201): the counters (KI-193) and kiro-cli's data folder, where `kiro-cli login` keeps
+  # its session (<XDG_DATA_HOME>/kiro-cli/data.sqlite3). The entrypoint makes the folders and hands them to `node`.
   KIRO_STATE_FILE = "/data/runs.json"
+  XDG_DATA_HOME = "/data/xdg"
   KIRO_NO_AUTO_UPDATE = "1"
 
-# The secret, never here: `fly secrets set KIRO_API_KEY=ksk_…`
+# Kiro's login is done on the machine itself, by hand, once: `fly ssh console -u node`, then
+# `kiro-cli login --use-device-flow` (docs/HOSTING.md §3). A key, if one ever exists, is a secret and wins:
+# `fly secrets set KIRO_API_KEY=ksk_…`. Neither is ever written here.
+
+# The volume (D-201). Create it once, before the first deploy, in `primary_region`:
+#   fly volumes create data --size 1 --region ams
+# One machine, one volume, same region: the machine is pinned to the volume's region, and a deploy needs the
+# volume to exist (Fly creates one on the first deploy if none does, `initial_size`).
+[mounts]
+  source = "data"
+  destination = "/data"
+  initial_size = "1gb"
 
 [http_service]
   internal_port = 8080
@@ -43,9 +57,3 @@ primary_region = "ams"
   size = "shared-cpu-1x"
   memory = "1gb"
   processes = ["app"]
-
-# Optional: a 1 GB volume so the day's Kiro counter survives deploys (KI-193). Create it first in the same region
-# (`fly volumes create data --size 1 --region <primary_region>`), then uncomment:
-# [mounts]
-#   source = "data"
-#   destination = "/data"

@@ -10,6 +10,7 @@ import { DRAFTS, OFFLINE_ANSWER, debriefTemplate } from '../src/content/kiro-fal
 import { GAP_WORDS } from '../src/kiro/gaps';
 import type { DebriefFacts } from '../src/kiro/rails';
 import { createHandler } from './app';
+import type { AuthMode } from './auth';
 import { handleMcp } from './mcp';
 import { Runs } from './runs';
 import { SNAPSHOT } from './test/snapshot';
@@ -47,7 +48,7 @@ async function start(opts: { caps?: { perRun: number; perDay: number }; timeoutM
     caps: opts.caps,
     timeoutMs: opts.timeoutMs ?? 5000,
   });
-  const server = createServer(createHandler({ runs, log: (l) => log.push(l) }));
+  const server = createServer(createHandler({ runs, auth: () => ({ mode: 'none', why: 'test' }), log: (l) => log.push(l) }));
   await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
   port = (server.address() as AddressInfo).port;
   const post = async (path: string, body: unknown) => {
@@ -216,18 +217,26 @@ describe('the Kiro server (SYS-12)', () => {
     const runsBefore = h.log.length;
     const dev = await fetch(`http://127.0.0.1:${h.port}/healthz`);
     expect(dev.status).toBe(200); // no dist configured: the API alone is healthy (dev shape)
-    expect(await dev.json()).toMatchObject({ ok: true, page: true });
+    expect(await dev.json()).toMatchObject({ ok: true, page: true, kiroAuth: 'none' }); // D-201: the cached auth mode
     expect((await fetch(`http://127.0.0.1:${h.port}/healthz`, { method: 'POST' })).status).toBe(405);
     expect(h.log.length).toBe(runsBefore); // nothing spawned, nothing logged
 
     const dist = mkdtempSync(join(tmpdir(), 'kiro-dist-'));
-    const prod = createServer(createHandler({ runs: h.runs, distDir: dist }));
+    let auth: AuthMode | undefined; // the watcher's first probe has not finished yet
+    const prod = createServer(createHandler({ runs: h.runs, distDir: dist, auth: () => auth }));
     await new Promise<void>((r) => prod.listen(0, '127.0.0.1', r));
     const port = (prod.address() as AddressInfo).port;
     try {
       expect((await fetch(`http://127.0.0.1:${port}/healthz`)).status).toBe(503); // dist without index.html: not servable
       writeFileSync(join(dist, 'index.html'), '<!doctype html><title>BLACKOUT.exe</title>');
-      expect((await fetch(`http://127.0.0.1:${port}/healthz`)).status).toBe(200);
+      const probing = await fetch(`http://127.0.0.1:${port}/healthz`);
+      expect(probing.status).toBe(200);
+      expect(await probing.json()).toMatchObject({ ok: true, kiroAuth: 'none' }); // unknown yet: nothing is proven, so `none`
+      auth = { mode: 'cli-login', who: 'someone@example.org' };
+      expect(await (await fetch(`http://127.0.0.1:${port}/healthz`)).json()).toMatchObject({ kiroAuth: 'cli-login' }); // and no `who`: the email stays off the public URL
+      expect(JSON.stringify(await (await fetch(`http://127.0.0.1:${port}/healthz`)).json())).not.toContain('example.org');
+      auth = { mode: 'key' };
+      expect(await (await fetch(`http://127.0.0.1:${port}/healthz`)).json()).toMatchObject({ kiroAuth: 'key' });
       const page = await fetch(`http://127.0.0.1:${port}/`);
       expect(page.headers.get('content-type')).toContain('text/html');
       expect(await page.text()).toContain('BLACKOUT.exe');
