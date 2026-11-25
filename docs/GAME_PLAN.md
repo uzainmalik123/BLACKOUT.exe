@@ -166,7 +166,7 @@ Players may never have seen a server log, so there are **three levels**. The rul
 | **Kiro** | Explains every alert in plain words, suggests your next move | Hints only when you've been stuck a while | Silent unless asked; asking costs time |
 | **Controls** | Buttons for everything; terminal optional | Buttons + terminal | Terminal only |
 | **Logs** | Suspicious lines highlighted; hover any line for "what this means" | Highlighted, no explanations | Raw, the way real analysts see them |
-| **Briefing** | Untimed, with a "what to look for" checklist | Timed | Short timer |
+| **Briefing** | Untimed: a narrated briefing (D-183) | Untimed: a narrated briefing (D-183) | Untimed: a narrated briefing (D-183) |
 | **Death** | Slower, telegraphs his next move | Normal pace, adapts | Faster, always plants a backdoor |
 | **Meters** | More souls and heartbeat to spare | Normal | Very little room for error |
 

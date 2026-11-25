@@ -36,7 +36,7 @@
 ## 2. Title and menu (UI-02)
 
 - **For:** the first impression, then picking a scenario and difficulty.
-- **Contains:** the title, **BLACKOUT.exe** (D-210; it comes from App's `TITLE` constant, so it stays one edit); the scenario list (one for now: *the Juice Shop breach*); difficulty pick with one line each:
+- **Contains:** the title, **BLACKOUT.exe** (D-210; it comes from App's `TITLE` constant, so it stays one edit); the scenario (one for now: *the Juice Shop breach*, so the menu shows no list until there is a second, D-188); difficulty pick with one line each:
   - **Easy:** never seen a server log. Kiro explains everything.
   - **Medium:** you know your way around. Kiro hints when you're stuck.
   - **Hard:** a real shift. Raw logs, Kiro stays quiet.
@@ -46,9 +46,8 @@
 
 - **For:** the calm before. The player reads what a real defender would have before a shift.
 - **Contains:**
-  - the four briefing files (content CON-01: system map, who's a legit admin, what normal traffic looks like, the company playbook)
-  - a countdown: **Easy none, Medium 3 min, Hard 90 s**
-  - a "Start now" button
+  - the four briefing files' facts (content CON-01: system map, who's a legit admin, what normal traffic looks like, the company playbook), told by Kiro in a 60-second cinematic (D-189): the shop at 3 AM, a tactical map, the unguarded gate, the logs, the unknown admin and Death, narrated aloud with no music, with an optional three-question check afterwards, in front of a cabin in a dark forest with eyes in its doorway
+  - no countdown (D-183): a "Start" button
   - the files stay reachable later from the dashboard
 - **Feels:** quiet, slightly too quiet. A clock ticking. Something in the dark you can almost see.
 

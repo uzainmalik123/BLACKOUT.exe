@@ -87,7 +87,7 @@
   position: absolute;
   left: 50%;
   bottom: 4.5vh;
-  width: min(760px, 56vw);
+  width: min(980px, 66vw);
   transform: translate(-50%, 16px);
   text-align: center;
   opacity: 0;
@@ -167,12 +167,12 @@
 
 .ts-path {
   position: relative;
-  padding: 12px 6px;
+  padding: 14px 10px;
   border: 0;
   background: none;
   font-family: var(--display);
   font-weight: 600;
-  font-size: clamp(16px, 1.45vw, 23px);
+  font-size: clamp(22px, 2.15vw, 36px);
   font-weight: 700;
   letter-spacing: 0.22em;
   text-transform: uppercase;
@@ -196,7 +196,7 @@
   left: 50%;
   right: 50%;
   bottom: 2px;
-  height: 1px;
+  height: 2px;
   background: currentColor;
   box-shadow: 0 0 10px currentColor;
   transition: left 0.5s ease, right 0.5s ease;
@@ -211,8 +211,8 @@
 .ts-sigil {
   position: absolute;
   left: 50%;
-  top: -6px;
-  font-size: 10px;
+  top: -8px;
+  font-size: 13px;
   letter-spacing: 0;
   opacity: 0;
   transform: translate(-50%, 5px);

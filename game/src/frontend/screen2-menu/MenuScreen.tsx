@@ -9,7 +9,6 @@ import { needsDesktop } from '../screen1-title/curtain';
 import {
   DIFFICULTIES,
   DIFFICULTY_LABEL,
-  SCENARIO,
   activate,
   initialMenu,
   pick,
@@ -43,7 +42,7 @@ const KEYS: Record<string, MenuKey> = {
   Escape: 'escape',
 };
 
-const LABEL: Record<MenuItem, string> = { start: 'Start Game', scenario: 'Scenario', difficulty: 'Difficulty', exit: 'Exit' };
+const LABEL: Record<MenuItem, string> = { start: 'Start Game', difficulty: 'Difficulty', exit: 'Exit' };
 
 function tooSmall(): boolean {
   if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return false;
@@ -116,7 +115,6 @@ export function MenuScreen({ title, initialDifficulty = 'medium', onStart, onBac
         setLeaving('back');
         scene?.leave();
         break;
-      case 'scenario':
       case 'none':
         break;
     }
@@ -160,32 +158,31 @@ export function MenuScreen({ title, initialDifficulty = 'medium', onStart, onBac
       <h1 className="ms-sr">{title}</h1>
 
       <nav className="ms-menu" aria-label="Main menu" inert={leaving !== null}>
-        <button type="button" className={rowClass('start')} style={{ '--i': 0 } as CSSProperties} aria-current={menu.item === 'start'} onMouseEnter={() => hover('start')} onFocus={() => hover('start')} onClick={() => click('start')}>
-          {inside('start')}
-        </button>
+        {/* the three rows, each the same height (equal distances), the gold rail strung through their diamonds */}
+        <div className="ms-rows">
+          <span className="ms-rail" aria-hidden="true" />
+          <button type="button" className={rowClass('start')} style={{ '--i': 0 } as CSSProperties} aria-current={menu.item === 'start'} onMouseEnter={() => hover('start')} onFocus={() => hover('start')} onClick={() => click('start')}>
+            {inside('start')}
+          </button>
 
-        <button type="button" className={`${rowClass('scenario')} ms-row`} style={{ '--i': 1 } as CSSProperties} aria-current={menu.item === 'scenario'} onMouseEnter={() => hover('scenario')} onFocus={() => hover('scenario')} onClick={() => click('scenario')}>
-          {inside('scenario')}
-          <span className="ms-value">{SCENARIO.name}</span>
-        </button>
+          <div className={`${rowClass('difficulty')} ms-row`} style={{ '--i': 1 } as CSSProperties} role="group" aria-label="Difficulty" onMouseEnter={() => hover('difficulty')}>
+            {inside('difficulty')}
+            <span className="ms-levels">
+              {DIFFICULTIES.map((d) => (
+                <button key={d} type="button" className={`ms-level${menu.difficulty === d ? ' on' : ''}`} aria-pressed={menu.difficulty === d} onFocus={() => hover('difficulty')} onClick={() => apply(pick(live.current.menu, d))}>
+                  {DIFFICULTY_LABEL[d]}
+                </button>
+              ))}
+            </span>
+          </div>
 
-        <div className={`${rowClass('difficulty')} ms-row`} style={{ '--i': 2 } as CSSProperties} role="group" aria-label="Difficulty" onMouseEnter={() => hover('difficulty')}>
-          {inside('difficulty')}
-          <span className="ms-levels">
-            {DIFFICULTIES.map((d) => (
-              <button key={d} type="button" className={`ms-level${menu.difficulty === d ? ' on' : ''}`} aria-pressed={menu.difficulty === d} onFocus={() => hover('difficulty')} onClick={() => apply(pick(live.current.menu, d))}>
-                {DIFFICULTY_LABEL[d]}
-              </button>
-            ))}
-          </span>
+          <button type="button" className={rowClass('exit')} style={{ '--i': 2 } as CSSProperties} aria-current={menu.item === 'exit'} onMouseEnter={() => hover('exit')} onFocus={() => hover('exit')} onClick={() => click('exit')}>
+            {inside('exit')}
+          </button>
         </div>
 
-        <button type="button" className={rowClass('exit')} style={{ '--i': 3 } as CSSProperties} aria-current={menu.item === 'exit'} onMouseEnter={() => hover('exit')} onFocus={() => hover('exit')} onClick={() => click('exit')}>
-          {inside('exit')}
-        </button>
-
         {/* the line stays; only its words change */}
-        <p className="ms-whisper" style={{ '--i': 4 } as CSSProperties} aria-live="polite">
+        <p className="ms-whisper" style={{ '--i': 3 } as CSSProperties} aria-live="polite">
           <span key={whisper} className="ms-whisper-text">
             {whisper}
           </span>

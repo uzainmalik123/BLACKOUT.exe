@@ -1,20 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import { DIFFICULTY_LINE, MENU_ITEMS, activate, initialMenu, pick, select, step, whisperFor, type MenuState } from './menu';
 
-describe('screen 2 menu (UI-02, D-181)', () => {
-  it('has the four items in order and starts on Start Game at Medium', () => {
-    expect(MENU_ITEMS).toEqual(['start', 'scenario', 'difficulty', 'exit']);
+describe('screen 2 menu (UI-02, D-181, D-188)', () => {
+  it('has three items in order, with no scenario row, and starts on Start Game at Medium', () => {
+    expect(MENU_ITEMS).toEqual(['start', 'difficulty', 'exit']);
     expect(initialMenu()).toEqual({ item: 'start', difficulty: 'medium' });
   });
 
   it('Up and Down move through the items and wrap round', () => {
     let s: MenuState = initialMenu();
     const seen: string[] = [];
-    for (let i = 0; i < 4; i++) {
+    for (let i = 0; i < 3; i++) {
       s = step(s, 'down').state;
       seen.push(s.item);
     }
-    expect(seen).toEqual(['scenario', 'difficulty', 'exit', 'start']);
+    expect(seen).toEqual(['difficulty', 'exit', 'start']);
     expect(step(initialMenu(), 'up').state.item).toBe('exit');
     expect(step(initialMenu(), 'down').changed).toBe('item');
   });
@@ -33,7 +33,6 @@ describe('screen 2 menu (UI-02, D-181)', () => {
   it('Enter starts with the chosen scenario and difficulty, cycles the difficulty row, and Exit goes back', () => {
     expect(step({ item: 'start', difficulty: 'hard' }, 'enter').action).toEqual({ kind: 'start', choice: { scenario: 'juice-shop', difficulty: 'hard' } });
     expect(step({ item: 'difficulty', difficulty: 'hard' }, 'enter').state.difficulty).toBe('easy');
-    expect(step({ item: 'scenario', difficulty: 'easy' }, 'enter').action).toEqual({ kind: 'scenario' });
     expect(activate({ item: 'exit', difficulty: 'easy' }).action).toEqual({ kind: 'back' });
   });
 
