@@ -92,16 +92,43 @@
 .ms-menu {
   --gold: #e2c98a;
   --gold-dim: rgba(226, 201, 138, 0.5);
+  /* one height for every row, so they stand at equal distances whatever is in them (D-188) */
+  --row: clamp(64px, 11vh, 120px);
   position: absolute;
   left: 5vw;
-  top: 24vh;
+  top: 22vh;
   bottom: 8vh;
-  width: min(42vw, 820px);
+  width: min(54vw, 1040px);
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: flex-start;
-  gap: clamp(14px, 4.2vh, 46px);
+  gap: 0;
+}
+
+/* the rows, together: each the same height, so they stand at equal distances */
+.ms-rows {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.ms-rows > .ms-item {
+  animation: ms-in 0.9s ease both;
+  animation-delay: calc(0.9s + var(--i, 0) * 0.12s);
+}
+
+/* a fine gold rail down the left, from the first row's diamond to the last's */
+.ms-rail {
+  position: absolute;
+  left: 8px;
+  top: calc(var(--row) / 2);
+  bottom: calc(var(--row) / 2);
+  width: 1px;
+  pointer-events: none;
+  background: linear-gradient(to bottom, transparent, var(--gold-dim) 18%, var(--gold-dim) 82%, transparent);
+  animation: ms-in 0.9s ease 0.8s both;
 }
 
 /* a pool of shadow under the words: light, not a box */
@@ -123,12 +150,13 @@
 .ms-item {
   position: relative;
   margin: 0;
-  padding: 10px 6px 12px 34px;
+  height: var(--row);
+  padding: 0 6px 0 44px;
   display: flex;
-  align-items: baseline;
+  align-items: center;
   border: 0;
   background: none;
-  font: 700 clamp(19px, 2.7vh, 32px) / 1 var(--display);
+  font: 700 clamp(28px, 4.7vh, 56px) / 1 var(--display);
   letter-spacing: 0.22em;
   text-transform: uppercase;
   text-align: left;
@@ -156,8 +184,8 @@
   position: absolute;
   left: 50%;
   right: 50%;
-  bottom: -10px;
-  height: 1px;
+  bottom: -12px;
+  height: 2px;
   background: currentColor;
   box-shadow: 0 0 10px currentColor;
   transition:
@@ -166,27 +194,31 @@
 }
 
 .ms-item.sel .ms-label::after {
-  left: 2%;
-  right: 8%;
+  left: 0;
+  right: 6%;
+  background: linear-gradient(90deg, currentColor, currentColor 70%, transparent);
 }
 
 /* the small diamond beside the chosen path */
 .ms-sigil {
   position: absolute;
-  left: -30px;
+  left: -43px;
   top: 50%;
-  font-size: 11px;
+  font-size: 15px;
   letter-spacing: 0;
-  opacity: 0;
-  transform: translate(-5px, -50%);
+  color: var(--gold-dim);
+  opacity: 0.55;
+  transform: translate(0, -50%) scale(0.75);
   transition:
     opacity 0.35s ease,
-    transform 0.35s ease;
+    transform 0.35s ease,
+    color 0.35s ease;
 }
 
 .ms-item.sel .ms-sigil {
+  color: currentColor;
   opacity: 1;
-  transform: translate(0, -50%);
+  transform: translate(0, -50%) scale(1.15);
   animation: ms-sigil 2.4s ease-in-out infinite;
 }
 
@@ -208,11 +240,11 @@
 }
 
 .ms-row {
-  gap: 1.1em;
+  gap: 1.3em;
 }
 
 .ms-value {
-  font: italic 600 clamp(19px, 2.6vh, 31px) / 1 var(--italic);
+  font: italic 600 clamp(24px, 3.5vh, 42px) / 1 var(--italic);
   letter-spacing: 0.01em;
   text-transform: none;
   color: #ece6da;
@@ -221,18 +253,30 @@
 
 .ms-levels {
   display: flex;
-  align-items: baseline;
-  gap: clamp(12px, 1.4vw, 24px);
+  align-items: center;
+  gap: clamp(10px, 1.1vw, 22px);
+}
+
+/* a small dot between the levels */
+.ms-level + .ms-level::before {
+  content: "·";
+  position: absolute;
+  left: calc(-0.5 * clamp(10px, 1.1vw, 22px) - 0.2em);
+  top: 50%;
+  transform: translateY(-55%);
+  color: var(--gold-dim);
+  letter-spacing: 0;
+  pointer-events: none;
 }
 
 /* the three levels: smaller paths of the same kind */
 .ms-level {
   position: relative;
   margin: 0;
-  padding: 6px 2px 8px;
+  padding: 8px 6px 10px;
   border: 0;
   background: none;
-  font: 700 clamp(12px, 1.6vh, 18px) / 1 var(--display);
+  font: 700 clamp(18px, 2.8vh, 32px) / 1 var(--display);
   letter-spacing: 0.2em;
   text-transform: uppercase;
   color: rgba(236, 229, 211, 0.42);
@@ -275,10 +319,11 @@
 
 /* the whisper, like the title screen's note: a soft italic line */
 .ms-whisper {
-  margin: 0;
-  padding: 0 6px 0 34px;
+  position: relative;
+  margin: clamp(8px, 2vh, 24px) 0 0;
+  padding: 0 6px 0 44px;
   min-height: 2.6em;
-  font: italic 600 clamp(16px, 2.2vh, 24px) / 1.35 var(--italic);
+  font: italic 600 clamp(18px, 2.5vh, 28px) / 1.35 var(--italic);
   letter-spacing: 0.01em;
   color: #ece6da;
   text-shadow: 0 1px 2px #000;
@@ -334,6 +379,8 @@
 @media (prefers-reduced-motion: reduce) {
   .ms-grain,
   .ms-menu > *,
+  .ms-rows > .ms-item,
+  .ms-rail,
   .ms-whisper-text,
   .ms-item.sel .ms-sigil {
     animation: none;

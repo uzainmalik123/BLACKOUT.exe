@@ -1,14 +1,15 @@
-// Screen 2's menu (UI-02, D-181) as pure state, free of the DOM so it can be tested: which item is selected,
+// Screen 2's menu (UI-02, D-181, D-188) as pure state, free of the DOM so it can be tested: which item is selected,
 // which difficulty is chosen, and what a key does. The screen and the scene only render what this decides.
 
 import type { Difficulty } from '../../rules/vocabulary';
 
-export const MENU_ITEMS = ['start', 'scenario', 'difficulty', 'exit'] as const;
+/** Start Game, the difficulty pick, Exit (D-188: the one scenario needs no row). */
+export const MENU_ITEMS = ['start', 'difficulty', 'exit'] as const;
 export type MenuItem = (typeof MENU_ITEMS)[number];
 
 export const DIFFICULTIES: readonly Difficulty[] = ['easy', 'medium', 'hard'];
 
-/** The one scenario there is (SCENES §2). */
+/** The one scenario there is (SCENES §2); Start Game hands it on with the difficulty. */
 export const SCENARIO = { id: 'juice-shop', name: 'Juice Shop Breach' } as const;
 export type ScenarioId = (typeof SCENARIO)['id'];
 
@@ -26,8 +27,6 @@ export function whisperFor(state: MenuState): string {
   switch (state.item) {
     case 'start':
       return 'The night shift begins the moment you do.';
-    case 'scenario':
-      return 'An online shop, one long night, and something already inside.';
     case 'difficulty':
       return DIFFICULTY_LINE[state.difficulty];
     case 'exit':
@@ -52,9 +51,7 @@ export type MenuAction =
   /** Start Game: hand the choice on. */
   | { kind: 'start'; choice: MenuChoice }
   /** Exit or Escape: back to the title screen (a browser tab cannot close itself). */
-  | { kind: 'back' }
-  /** Enter on the scenario: there is only one, so nothing changes. */
-  | { kind: 'scenario' };
+  | { kind: 'back' };
 
 export interface MenuStep {
   state: MenuState;
@@ -86,8 +83,6 @@ export function activate(state: MenuState): MenuStep {
   switch (state.item) {
     case 'start':
       return { state, action: { kind: 'start', choice: { scenario: SCENARIO.id, difficulty: state.difficulty } }, changed: null };
-    case 'scenario':
-      return { state, action: { kind: 'scenario' }, changed: null };
     case 'difficulty': {
       const difficulty = shiftDifficulty(state.difficulty, 1, true);
       return { state: { ...state, difficulty }, action: NONE, changed: 'difficulty' };
