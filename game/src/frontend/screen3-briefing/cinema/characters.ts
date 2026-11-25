@@ -111,6 +111,8 @@ export interface KiroPose {
   glitch: number;
   /** Raise her right hand toward (x, y) in figure units, a cyan light at the fingertip; null to hold the chain. */
   hand: { x: number; y: number } | null;
+  /** Both eyes lit this colour instead of her own cyan and amber (the night shift's handshake, D-223). */
+  eyeTint?: string;
 }
 
 const SKIN = '#9a9c96';
@@ -377,9 +379,9 @@ export function drawKiro(g: G, x: number, y: number, s: number, p: KiroPose, scr
     b.ellipse(ex, ey, S * 0.014, S * 0.007 * open, side * -0.12, 0, Math.PI * 2);
     b.fill();
     b.save();
-    b.shadowColor = col;
-    b.shadowBlur = S * 0.03 * dpr;
-    b.fillStyle = col;
+    b.shadowColor = p.eyeTint ?? col;
+    b.shadowBlur = S * (p.eyeTint ? 0.06 : 0.03) * dpr;
+    b.fillStyle = p.eyeTint ?? col;
     b.beginPath();
     b.arc(ex + p.look * S * 0.003, ey, S * 0.0045 * Math.max(0.3, open), 0, Math.PI * 2);
     b.fill();

@@ -1212,23 +1212,21 @@ function paintGate(g: G, W: number, H: number): void {
     g.lineTo(x, H * 0.52);
     g.stroke();
   }
-  // grass and fallen autumn leaves in front
+  // grass, and a handful of fallen leaves on the ground, kept clear of the gate (D-224: four or five, no more)
   const grass = g.createLinearGradient(0, ground, 0, H);
   grass.addColorStop(0, '#0e1a12');
   grass.addColorStop(1, '#050806');
   g.fillStyle = grass;
   g.fillRect(0, ground, W, H - ground);
-  for (let k = 0; k < 900; k++) {
-    const y = ground + rand(k + 7.7) ** 0.7 * (H - ground);
-    const x = rand(k * 5.1) * W;
-    const near = (y - ground) / (H - ground);
-    const r = H * (0.004 + near * 0.02) * (0.5 + rand(k + 3));
-    const hue = rand(k + 13);
-    g.fillStyle = hue < 0.4 ? `rgba(140, 40, 25, ${0.5 + near * 0.4})` : hue < 0.7 ? `rgba(170, 90, 35, ${0.45 + near * 0.4})` : `rgba(110, 80, 40, ${0.4 + near * 0.4})`;
-    g.beginPath();
-    g.ellipse(x, y, r * 1.6, r * 0.7, rand(k) * Math.PI, 0, Math.PI * 2);
-    g.fill();
-  }
+  const fallen: Array<[number, number, number, number, string]> = [
+    // x, y (fractions of the frame), size (fraction of H), turn, colour
+    [0.12, 0.93, 0.03, 0.6, '#6e2216'],
+    [0.24, 0.975, 0.036, -0.9, '#7a4a1c'],
+    [0.31, 0.9, 0.022, 2.2, '#5a2a18'],
+    [0.74, 0.95, 0.032, -2.4, '#6a3018'],
+    [0.88, 0.91, 0.026, 1.1, '#5e3a1a'],
+  ];
+  for (const [fx, fy, fs, turn, colour] of fallen) leaf(g, W * fx, Math.max(ground + H * 0.02, H * fy), H * fs, turn, colour);
   // branches hanging over the top
   g.strokeStyle = '#020404';
   g.lineCap = 'round';
@@ -1239,6 +1237,46 @@ function paintGate(g: G, W: number, H: number): void {
     g.quadraticCurveTo(rand(k + 1) * W * 0.6, H * 0.08, rand(k + 2) * W * 0.7, H * (0.12 + 0.08 * rand(k + 3)));
     g.stroke();
   }
+}
+
+/** A fallen maple leaf lying flat on the ground: five lobes, a stem, faint veins, a little shadow. */
+function leaf(g: G, x: number, y: number, s: number, turn: number, colour: string): void {
+  g.save();
+  g.translate(x, y);
+  g.scale(1, 0.55); // lying on the ground, seen at an angle
+  g.rotate(turn);
+  g.fillStyle = 'rgba(0, 0, 0, 0.35)';
+  g.beginPath();
+  g.ellipse(s * 0.08, s * 0.12, s * 0.95, s * 0.8, 0, 0, Math.PI * 2);
+  g.fill();
+  g.beginPath();
+  const lobes = 5;
+  for (let i = 0; i <= lobes * 2; i++) {
+    const a = -Math.PI / 2 + ((i / (lobes * 2)) * Math.PI * 1.6 - Math.PI * 0.8);
+    const r = i % 2 === 0 ? s * (i === lobes ? 1 : 0.82) : s * 0.38;
+    const px = Math.cos(a) * r;
+    const py = Math.sin(a) * r;
+    if (i === 0) g.moveTo(px, py);
+    else g.lineTo(px, py);
+  }
+  g.lineTo(0, s * 0.15);
+  g.closePath();
+  const body = g.createRadialGradient(0, -s * 0.2, s * 0.05, 0, 0, s);
+  body.addColorStop(0, colour);
+  body.addColorStop(1, '#1e0e08');
+  g.fillStyle = body;
+  g.fill();
+  g.strokeStyle = 'rgba(20, 8, 4, 0.7)';
+  g.lineWidth = Math.max(0.6, s * 0.03);
+  g.beginPath();
+  g.moveTo(0, s * 0.45);
+  g.lineTo(0, -s * 0.95);
+  for (const a of [-2.3, -0.85, 2.3 - Math.PI, -Math.PI + 0.85]) {
+    g.moveTo(0, -s * 0.05);
+    g.lineTo(Math.cos(a) * s * 0.7, Math.sin(a) * s * 0.7);
+  }
+  g.stroke();
+  g.restore();
 }
 
 /** One leaf of the wrought-iron gate: bars and scrolls, swung open by `open` (0 shut, 1 flat against the wall). */
