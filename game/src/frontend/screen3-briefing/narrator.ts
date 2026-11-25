@@ -36,6 +36,17 @@ export function pickVoice<V extends VoiceInfo>(voices: readonly V[]): V | null {
   return female.find((v) => /^en[-_]GB/i.test(v.lang)) ?? female[0] ?? british[0] ?? english[0] ?? null;
 }
 
+/** Death's voice (D-223): the deepest male English voice the browser has; played slow and low. */
+const DEEP: readonly RegExp[] = [/Microsoft (Guy|Christopher|Eric|Davis|Roger|Andrew|Brian|Ryan|Thomas) .*Natural/i, /Google UK English Male/i, /Microsoft (David|Mark|George|James|Richard)\b/i, /\b(Daniel|Fred|Alex|Arthur|Gordon|Aaron|Oliver)\b/i];
+export function pickDeathVoice<V extends VoiceInfo>(voices: readonly V[]): V | null {
+  const english = voices.filter((v) => /^en([-_]|$)/i.test(v.lang));
+  for (const re of DEEP) {
+    const hit = english.find((v) => re.test(v.name));
+    if (hit) return hit;
+  }
+  return english.find((v) => !FEMALE.test(v.name)) ?? english[0] ?? null;
+}
+
 /** The start of the word at (or before) `i`, so a line picked up after a pause starts on a whole word. */
 export function wordStart(text: string, i: number): number {
   let k = Math.max(0, Math.min(text.length, i));
@@ -89,10 +100,18 @@ export class Narrator {
     return typeof window !== 'undefined' && 'speechSynthesis' in window && typeof window.SpeechSynthesisUtterance === 'function';
   }
 
-  constructor() {
+  /** How high the voice sits (Kiro just under natural; Death far below, D-223). */
+  pitch = 0.95;
+  private readonly pick: (voices: SpeechSynthesisVoice[]) => SpeechSynthesisVoice | null;
+
+  /** Kiro's voice by default; another speaker passes its own way of choosing a voice and its pitch and rate. */
+  constructor(opts: { pick?: (voices: SpeechSynthesisVoice[]) => SpeechSynthesisVoice | null; pitch?: number; rate?: number } = {}) {
     this.synth = window.speechSynthesis;
+    this.pick = opts.pick ?? pickVoice;
+    if (opts.pitch !== undefined) this.pitch = opts.pitch;
+    if (opts.rate !== undefined) this.rate = opts.rate;
     const load = () => {
-      this.voice = pickVoice(this.synth.getVoices());
+      this.voice = this.pick(this.synth.getVoices());
     };
     load();
     // the list often arrives a moment later
@@ -122,12 +141,12 @@ export class Narrator {
       if (token !== this.token || this.muted) return;
       const u = new SpeechSynthesisUtterance(text);
       // the voice list can arrive late; look again before the first line
-      if (!this.voice) this.voice = pickVoice(this.synth.getVoices());
+      if (!this.voice) this.voice = this.pick(this.synth.getVoices());
       if (this.voice) {
         u.voice = this.voice;
         u.lang = this.voice.lang;
       } else u.lang = 'en-GB';
-      u.pitch = 0.95;
+      u.pitch = this.pitch;
       u.rate = this.rate;
       u.volume = this.volume;
       u.onboundary = (e) => {

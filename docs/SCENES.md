@@ -51,10 +51,10 @@
   - the files stay reachable later from the dashboard
 - **Feels:** quiet, slightly too quiet. A clock ticking. Something in the dark you can almost see.
 
-## 4. Death arrives (transition)
+## 4. Death arrives: the night-shift prologue (UI-10, D-223)
 
 - **For:** the moment the briefing ends and the incident starts (GAME_PLAN §3.3).
-- **Contains:** nothing to read; a few seconds at most.
+- **Contains:** Death's eyes in the dark; the first-person office in the rain; Kiro's welcome and handshake; the walk to the desk; sitting down; the login and a first, unscored check; the first alarm. The dashboard then lives on the office's monitors.
 - **Feels:** the room goes cold, the live data starts flowing. Death's first appearance.
 
 ## 5. The SOC dashboard (UI-04): the main scene
