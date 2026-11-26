@@ -96,7 +96,7 @@ const MEDIUM: EngineConfig = {
   pacing: { delayAtOpenAlerts: 2, bringForwardAfterQuietGameMs: 60 * REAL_S },
   returnDelayGameMs: 120 * REAL_S,
   patchDurationGameMs: 20 * GAME_MIN,
-  firstMoveDelayRealMs: { min: 20_000, max: 30_000 },
+  firstMoveDelayRealMs: { min: 6_000, max: 9_000 }, // D-252 (approved 2026-11-26): the calm kept, shortened from 20-30 s
   bandage: { breathers: 1 },
   alerts: ALERTS,
   heartbeat: {
@@ -137,7 +137,7 @@ const MEDIUM: EngineConfig = {
 export const CONFIG: Readonly<Record<Difficulty, EngineConfig>> = {
   easy: {
     ...MEDIUM, pausable: true, breatherGameMs: { min: 45 * REAL_S, max: 60 * REAL_S },
-    firstMoveDelayRealMs: { min: 25_000, max: 30_000 }, bandage: { breathers: 2 }, // D-230, D-231: the longest calm, and a rule that holds for two breathers
+    firstMoveDelayRealMs: { min: 8_000, max: 10_000 }, bandage: { breathers: 2 }, // D-230, D-231, D-252: the longest calm (was 25-30 s), and a rule that holds for two breathers
     minions: { ...MEDIUM.minions, alongsideDeath: false }, customers: { ...MEDIUM.customers, share: 0.2 },
     taps: { ...MEDIUM.taps, everyGameMs: { min: 240 * REAL_S, max: 300 * REAL_S } },
     struggle: { ...MEDIUM.struggle, unlocks: false }, // SYS-13: on Easy Kiro helps anyway (KIRO-03); nothing to unlock
@@ -146,7 +146,7 @@ export const CONFIG: Readonly<Record<Difficulty, EngineConfig>> = {
   medium: MEDIUM,
   hard: {
     ...MEDIUM, breatherGameMs: { min: 20 * REAL_S, max: 35 * REAL_S }, minions: { ...MEDIUM.minions, successesPerWave: 2 }, customers: { ...MEDIUM.customers, share: 0.8 },
-    firstMoveDelayRealMs: { min: 15_000, max: 25_000 },
+    firstMoveDelayRealMs: { min: 5_000, max: 8_000 }, // D-252: was 15-25 s
     pinnedVariants: { 'ATK-08': { normal: ['f', 'g'], tippedOff: ['f', 'g'] } },
     shiftGameMs: 13 * 60 * REAL_S, // D-118: idle Hard runs flatline at 11.7–12.8 real min
     taps: { ...MEDIUM.taps, everyGameMs: { min: 120 * REAL_S, max: 180 * REAL_S } },

@@ -29,6 +29,7 @@ import { PANEL_TOOL, TOOL_BY_ID, closeTool, dockFor, focusTool, isOpen, moveTool
 import { NOW_WORDS, battleGate, freezeReason, gateConsole, gateSentence, shiftLeft } from './words';
 import { CONFIG } from '../../engine/config';
 import { KiroCanvas } from '../shared/KiroCanvas';
+import { markSeen, seen } from '../shared/seen';
 
 export interface Volumes {
   rain: number;
@@ -41,6 +42,8 @@ export type Sfx = 'shield' | 'gate' | 'key' | 'evidence' | 'breach' | 'recover';
 
 export interface PlayProps {
   run: Run;
+  /** The first shift's tutorial is open: hold the night's clock (D-252). */
+  onHold?: (on: boolean) => void;
   tick: number;
   on: boolean;
   kiroLines: KiroLine[];
@@ -95,6 +98,8 @@ export function Play({ toasts, ...p }: PlayProps) {
   const [hi, setHi] = useState(-1);
   const [sound, setSound] = useState(false);
   const [lesson, setLesson] = useState(0);
+  // the tutorial plays on the player's first shift only; Kiro's panel can bring it back (D-252)
+  const [tutorial, setTutorial] = useState(() => !seen('tutorial'));
   const { wins, setWins } = p;
   const terminal = isOpen(wins, 'terminal');
   const view = () => ({ w: window.innerWidth, h: window.innerHeight });
@@ -294,7 +299,18 @@ export function Play({ toasts, ...p }: PlayProps) {
 
   // ---- the opening's tutorial (CON-03, D-238): during the freeze, one step at a time, lighting what it names
   const steps = OPENING_TUTORIAL[run.difficulty];
-  const teaching = frozen && lesson < steps.length ? steps[lesson]! : null;
+  const teaching = tutorial && lesson < steps.length ? steps[lesson]! : null;
+  const endTutorial = () => {
+    markSeen('tutorial');
+    setTutorial(false);
+  };
+  // while it is open before anything has happened (the freeze), the clock waits for the player
+  const holding = !!teaching && !!frozen;
+  const { onHold } = p;
+  useEffect(() => {
+    onHold?.(holding);
+  }, [holding, onHold]);
+  useEffect(() => () => onHold?.(false), [onHold]);
   const lit = new Set<ToolId>();
   for (const panel of teaching?.panels ?? []) {
     const t = PANEL_TOOL[panel];
@@ -562,14 +578,33 @@ export function Play({ toasts, ...p }: PlayProps) {
           {teaching ? (
             <>
               <p className="pl-kiro-line">{teaching.lines.join(' ')}</p>
-              <button type="button" className="pl-lesson" onClick={() => setLesson((n) => n + 1)}>
-                {lesson + 1 < steps.length ? `Next (${lesson + 1}/${steps.length})` : 'Got it'}
-              </button>
+              <span className="pl-lesson-row">
+                <button type="button" className="pl-lesson" onClick={() => (lesson + 1 < steps.length ? setLesson((n) => n + 1) : endTutorial())}>
+                  {lesson + 1 < steps.length ? `Next (${lesson + 1}/${steps.length})` : 'Got it'}
+                </button>
+                {lesson + 1 < steps.length && (
+                  <button type="button" className="pl-lesson-skip" onClick={endTutorial}>
+                    Skip
+                  </button>
+                )}
+              </span>
             </>
           ) : (
             <p className={`pl-kiro-line${lastKiro?.urgent ? ' is-urgent' : ''}`}>{asking ? '…' : (lastKiro?.text ?? situation.kiro)}</p>
           )}
           {!teaching && lastKiro?.offline && <small className="pl-off">rule-written answer (Kiro offline)</small>}
+          {!teaching && (
+            <button
+              type="button"
+              className="pl-lesson-again"
+              onClick={() => {
+                setLesson(0);
+                setTutorial(true);
+              }}
+            >
+              Show the tutorial
+            </button>
+          )}
           <input
             className="pl-ask"
             placeholder="Ask Kiro anything…"

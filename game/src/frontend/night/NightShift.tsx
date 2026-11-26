@@ -18,6 +18,7 @@ import { Play, type Volumes } from './Play';
 import { ReportWall } from './Report';
 import type { Run } from './run';
 import { BUS_DEFAULTS } from './sound';
+import { seen } from '../shared/seen';
 import { NO_WINDOWS, closeTool, openTool, startingTools, topTool, type Wins } from './windows';
 import './night.css';
 import './play.css';
@@ -157,6 +158,9 @@ export function NightShift({ difficulty, skipPrologue = false, onMenu, onAgain }
     setMuted(m);
   };
   const pause = () => setPaused(night.current?.togglePause() ?? false);
+  const hold = useCallback((on: boolean) => night.current?.hold(on), []);
+  // a player who has seen the prologue may skip it (D-252)
+  const [skippable] = useState(() => !skipPrologue && seen('prologue'));
 
   if (report && run) return <ReportWall run={run} onAgain={onAgain} onMenu={onMenu} />;
 
@@ -183,6 +187,7 @@ export function NightShift({ difficulty, skipPrologue = false, onMenu, onAgain }
           onFiles={() => setFiles(true)}
           paused={paused}
           onPause={pause}
+          onHold={hold}
           volumes={volumes}
           setVolumes={setVolumes}
           muted={muted}
@@ -215,6 +220,11 @@ export function NightShift({ difficulty, skipPrologue = false, onMenu, onAgain }
       )}
 
       {!seated && phase !== 'dark' && phase !== 'eyes' && !menu && <p className="ns-controls">Mouse to look · A / D turn · E interact · Esc menu</p>}
+      {skippable && !seated && !menu && (
+        <button type="button" className="ns-skip" onClick={() => night.current?.skip()}>
+          Skip intro ▸
+        </button>
+      )}
 
       {menu && (
         <div className="ns-menu" role="dialog" aria-label="Menu">

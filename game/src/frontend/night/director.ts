@@ -17,6 +17,7 @@ import { CAMS, kiroArmRoot, lerpCam, onScreen, paintEyes, paintHands, paintOffic
 import { talkLevel, type GhostPose, type Mood, type Speech } from '../shared/ghost';
 import type { Run } from './run';
 import { Soundscape, type Bus } from './sound';
+import { markSeen } from '../shared/seen';
 
 /** What the director tells the screen. */
 export interface NightUi {
@@ -44,12 +45,12 @@ export interface NightHost {
 
 /** Kiro's lines in the prologue: phase, seconds into it, the line (the brief's words). */
 export const KIRO_LINES: ReadonlyArray<readonly [Phase, number, string]> = [
-  ['intro', 0.3, "You're late."],
-  ['intro', 1.9, "I'm Kiro. Your guide tonight."],
-  ['shake', 1.2, 'Welcome to the night shift. Try not to die.'],
-  ['after', 0.3, "Come on. Your shift's waiting."],
+  ['intro', 0.15, "You're late."],
+  ['intro', 1.3, "I'm Kiro. Your guide tonight."],
+  ['shake', 0.6, 'Welcome to the night shift. Try not to die.'],
+  ['after', 0.7, "Come on. Your shift's waiting."],
   ['seat', 0.2, "That's your kingdom for tonight."],
-  ['alarm', 1.0, "Well. That didn't last long."],
+  ['alarm', 0.5, "Well. That didn't last long."],
 ];
 
 /** Kiro's three warnings as the run nears its end (D-223's last chance). */
@@ -107,6 +108,8 @@ export class Night {
   private volume = 0.35;
   private menu = false;
   private paused = false;
+  /** The first shift's tutorial is open: the night's clock waits for the player (D-252). */
+  private held = false;
   private focused: MonitorName | null = null;
   private mouse: { x: number; y: number } | null = null;
   private offs: Array<() => void> = [];
@@ -228,7 +231,15 @@ export class Night {
     this.voicesVolume = v;
   }
 
-  /** Straight to the desk (the menu's skip, a retry). */
+  /**
+   * Hold the night's clock while the first shift's tutorial is open (D-252): nothing of his has begun and no change
+   * can be made (the freeze), so the short calm starts when the player has finished reading.
+   */
+  hold(on: boolean): void {
+    this.held = on;
+  }
+
+  /** Straight to the desk (the menu's skip, the skip button once it has been seen, a retry). */
   skip(): void {
     this.flow = step(this.flow, { kind: 'skip' });
     this.begin();
@@ -402,6 +413,7 @@ export class Night {
     if (p === 'wake') this.sound.setRain(0.6);
     if (p === 'shake') this.later(1300, () => (this.shadow = this.t));
     if (p === 'login') this.begin();
+    if (p === 'shift') markSeen('prologue'); // the next night offers to skip it (D-252)
     if (p === 'alarm') {
       this.sound.alarm(5);
       this.sound.cue('death');
@@ -474,12 +486,12 @@ export class Night {
         this.say('Kiro', line, { urgent: true });
       }
     }
-    if (f.phase === 'eyes' && f.t > 1.6 && !this.said.has('death:eyes')) {
+    if (f.phase === 'eyes' && f.t > 0.8 && !this.said.has('death:eyes')) {
       this.said.add('death:eyes');
       this.say('Death', "I've been expecting you.");
     }
     // the engine's clock runs from the login
-    if (r && SEATED.has(f.phase) && !this.ending && !this.paused) {
+    if (r && SEATED.has(f.phase) && !this.ending && !this.paused && !this.held) {
       r.engine.advance(dt * 1000);
       // what happened before the alarm is played out when it sounds
       if (f.phase === 'shift' || f.phase === 'alarm') {

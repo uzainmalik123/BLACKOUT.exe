@@ -14,9 +14,10 @@ describe('the dial on screen (D-234)', () => {
 
 describe("the difficulty pick's lists (UI-02)", () => {
   it('are generated from the engine config: the calm, the breather, the shift, the pause', () => {
-    expect(dialLines('easy')).toContain('The calm before the first sign of trouble: 25–30 s');
-    expect(dialLines('medium')).toContain('The calm before the first sign of trouble: 20–30 s');
-    expect(dialLines('hard')).toContain('The calm before the first sign of trouble: 15–25 s');
+    // D-252 (approved 2026-11-26): the calm kept, shortened from 25–30, 20–30 and 15–25 s
+    expect(dialLines('easy')).toContain('The calm before the first sign of trouble: 8–10 s');
+    expect(dialLines('medium')).toContain('The calm before the first sign of trouble: 6–9 s');
+    expect(dialLines('hard')).toContain('The calm before the first sign of trouble: 5–8 s');
     expect(dialLines('easy')).toContain('Death rests 45–60 s between moves');
     expect(dialLines('medium')).toContain('Death rests 30–45 s between moves');
     expect(dialLines('hard')).toContain('Death rests 20–35 s between moves');

@@ -88,6 +88,26 @@
   letter-spacing: 1px;
   color: rgba(236, 229, 211, 0.45);
 }
+/* the prologue can be skipped once it has been seen (D-252) */
+.ns-skip {
+  position: absolute;
+  right: 22px;
+  bottom: 22px;
+  z-index: 9;
+  font-family: var(--mono);
+  font-size: 13px;
+  letter-spacing: 1px;
+  color: #ece5d3;
+  background: rgba(8, 8, 12, 0.75);
+  border: 1px solid rgba(236, 229, 211, 0.3);
+  border-radius: 6px;
+  padding: 8px 14px;
+  cursor: pointer;
+}
+.ns-skip:hover,
+.ns-skip:focus-visible {
+  border-color: rgba(236, 229, 211, 0.7);
+}
 .ns-sub {
   position: absolute;
   left: 50%;
