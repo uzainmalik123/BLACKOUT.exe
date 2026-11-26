@@ -656,11 +656,12 @@ describe('a player who only spams ls and pwd (D-114)', { timeout: WHOLE_RUN_TIME
 
 describe('flags in the judge (D-233)', () => {
   it("a confirmed flag is the discovery: time to notice is the confirmation's time; an unconfirmed flag is not", () => {
-    const r = run().at(0).start('ATK-01', 1).at(20 * REAL_S).act({ type: 'DEF-21', ip: HIS_IP }).act({ type: 'DEF-21', ip: '192.0.2.9' })
+    const r = run().at(0).start('ATK-01', 1).at(5 * REAL_S).act({ type: 'DEF-21', ip: '192.0.2.9' }).at(20 * REAL_S).act({ type: 'DEF-21', ip: HIS_IP }) // D-239: 15 s apart
       .at(35 * REAL_S).e({ kind: 'flag-confirmed', ip: HIS_IP, about: 'ATK-01' });
     const g = grade(r);
     expect(fact(g, 'Time to notice stage 1')).toBe(fmtGameMs(35 * REAL_S));
     const flagEvent = eventsOfKind(r.w, 'action').find((e) => e.action.type === 'DEF-21' && e.action.ip === HIS_IP)!;
+    expect(eventsOfKind(r.w, 'action').filter((e) => e.action.type === 'DEF-21' && e.ok)).toHaveLength(2);
     expect(g.relevant).toEqual([flagEvent.id]);
     const unconfirmed = grade(run().at(0).start('ATK-01', 1).at(20 * REAL_S).act({ type: 'DEF-21', ip: HIS_IP }));
     expect(fact(unconfirmed, 'Time to notice stage 1')).toBe('never');

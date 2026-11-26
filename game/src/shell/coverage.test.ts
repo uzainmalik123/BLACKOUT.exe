@@ -338,6 +338,13 @@ describe('R16.2: the 16 command-to-action rows (15 of R16.2, the flag of D-233)'
 });
 
 describe('R16.2: the read actions and the session examples', () => {
+  it('flag inside the cooldown prints the engine\'s refusal and changes nothing (D-239)', { timeout: T }, async () => {
+    const f = fixture();
+    expect((await f.shell.run(`flag ${IP}`)).exitCode).toBe(0);
+    expect(await f.shell.run('flag 192.0.2.4 a hunch')).toEqual({ output: 'Too soon: one flag every 15 s. Next flag in 15 s', exitCode: 1 });
+    expect(f.world.flags.map((x) => x.ip)).toEqual([IP]);
+  });
+
   it('DEF-01, DEF-02 and DEF-03 are each sent once by reading a log, the database and an upload', { timeout: T }, async () => {
     const f = fixture();
     const act = vi.spyOn(f.engine, 'act');
