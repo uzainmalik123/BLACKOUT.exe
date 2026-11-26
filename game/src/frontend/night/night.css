@@ -116,7 +116,7 @@
   margin-bottom: 2px;
 }
 .ns-sub.who-kiro b {
-  color: var(--cyan);
+  color: #c8a6ff;
 }
 .ns-sub.who-death b {
   color: var(--crimson);
@@ -1188,11 +1188,8 @@ button.is-armed {
   font-size: 11px;
 }
 .ns-kiro-sigil {
-  font-size: 26px;
-  color: var(--cyan);
-  text-shadow:
-    0 0 12px var(--cyan),
-    0 0 26px var(--violet);
+  display: inline-flex;
+  filter: drop-shadow(0 0 6px rgba(144, 70, 255, 0.8));
 }
 .ns-kiro-lines {
   flex: 1;
@@ -1414,8 +1411,8 @@ button.is-armed {
   padding: 10px 18px;
   font-size: 24px;
   font-style: italic;
-  border-left: 3px solid var(--cyan);
-  background: rgba(70, 232, 255, 0.05);
+  border-left: 3px solid #9046ff;
+  background: rgba(144, 70, 255, 0.07);
 }
 .ns-verdict cite {
   display: block;
@@ -1423,7 +1420,7 @@ button.is-armed {
   font-style: normal;
   font-size: 12px;
   letter-spacing: 4px;
-  color: var(--cyan);
+  color: #c8a6ff;
   margin-top: 4px;
 }
 .ns-rep-meters {
@@ -1634,8 +1631,8 @@ button.is-armed {
 .ns-rep-debrief {
   margin-top: 24px;
   padding: 16px 20px;
-  border: 1px solid rgba(70, 232, 255, 0.25);
-  background: rgba(70, 232, 255, 0.04);
+  border: 1px solid rgba(144, 70, 255, 0.35);
+  background: rgba(144, 70, 255, 0.05);
 }
 .ns-rep-debrief p {
   margin: 0;

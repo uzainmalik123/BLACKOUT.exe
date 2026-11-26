@@ -5,6 +5,8 @@
 
 import type { GameEvent } from '../../engine/log';
 import type { Ending, Stage } from '../../rules/vocabulary';
+import type { Mood } from '../shared/ghost';
+import type { Outcome } from './results';
 
 // ------------------------------------------------------------------ the first check
 
@@ -131,6 +133,33 @@ export const ENDINGS: Record<Ending, EndingWords> = {
 };
 
 /** Kiro's word on the report, from its grades: three or more A or B is following the evidence. */
+/** What Kiro's mood on the play screen is read from (D-250): only what the engine and the last result report. */
+export interface MoodInput {
+  ending?: Ending;
+  /** The last action's result while its banner shows, or null. */
+  outcome: Outcome | null;
+  danger: 0 | 1 | 2 | 3;
+  /** Real seconds since the newest open alert opened, or null when none is open. */
+  alertAge: number | null;
+}
+
+const DEFENDED: ReadonlySet<Outcome> = new Set(['contained', 'evidence', 'restored', 'deploying']);
+const MISTAKES: ReadonlySet<Outcome> = new Set(['failed', 'shutdown', 'disrupted']);
+const WON: ReadonlySet<Ending> = new Set(['banished', 'clean-handover']);
+
+/**
+ * Kiro's mood (D-250): the ending first (won: happy; his return: shock; any other loss: sad), then the last result
+ * (a defence that worked: happy; a mistake: a wince), then the danger and a fresh alert (alarm), else calm.
+ */
+export function kiroMood(i: MoodInput): Mood {
+  if (i.ending) return WON.has(i.ending) ? 'happy' : i.ending === 'return' ? 'shock' : 'sad';
+  if (i.outcome && DEFENDED.has(i.outcome)) return 'happy';
+  if (i.outcome && MISTAKES.has(i.outcome)) return 'oops';
+  if (i.danger >= 2 || (i.alertAge !== null && i.alertAge < 6)) return 'alarm';
+  if (i.danger === 1 || i.alertAge !== null || i.outcome === 'still-active') return 'concern';
+  return 'calm';
+}
+
 export function kiroVerdict(grades: Record<string, 'A' | 'B' | 'C' | 'D' | 'F'>): string {
   const good = Object.values(grades).filter((g) => g === 'A' || g === 'B').length;
   return good >= 3 ? "You followed the evidence. That's why you're still here." : 'You panicked when you needed to think. Death counted on that.';

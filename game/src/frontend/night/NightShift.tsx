@@ -40,7 +40,6 @@ const rectOf = (el: HTMLElement | null, base: DOMRect): Rect | null => {
 export function NightShift({ difficulty, skipPrologue = false, onMenu, onAgain }: NightShiftProps) {
   const office = useRef<HTMLCanvasElement>(null);
   const haunt = useRef<HTMLCanvasElement>(null);
-  const clip = useRef<HTMLVideoElement>(null);
   const night = useRef<Night | null>(null);
 
   const [phase, setPhase] = useState<Phase>(skipPrologue ? 'shift' : 'dark');
@@ -76,7 +75,6 @@ export function NightShift({ difficulty, skipPrologue = false, onMenu, onAgain }
     const host = {
       office: office.current!,
       haunt: haunt.current!,
-      clip: () => clip.current,
       monitors: (): Record<MonitorName, Rect> | null => {
         const base = office.current?.getBoundingClientRect();
         if (!base) return null;
@@ -168,7 +166,6 @@ export function NightShift({ difficulty, skipPrologue = false, onMenu, onAgain }
   return (
     <main className={`ns-root phase-${phase}${ending ? ' is-ending' : ''}${shakeDesk ? ' is-shake' : ''}${glitch ? ' is-glitch' : ''}`}>
       <canvas ref={office} className="ns-office" aria-hidden />
-      <video ref={clip} className="ns-clip" src="/night/handshake.mp4" muted playsInline preload="auto" aria-hidden />
       {seated && run && phase !== 'login' && (
         <Play
           run={run}

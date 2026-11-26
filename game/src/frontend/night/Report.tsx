@@ -5,12 +5,12 @@
 // The download is the report's own Markdown with her debrief in it. There is no numeric score: the rules grade the
 // four phases, and that is what is shown.
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { buildReport, renderMarkdown, type Report as EngineReport } from '../../engine/report';
 import type { Difficulty } from '../../rules/vocabulary';
-import { drawKiro } from '../screen3-briefing/cinema/characters';
+import { KiroCanvas } from '../shared/KiroCanvas';
 import { DIFFICULTY_LABEL } from '../screen2-menu/menu';
-import { ENDINGS, kiroVerdict } from './judge';
+import { ENDINGS, kiroMood, kiroVerdict } from './judge';
 import type { Run } from './run';
 import { clockAt, timelineOf } from './words';
 
@@ -53,7 +53,7 @@ export function ReportWall({ run, onAgain, onMenu }: { run: Run; onAgain: (d: Di
   };
   return (
     <main className="ns-report">
-      <KiroWatching />
+      <KiroCanvas className="ns-rep-kiro" mood={kiroMood({ ending: w.ending, outcome: null, danger: 0, alertAge: null })} line={debrief?.text.split('. ')[0] ?? null} appear fps={30} />
       <header className="ns-rep-head">
         <p className="ns-rep-kicker">Post-incident report · {DIFFICULTY_LABEL[run.difficulty]} · seed {w.seed}</p>
         <h1 className={ending?.won ? 'is-won' : 'is-lost'}>{ending?.title ?? 'Shift unfinished'}</h1>
@@ -182,33 +182,4 @@ export function ReportWall({ run, onAgain, onMenu }: { run: Run; onAgain: (d: Di
       </nav>
     </main>
   );
-}
-
-/** Kiro beside the wall, watching the player read it. */
-function KiroWatching() {
-  const ref = useRef<HTMLCanvasElement>(null);
-  useEffect(() => {
-    const c = ref.current;
-    if (!c) return;
-    const g = c.getContext('2d');
-    if (!g) return;
-    const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-    let raf = 0;
-    const t0 = performance.now();
-    const draw = (now: number) => {
-      const dpr = Math.min(2, window.devicePixelRatio || 1);
-      const W = c.clientWidth;
-      const H = c.clientHeight;
-      if (c.width !== Math.round(W * dpr)) c.width = Math.round(W * dpr);
-      if (c.height !== Math.round(H * dpr)) c.height = Math.round(H * dpr);
-      g.setTransform(dpr, 0, 0, dpr, 0, 0);
-      g.clearRect(0, 0, W, H);
-      const t = (now - t0) / 1000;
-      drawKiro(g, W * 0.5, H * 1.02, H * 1.05, { t, form: reduce ? 1 : Math.min(1, t / 1.5), talk: 0, look: Math.sin(t * 0.3) * 0.3, eyes: 0.7, glitch: 0, hand: null }, dpr);
-      if (!reduce) raf = requestAnimationFrame(draw);
-    };
-    raf = requestAnimationFrame(draw);
-    return () => cancelAnimationFrame(raf);
-  }, []);
-  return <canvas ref={ref} className="ns-rep-kiro" aria-hidden />;
 }

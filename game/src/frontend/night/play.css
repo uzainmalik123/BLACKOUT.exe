@@ -368,25 +368,24 @@
   padding: 12px;
   min-height: 0;
   background: rgba(10, 8, 16, 0.88);
-  border: 1px solid rgba(70, 232, 255, 0.25);
+  border: 1px solid rgba(144, 70, 255, 0.35);
   border-radius: 10px;
-  box-shadow: 0 0 40px rgba(70, 232, 255, 0.08);
+  box-shadow: 0 0 40px rgba(144, 70, 255, 0.1);
 }
+/* Kiro, the logo's ghost (D-250), on her own purple dark */
 .pl-portrait {
   width: 100%;
   flex: 1 1 auto;
   min-height: 120px;
   max-height: 46vh;
-  object-fit: cover;
-  object-position: 50% 15%;
   border-radius: 8px;
-  background: radial-gradient(ellipse at 50% 30%, #1a1626, #050408);
+  background: radial-gradient(ellipse at 50% 48%, #24133f 0%, #110a1f 45%, #050309 100%);
 }
 .pl-kiro-name {
   font-family: var(--caps);
   font-size: 18px;
   letter-spacing: 6px;
-  color: var(--cyan);
+  color: #c8a6ff;
 }
 .pl-kiro-line {
   margin: 0;
@@ -522,7 +521,7 @@
   color: var(--amber);
 }
 
-/* the way back from the full toolkit, and the handshake clip */
+/* the way back from the full toolkit */
 .ns-back-simple {
   position: absolute;
   top: 2vh;
@@ -536,16 +535,6 @@
   border-radius: 6px;
   padding: 8px 14px;
   cursor: pointer;
-}
-.ns-clip {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  opacity: 0;
-  pointer-events: none;
-  z-index: 1;
 }
 
 @keyframes pl-blink {
@@ -731,7 +720,7 @@
   }
 }
 
-/* Kiro's mood on her panel's edge (D-226) */
+/* Kiro's mood on her panel's edge (D-226, D-250): the glow changes slowly, nothing flashes */
 .pl-kiro {
   transition:
     border-color 0.8s,
@@ -745,9 +734,25 @@
   box-shadow: 0 0 40px rgba(255, 42, 74, 0.2);
   animation: pl-kiro-alarm 1.4s ease-in-out infinite;
 }
-.pl-kiro.mood-relief {
-  border-color: rgba(61, 220, 151, 0.55);
-  box-shadow: 0 0 40px rgba(61, 220, 151, 0.15);
+.pl-kiro.mood-happy {
+  border-color: rgba(190, 150, 255, 0.75);
+  box-shadow: 0 0 44px rgba(160, 100, 255, 0.28);
+}
+.pl-kiro.mood-oops {
+  border-color: rgba(255, 168, 92, 0.6);
+}
+.pl-kiro.mood-sad {
+  border-color: rgba(110, 92, 196, 0.35);
+  box-shadow: none;
+}
+.pl-kiro.mood-shock {
+  border-color: rgba(255, 44, 84, 0.7);
+  box-shadow: 0 0 40px rgba(255, 44, 84, 0.25);
+}
+@media (prefers-reduced-motion: reduce) {
+  .pl-kiro.mood-alarm {
+    animation: none;
+  }
 }
 @keyframes pl-kiro-alarm {
   50% {

@@ -2,10 +2,11 @@
 // candle-lit table and the gate a gothic one in an ivy-covered wall (D-221). Each draws a moment of its shot from the time into it,
 // the mouse (a little parallax) and the narration, and lists the things on screen the player can inspect
 // (hotspots: a rectangle, a title, the fact from the files). Static layers (the street, the table) are painted once
-// per window size and reused. Colour carries meaning: cyan is Kiro and guidance, crimson is Death and danger, amber
+// per window size and reused. Colour carries meaning: purple is Kiro (the logo's ghost, D-250), cyan is guidance, crimson is Death and danger, amber
 // is a warning, emerald is normal and verified. Lights flicker slowly and partially, never strobe.
 
-import { AMBER, CRIMSON, CYAN, EMERALD, VIOLET, drawDeath, drawKiro } from './characters';
+import { KIRO_PURPLE, drawGhost } from '../../shared/ghost';
+import { AMBER, CRIMSON, CYAN, EMERALD, VIOLET, drawDeath } from './characters';
 import { DOORS, EVIDENCE, FACTS, QUIZ, SUSPICIOUS } from './facts';
 import type { ShotId } from './timeline';
 
@@ -535,9 +536,9 @@ function streetLife(f: Frame, z: number, shadow: number, reflection: number): vo
       g.ellipse(x, b.win.y0 + (b.win.y1 - b.win.y0) * 0.5, W * 0.035, (b.win.y1 - b.win.y0) * 0.55, 0, 0, Math.PI * 2);
       g.fill();
     }
-    // Kiro's reflection in the glass, before he is there
+    // Kiro's reflection in the glass, before she is there
     if (reflection > 0.01)
-      drawKiro(g, b.win.x1 - W * 0.07, b.win.y1 + H * 0.02, (b.win.y1 - b.win.y0) * 1.05, { t, form: reflection * 0.55, talk: 0, look: 0.3, eyes: 0.6, glitch: 0.35, hand: null }, f.dpr);
+      drawGhost(g, b.win.x1 - W * 0.07, b.win.y0 + (b.win.y1 - b.win.y0) * 0.55, (b.win.y1 - b.win.y0) * 0.5, { t, mood: 'calm', alpha: reflection * 0.55, look: 0.3, wander: 0, glitch: f.reduced ? 0 : 0.35, reduce: f.reduced }, f.dpr);
     g.restore();
   });
   fog(g, W, H, t, H * 0.55, H * 0.95, 0.22);
@@ -565,10 +566,10 @@ function kiro(f: Frame): void {
   g.fillRect(0, 0, W, H);
   const form = f.reduced ? ramp(st, 0, 0.6) : ramp(st, 0.1, 1.6);
   const look = st < 3 ? -0.3 : st < 5 ? 0.4 * Math.sin((st - 3) * 1.5) : -0.2;
-  const hand = st > 4.4 && st < 7.4 ? { x: 0.38 - 0.06 * ramp(st, 4.4, 5.2), y: -0.55 - 0.08 * ramp(st, 4.4, 5.2) } : null;
-  // a cyan light on the pavement where he stands
-  glow(g, W * 0.36, H * 0.98, W * 0.3, rgba(CYAN, 0.35), form);
-  drawKiro(g, W * 0.36 + f.mx * W * 0.02, H * 1.03, H * 0.98, { t, form, talk: f.talk, look, eyes: st > 5.2 ? 0.45 : 0.9, glitch: st < 1.6 ? 0.4 : rand(Math.floor(t * 3)) < 0.04 ? 0.3 : 0, hand }, f.dpr);
+  const wave = st > 1.8 && st < 4.2 ? 1 : 0;
+  // her purple light on the pavement under her
+  glow(g, W * 0.36, H * 0.92, W * 0.26, rgba(KIRO_PURPLE, 0.4), form);
+  drawGhost(g, W * 0.36 + f.mx * W * 0.02, H * 0.52, H * 0.5, { t, form, talk: f.talk, look, wander: 0.5, mood: st > 5.2 ? 'happy' : 'calm', wave, glitch: f.reduced ? 0 : st < 1.6 ? 0.4 : rand(Math.floor(t * 3)) < 0.04 ? 0.3 : 0, reduce: f.reduced }, f.dpr);
   // the street's amber on his right side
   glow(g, W * 0.6, H * 0.35, W * 0.3, rgba(AMBER, 0.18), flicker(t, 1.3, f.reduced));
 }
@@ -1685,9 +1686,8 @@ function admin(f: Frame): void {
       g.stroke();
     }
   }
-  // Kiro at the edge, eyes flaring amber
-  drawKiro(g, W * 0.12, H * 1.06, H * 0.55, { t, form: 1, talk: f.talk, look: 0.6, eyes: st > 3 ? 1 : 0.6, glitch: 0, hand: null }, f.dpr);
-  if (st > 3.1) glow(g, W * 0.135, H * 0.6, H * 0.06, rgba(AMBER, 0.6), 0.5 + 0.3 * Math.sin(t * 4));
+  // Kiro at the edge, alarmed as the hand reaches for the vault
+  drawGhost(g, W * 0.12, H * 0.76, H * 0.3, { t, talk: f.talk, look: 0.6, wander: 0, mood: st > 3 ? 'alarm' : 'concern', reduce: f.reduced }, f.dpr);
   // evidence first, in the playbook's words
   if (st > 3.8) chip(g, (QUIZ[1]?.reveal ?? '').split('. ')[0]?.toUpperCase() ?? '', W / 2, H * 0.68, Math.max(12, H * 0.018), AMBER, 'rgba(24, 14, 2, 0.88)', 'center');
 }
@@ -1730,9 +1730,9 @@ function death(f: Frame): void {
   sheen.addColorStop(1, 'rgba(255, 255, 255, 0.04)');
   g.fillStyle = sheen;
   g.fillRect(W * 0.06, H * 0.05, W * 0.88, H * 0.78);
-  // Kiro in front, sensing her, turning
+  // Kiro in front, sensing Death behind her, turning, frightened
   const turn = ramp(st, 1.6, 2.6);
-  drawKiro(g, W * 0.76 + f.mx * W * 0.03, H * 1.08, H * 0.92, { t, form: 1, talk: f.talk, look: -turn, eyes: 0.6 + 0.4 * turn, glitch: st > 4 ? 0.15 : 0, hand: null }, f.dpr);
+  drawGhost(g, W * 0.76 + f.mx * W * 0.03, H * 0.52, H * 0.46, { t, talk: f.talk, look: -turn, wander: 0, mood: turn > 0.5 ? 'alarm' : 'concern', glitch: !f.reduced && st > 4 ? 0.15 : 0, reduce: f.reduced }, f.dpr);
   // the scene begins to corrupt
   corrupt(g, W, H, t, ramp(st, 2.8, 6) * 0.75, f.reduced);
   // the six steps along the bottom, each lit as he names it; legal's deadline beside them
@@ -1770,10 +1770,7 @@ function blackout(f: Frame): void {
     glow(g, ex + W * 0.01, ey, H * 0.02, rgba(CRIMSON, 1), de);
   }
   const ke = ramp(st, 2.6, 3.0) * (1 - ramp(st, 3.6, 4));
-  if (ke > 0) {
-    glow(g, W * 0.12, H * 0.5, H * 0.025, rgba(CYAN, 1), ke);
-    glow(g, W * 0.16, H * 0.5, H * 0.025, rgba(AMBER, 1), ke);
-  }
+  if (ke > 0) drawGhost(g, W * 0.14, H * 0.52, H * 0.2, { t: f.t, mood: 'calm', look: 0.4, wander: 0, alpha: ke * 0.85, reduce: f.reduced }, f.dpr);
 }
 
 const PAINT: Record<ShotId, (f: Frame) => void> = { street, kiro, map: tacticalMap, gate, logs, admin, death, blackout };
