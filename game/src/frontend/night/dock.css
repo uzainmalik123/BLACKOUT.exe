@@ -1,0 +1,365 @@
+/* The dock, the floating windows and the "Now:" strip (UI-11, D-234, D-240), in the night shift's own look: the
+   monitors' bezel and bar for every window, the play screen's buttons for the dock, cyan for the screens, amber for
+   what to look at, crimson for him. Nothing here adds a colour or a font the screens did not already use. */
+
+/* ---- room for the dock on the left */
+.pl-root.has-dock {
+  padding-left: calc(2vw + 74px);
+}
+.pl-root.has-dock .pl-tools button {
+  white-space: nowrap;
+}
+
+/* ---- the dock */
+.pl-dock {
+  position: absolute;
+  left: 1vw;
+  top: 2vh;
+  bottom: 2.4vh;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 66px;
+  padding: 6px 4px;
+  overflow-y: auto;
+  scrollbar-width: none;
+  box-sizing: border-box;
+  background: rgba(8, 10, 14, 0.86);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 10px;
+}
+.pl-dock.is-lit {
+  border-color: var(--amber);
+  box-shadow: 0 0 24px rgba(227, 179, 65, 0.35);
+}
+.pl-dock-item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  flex: 0 0 auto;
+  padding: 5px 2px 4px;
+  font-family: var(--mono);
+  color: var(--bone);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  cursor: pointer;
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s;
+}
+.pl-dock-item i {
+  font-style: normal;
+  font-size: 16px;
+  line-height: 1.1;
+  color: var(--cyan);
+}
+.pl-dock-item span {
+  font-size: 9.5px;
+  letter-spacing: 0.5px;
+  line-height: 1.1;
+  text-align: center;
+  color: rgba(236, 229, 211, 0.75);
+}
+.pl-dock-item:hover {
+  border-color: var(--cyan);
+}
+.pl-dock-item.is-open {
+  background: rgba(70, 232, 255, 0.12);
+  border-color: rgba(70, 232, 255, 0.55);
+}
+.pl-dock-item.is-lit {
+  border-color: var(--amber);
+  box-shadow: 0 0 16px rgba(227, 179, 65, 0.55);
+  animation: pl-blink 1.4s steps(2) infinite;
+}
+.pl-dock-lock {
+  position: absolute;
+  top: 1px;
+  right: 2px;
+  font-size: 9px;
+  text-decoration: none;
+  opacity: 0.8;
+}
+
+/* ---- the floating windows: a monitor's bezel and bar, free on the screen */
+.ns-win {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  background: #060709;
+  border: 6px solid #0b0c0f;
+  border-radius: 7px;
+  box-shadow:
+    0 0 0 1px #17181d,
+    0 18px 50px rgba(0, 0, 0, 0.8),
+    0 0 60px rgba(70, 232, 255, 0.1);
+  overflow: hidden;
+  animation: pl-in 0.2s ease-out;
+}
+.ns-win.is-lit {
+  box-shadow:
+    0 0 0 1px var(--amber),
+    0 18px 50px rgba(0, 0, 0, 0.8),
+    0 0 40px rgba(227, 179, 65, 0.35);
+}
+.ns-win-bar {
+  flex: 0 0 auto;
+  box-sizing: border-box;
+  cursor: grab;
+  user-select: none;
+}
+.ns-win-bar:active {
+  cursor: grabbing;
+}
+.ns-win-close {
+  padding: 1px 7px;
+}
+.ns-win-close:hover {
+  color: #fff;
+  border-color: var(--crimson, #ff2a4a);
+}
+.ns-win-body {
+  font-size: 13px;
+}
+.ns-win-body > .ns-cbody,
+.ns-win-body > .ns-consoles {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+.ns-win.is-bare {
+  border-width: 0;
+  background: transparent;
+}
+/* the terminal and Kiro keep their own frames inside a window */
+.ns-win .pl-term {
+  position: relative;
+  inset: auto;
+  flex: 1;
+  border-radius: 7px;
+  box-shadow: none;
+}
+.ns-win .pl-term-bar,
+.ns-win .ns-kiro header {
+  cursor: grab;
+  user-select: none;
+}
+.ns-win .ns-kiro {
+  position: relative;
+  right: auto;
+  bottom: auto;
+  width: auto;
+  height: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+/* ---- the "Now:" strip */
+.pl-now {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 0;
+  padding: 6px 16px;
+  font-size: 15px;
+  background: rgba(8, 10, 14, 0.86);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-left: 3px solid var(--amber);
+  border-radius: 8px;
+}
+.pl-now span {
+  font-size: 11px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: rgba(236, 229, 211, 0.55);
+}
+.pl-now b {
+  font-family: var(--caps);
+  font-weight: normal;
+  letter-spacing: 2px;
+  color: var(--amber);
+}
+.pl-now em {
+  margin-left: auto;
+  font-style: normal;
+  font-size: 12px;
+  color: rgba(236, 229, 211, 0.6);
+}
+
+/* ---- the alert's gate sentence (Easy), the meters lit by the tutorial, the tutorial's step button */
+.pl-alert .pl-gate {
+  font-style: italic;
+  font-size: clamp(13px, 1vw, 15px);
+  color: #ffd0d6;
+}
+.pl-top.is-lit {
+  border-color: var(--amber);
+  box-shadow: 0 0 24px rgba(227, 179, 65, 0.35);
+}
+.pl-lesson {
+  align-self: flex-start;
+  font-family: var(--mono);
+  font-size: 13px;
+  color: #001014;
+  background: var(--cyan);
+  border: 0;
+  border-radius: 6px;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+
+/* ---- inside the windows: locks, refusals, flags, filters, lists */
+.ns-lock {
+  margin: 0 0 8px;
+  padding: 6px 10px;
+  font-size: 12px;
+  color: #ffd0d6;
+  background: rgba(60, 0, 10, 0.55);
+  border: 1px solid rgba(255, 42, 74, 0.45);
+}
+.ns-card button:disabled,
+.ns-deploy button:disabled,
+.ns-rowacts button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.ns-refused {
+  margin: 0;
+  font-size: 11px;
+  color: #ffb0ba;
+}
+.ns-rowacts {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  white-space: nowrap;
+}
+.ns-rowacts button {
+  font-family: var(--mono);
+  color: #e8f7ff;
+  background: rgba(70, 232, 255, 0.08);
+  border: 1px solid rgba(70, 232, 255, 0.35);
+  cursor: pointer;
+}
+.ns-rowacts button:hover:not(:disabled) {
+  background: rgba(70, 232, 255, 0.18);
+}
+.ns-flagstate {
+  padding: 0 5px;
+  font-size: 11px;
+  color: var(--amber);
+  border: 1px solid rgba(227, 179, 65, 0.5);
+}
+.ns-flagstate.is-confirmed {
+  color: #ffc0c8;
+  border-color: rgba(255, 42, 74, 0.6);
+}
+.ns-ipbtn {
+  font: inherit;
+  padding: 0;
+  color: inherit;
+  background: none;
+  border: 0;
+  border-bottom: 1px dashed rgba(70, 232, 255, 0.45);
+  cursor: pointer;
+}
+.ns-logfilters .ns-filter {
+  flex: 1 1 6em;
+}
+.ns-logfilters button {
+  font-family: var(--mono);
+  font-size: 11px;
+  padding: 3px 8px;
+  color: rgba(191, 234, 255, 0.85);
+  background: rgba(70, 232, 255, 0.06);
+  border: 1px solid rgba(70, 232, 255, 0.25);
+  cursor: pointer;
+}
+.ns-loglines.is-window .ns-logline {
+  white-space: pre-wrap;
+  word-break: break-all;
+  cursor: help;
+}
+.ns-traffic.is-window {
+  display: grid;
+  gap: 10px;
+}
+.ns-alertlist {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.ns-alertlist li {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 10px;
+  padding: 6px 8px;
+  background: rgba(255, 42, 74, 0.08);
+  border-left: 3px solid var(--crimson, #ff2a4a);
+}
+.ns-alertlist li.is-closed {
+  background: rgba(70, 232, 255, 0.03);
+  border-left-color: rgba(70, 232, 255, 0.3);
+  opacity: 0.7;
+}
+.ns-alertlist time {
+  color: rgba(191, 234, 255, 0.5);
+}
+.ns-alertlist code {
+  font-family: var(--mono);
+  color: #fff;
+}
+.ns-alertlist span,
+.ns-alertlist em,
+.ns-alertlist small {
+  grid-column: 1 / -1;
+}
+.ns-alertlist em {
+  color: #ffd0d6;
+}
+.ns-alertlist small {
+  color: rgba(191, 234, 255, 0.5);
+}
+.ns-win-body .ns-feed {
+  margin: 0;
+  padding: 6px 10px 8px;
+  border-top: 1px solid rgba(70, 232, 255, 0.12);
+}
+.ns-cheat-find {
+  width: 100%;
+  box-sizing: border-box;
+  margin-bottom: 8px;
+}
+.ns-cheats {
+  margin: 0;
+  display: grid;
+  gap: 8px;
+}
+.ns-cheats dt b {
+  color: var(--cyan);
+  font-weight: normal;
+}
+.ns-cheats dt {
+  color: #e8f7ff;
+}
+.ns-cheats dd {
+  display: grid;
+  gap: 2px;
+  margin: 2px 0 0 1.2em;
+}
+.ns-cheats code {
+  font-family: var(--mono);
+  color: rgba(191, 234, 255, 0.7);
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+.ns-cheats code.is-example {
+  color: var(--green, #3fb950);
+}

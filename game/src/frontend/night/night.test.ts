@@ -32,7 +32,7 @@ describe('the night-shift prologue, kept short (UI-10, D-223, D-224)', () => {
     expect(f.phase).toBe('after');
   });
 
-  it('the player follows her with W and sits with E; the login waits for the engine to show him', () => {
+  it('the player follows her with W and sits with E; the login waits for the run, the alarm for the first alert (D-243)', () => {
     let f = wait({ ...startFlow(), phase: 'after' }, (DURATION.after ?? 0) + 0.01);
     expect(f.phase).toBe('walk');
     f = run(f, { kind: 'walk', dt: WALK_SECONDS / 2 });
@@ -44,9 +44,13 @@ describe('the night-shift prologue, kept short (UI-10, D-223, D-224)', () => {
     expect(f.phase).toBe('sitting');
     f = wait(f, (DURATION.sitting ?? 0) + 0.01);
     expect(f.phase).toBe('login');
+    expect(run(f, { kind: 'ready' }).phase).toBe('login');
     expect(run(f, { kind: 'alarm' }).phase).toBe('login');
     f = wait(f, 99);
     expect(f.phase).toBe('login');
+    f = run(f, { kind: 'ready' });
+    expect(f.phase).toBe('shift');
+    expect(wait(f, 99).phase).toBe('shift');
     f = run(f, { kind: 'alarm' });
     expect(f.phase).toBe('alarm');
     expect(wait(f, (DURATION.alarm ?? 0) + 0.01).phase).toBe('shift');

@@ -21,9 +21,11 @@ export interface Run {
   seed: number;
 }
 
-/** A run on the given engine (built by the caller, so tests can hand in their own baseline). */
+/**
+ * A run on the given engine (built by the caller, so tests can hand in their own baseline). The shift does not begin
+ * here: the play screen calls `engine.beginShift()` when it shows (SYS-22, D-230, D-243; closes KI-230).
+ */
 export function runOn(engine: Engine, onInternalError: (e: unknown) => void = () => undefined): Run {
-  engine.beginShift(); // SYS-22 (D-230, KI-230): a run is made as the desk shows; his first move waits its seeded delay from here
   return { engine, shell: createShell(engine, { onInternalError }), kiro: createKiro(engine), difficulty: engine.world.difficulty, seed: engine.world.seed };
 }
 

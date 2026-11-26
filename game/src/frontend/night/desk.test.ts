@@ -10,7 +10,7 @@ import { CAMS, lerpCam, onScreen, walkCam } from './office';
 import { lab } from '../../engine/test-fixtures/lab';
 import { runOn } from './run';
 import { Soundscape, heartAt } from './sound';
-import { alertWords, clockAt, eventWords, shiftLeft, timelineOf } from './words';
+import { clockAt, eventWords, shiftLeft, timelineOf } from './words';
 
 const baseline = () => new Uint8Array(readFileSync(new URL('../../recordings/juiceshop.sqlite', import.meta.url)));
 const IDS = /\b(ATK|MIN|TAP|DEF)-\d/;
@@ -18,6 +18,7 @@ const IDS = /\b(ATK|MIN|TAP|DEF)-\d/;
 describe('the desk words what the player could see, and nothing more (D-223)', () => {
   it('never shows an internal id, over a whole run left alone', () => {
     const { engine } = runOn(new Engine({ seed: 5, difficulty: 'hard', baseline: baseline() }));
+    engine.beginShift(); // the play screen's call (D-243)
     for (let i = 0; i < 4000 && !engine.world.ending; i++) engine.advance(500);
     const kinds = new Set<string>();
     for (const e of engine.world.events) {
@@ -27,14 +28,15 @@ describe('the desk words what the player could see, and nothing more (D-223)', (
       expect(w.text, e.kind).not.toMatch(IDS);
     }
     expect(kinds.has('move-started')).toBe(true);
-    for (const a of engine.world.alerts) expect(alertWords(a.about)).not.toMatch(IDS);
+    expect(kinds.has('alert-opened')).toBe(true);
+    for (const a of engine.world.alerts) expect(`${a.route} ${a.symptom} ${a.gate}`).not.toMatch(IDS);
   });
 
-  it('words alerts by kind, and actions by what the player typed', () => {
-    expect(alertWords('ATK-04')).toBe('Suspicious activity');
-    expect(alertWords('TAP-02')).toBe('Data leaving the shop');
-    expect(alertWords('MIN-01')).toBe('Automated traffic');
+  it('words alerts by their symptom (D-232), and actions by what the player typed', () => {
     const ev = (body: object) => ({ t: 0, id: 1, ...body }) as GameEvent;
+    expect(eventWords(ev({ kind: 'alert-opened', alert: 4, about: 'ATK-04', route: '/rest/user/login', symptom: 'unusual activity on /rest/user/login: 5 failed logins in 30 s from one address' }))?.text).toBe(
+      'Alert #4: unusual activity on /rest/user/login: 5 failed logins in 30 s from one address',
+    );
     expect(eventWords(ev({ kind: 'action', action: { type: 'DEF-06', ip: '203.0.113.9', op: 'add' }, ok: true }))).toEqual({ text: '✓ firewall add 203.0.113.9', tone: 'info' });
     expect(eventWords(ev({ kind: 'souls-stolen', by: 'ATK-08', count: 3, stolen: 9, total: 312 }))?.text).toBe('3 customer records taken (9 of 312 gone)');
     expect(eventWords(ev({ kind: 'kiro', call: 'chat' }))).toBeNull();

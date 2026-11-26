@@ -12,7 +12,12 @@ import { runOn } from './run';
 import { commandFor, situationOf } from './situations';
 
 const baseline = () => new Uint8Array(readFileSync(new URL('../../recordings/juiceshop.sqlite', import.meta.url)));
-const fresh = (difficulty: 'easy' | 'medium' | 'hard' = 'medium', seed = 7) => runOn(new Engine({ seed, difficulty, baseline: baseline() }));
+/** A run whose shift has begun, as the play screen begins it when it shows (D-243). */
+const fresh = (difficulty: 'easy' | 'medium' | 'hard' = 'medium', seed = 7) => {
+  const r = runOn(new Engine({ seed, difficulty, baseline: baseline() }));
+  r.engine.beginShift();
+  return r;
+};
 /** The same run with the incident already declared, so an action lands at once (the change freeze, D-230). */
 const declared = (difficulty: 'easy' | 'medium' | 'hard' = 'medium', seed = 7) => { const r = fresh(difficulty, seed); lab(r.engine.world); return r; };
 const pendingFor = (run: ReturnType<typeof fresh>, type: Pending['type'], ok = true): Pending => ({ type, ok, message: '', from: run.engine.world.events.length, heartbeat: run.engine.world.heartbeat, max: run.engine.world.heartbeatMax, at: 0, live: liveAttacks(run.engine.world) });

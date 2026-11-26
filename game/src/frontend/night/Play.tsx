@@ -5,18 +5,28 @@
 // Top: heartbeat, souls, Death's stage, the threat. Centre: the battlefield (battle.ts). Side: Kiro. Bottom: the
 // choices. Investigating shows a short evidence card whose addresses, accounts and files can be picked as a target;
 // the full shell is one key away (T). A button, a key and a typed command all end as the same engine action.
+// Every other tool is one click on the dock and opens as a floating window (UI-11, D-234, D-240); the "Now:" strip
+// reads the playbook phase; during the change freeze change controls show locked with the engine's reason (SYS-22).
+// The shift begins when this screen shows (`engine.beginShift()`, D-243).
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { OPENING_TUTORIAL } from '../../content/kiro-fallback';
 import { gameClockLabel } from '../../engine/clock';
 import type { GameEvent } from '../../engine/log';
-import { metersOf, type Meters, type Toast } from './Desk';
-import { Battle, gateOf, type FxKind, type GateId } from './battle';
+import type { PlayerAction } from '../../rules/vocabulary';
+import { DIAL } from '../shared/dial';
+import { ConsolePanel, type ConsoleId } from './Consoles';
+import { Feed, Logs, metersOf, type Meters, type Toast } from './Desk';
+import { Dock, FloatWindow } from './Dock';
+import { Battle, type FxKind, type GateId } from './battle';
 import { anomalies, danger as dangerOf, whatKiroSees } from './judge';
-import type { KiroLine } from './KiroPanel';
+import { KiroPanel, type KiroLine } from './KiroPanel';
 import { OUTCOME_KIRO, OUTCOME_WORDS, READS, liveAttacks, outcomeOf, type Outcome, type Pending } from './results';
 import { readingsOf, type Run } from './run';
 import { STAGE_NAMES, commandFor, forLevel, situationOf, tokens, type Step, type TargetKind } from './situations';
-import { shiftLeft } from './words';
+import { AddressFlags, AlertsTool, CheatSheet, Freeze, TrafficTool, UploadsTool, type Act } from './Tools';
+import { PANEL_TOOL, TOOL_BY_ID, closeTool, dockFor, focusTool, isOpen, moveTool, openTool, toggleTool, type ToolId, type Wins } from './windows';
+import { NOW_WORDS, battleGate, freezeReason, gateConsole, gateSentence, shiftLeft } from './words';
 import { drawKiro } from '../screen3-briefing/cinema/characters';
 
 export interface Volumes {
@@ -38,7 +48,11 @@ export interface PlayProps {
   sfx: (k: Sfx) => void;
   onResult: (ok: boolean, text: string, before: Meters) => void;
   toasts: Toast[];
-  onTools: () => void;
+  /** The dock's windows (UI-11): kept by the night shift so Escape closes the top one. */
+  wins: Wins;
+  setWins: (f: (w: Wins) => Wins) => void;
+  /** Death's eyes in the accounts console (stage 3). */
+  eyes: boolean;
   onFiles: () => void;
   paused: boolean;
   onPause: () => void;
@@ -66,9 +80,12 @@ export function Play({ toasts, ...p }: PlayProps) {
   const w = run.engine.world;
   const easy = run.difficulty === 'easy';
   const hard = run.difficulty === 'hard';
+  const dial = DIAL[run.difficulty];
   const situation = forLevel(situationOf(w), run.difficulty);
-  const gate = situation.actor ? gateOf(situation.actor) : undefined;
+  // D-235: only Easy names the gate an alert's route belongs to, lights it on the battlefield and its console on the dock
+  const gate = easy ? situation.gate : undefined;
   const meters = metersOf(run);
+  const frozen = freezeReason(w);
   const [log, setLog] = useState<Entry[]>([]);
   const [cmd, setCmd] = useState('');
   const [busy, setBusy] = useState(false);
@@ -76,7 +93,11 @@ export function Play({ toasts, ...p }: PlayProps) {
   const [hist, setHist] = useState<string[]>([]);
   const [hi, setHi] = useState(-1);
   const [sound, setSound] = useState(false);
-  const [terminal, setTerminal] = useState(false);
+  const [lesson, setLesson] = useState(0);
+  const { wins, setWins } = p;
+  const terminal = isOpen(wins, 'terminal');
+  const view = () => ({ w: window.innerWidth, h: window.innerHeight });
+  const setTerminal = (f: (on: boolean) => boolean) => setWins((s) => (f(isOpen(s, 'terminal')) ? openTool(s, 'terminal', view()) : closeTool(s, 'terminal')));
   const [evidence, setEvidence] = useState<Entry | null>(null);
   const [full, setFull] = useState(false);
   const [result, setResult] = useState<{ id: number; outcome: Outcome; detail: string } | null>(null);
@@ -87,13 +108,19 @@ export function Play({ toasts, ...p }: PlayProps) {
   const input = useRef<HTMLInputElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const pending = useRef<Pending | null>(null);
-  const clock0 = useRef(0);
+  /** Seconds since the battlefield's loop began, as of its last frame (the RESULT's clock). */
+  const clockNow = useRef(0);
   const focusGate = useRef<GateId | null>(null);
   const files = useMemo(() => w.files.map((f) => f.path.split('/')[0]!), [w.files, p.tick]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    focusGate.current = gate?.id ?? null;
-  }, [gate?.id]);
+    focusGate.current = gate ? battleGate(gate) : null;
+  }, [gate]);
+
+  // the desk is in view: the shift begins, and with it the calm and the change freeze (SYS-22, D-230, D-243)
+  useEffect(() => {
+    run.engine.beginShift();
+  }, [run]);
 
   // the battlefield: its own frame loop, reading the engine; it also settles the pending RESULT
   useEffect(() => {
@@ -103,11 +130,11 @@ export function Play({ toasts, ...p }: PlayProps) {
     const battle = new Battle();
     let raf = 0;
     const t0 = performance.now();
-    clock0.current = t0;
     let last = 0;
     const frame = (now: number) => {
       raf = requestAnimationFrame(frame);
       const t = (now - t0) / 1000;
+      clockNow.current = t;
       const dpr = Math.min(1.5, window.devicePixelRatio || 1);
       const W = c.clientWidth;
       const H = c.clientHeight;
@@ -169,7 +196,7 @@ export function Play({ toasts, ...p }: PlayProps) {
     const evs = run.engine.world.events.slice(from).filter((e): e is Extract<GameEvent, { kind: 'action' }> => e.kind === 'action');
     const lastAct = evs[evs.length - 1];
     if (!lastAct || READS.has(lastAct.action.type)) return;
-    pending.current = { type: lastAct.action.type, ok: lastAct.ok, message: lastAct.note ?? '', from: run.engine.world.events.length, heartbeat: before.heartbeat, max: before.max, at: (performance.now() - clock0.current) / 1000, live };
+    pending.current = { type: lastAct.action.type, ok: lastAct.ok, message: lastAct.note ?? '', from: run.engine.world.events.length, heartbeat: before.heartbeat, max: before.max, at: clockNow.current, live };
   };
 
   const shell = async (line: string, note?: string) => {
@@ -238,6 +265,42 @@ export function Play({ toasts, ...p }: PlayProps) {
     }
   };
 
+  // ---- the dock's windows (UI-11)
+
+  /** A window's button: one `engine.act`, its answer on the toasts with what it did to the meters (refusals too). */
+  const actNow: Act = (action: PlayerAction) => {
+    const before = metersOf(run);
+    const r = run.engine.act(action);
+    if (!READS.has(action.type) || !r.ok) p.onResult(r.ok, r.message, before);
+    return r;
+  };
+  const openWin = (id: ToolId) => setWins((s) => openTool(s, id, view()));
+  const pick = (id: ToolId) => {
+    if (id === 'files') return p.onFiles();
+    setWins((s) => toggleTool(s, id, view()));
+  };
+  /** Kiro's drafted line, or an address, into the terminal's prompt (the player still presses Enter). */
+  const insert = (text: string) => {
+    setCmd((c) => (c && !c.endsWith(' ') ? `${c} ${text}` : c + text));
+    openWin('terminal');
+    window.setTimeout(() => input.current?.focus(), 0);
+  };
+  const explain = (line: string) => {
+    openWin('kiro');
+    p.addKiro({ who: 'you', text: `Explain: ${line}` });
+    void run.kiro.explain(line).then((r) => p.addKiro({ who: 'kiro', text: r.text, offline: r.offline }));
+  };
+
+  // ---- the opening's tutorial (CON-03, D-238): during the freeze, one step at a time, lighting what it names
+  const steps = OPENING_TUTORIAL[run.difficulty];
+  const teaching = frozen && lesson < steps.length ? steps[lesson]! : null;
+  const lit = new Set<ToolId>();
+  for (const panel of teaching?.panels ?? []) {
+    const t = PANEL_TOOL[panel];
+    if (t) lit.add(t);
+  }
+  if (gate && dial.gateSentence) lit.add(gateConsole(gate));
+
   // keys: 1, 2, 3 and T when the player isn't typing
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -302,9 +365,110 @@ export function Play({ toasts, ...p }: PlayProps) {
     );
   };
 
+  /** The terminal, in its own floating window: its bar is the window's handle, its close is the window's close. */
+  const terminalWin = (
+    <div className="pl-term" onClick={() => input.current?.focus()}>
+      <div className="pl-term-bar" data-drag>
+        <span className="dots" aria-hidden>
+          <i />
+          <i />
+          <i />
+        </span>
+        <span>BLACKOUT.exe · night shift · {hard ? 'terminal' : 'advanced terminal'}</span>
+        <button type="button" className="pl-term-close" onClick={() => setTerminal(() => false)}>
+          close (T)
+        </button>
+      </div>
+      <div className="pl-term-out" ref={out}>
+        {log.length === 0 && <p className="pl-hint">Type any command the workstation allows (try `help`, or open the cheat sheet on the dock). Click an address, account or file to pick it as a target.</p>}
+        {log.map((e) => (
+          <div key={e.id} className="pl-entry">
+            <div className="pl-cmd">
+              <span className="pl-prompt">{PROMPT}</span> {e.cmd}
+              {e.note && <span className="pl-note">← {e.note.toLowerCase()}</span>}
+            </div>
+            {e.out && output(e)}
+          </div>
+        ))}
+        {busy && <div className="pl-busy">…</div>}
+      </div>
+      <div className="pl-in">
+        <span className="pl-prompt">{PROMPT}</span>
+        <input
+          ref={input}
+          value={cmd}
+          spellCheck={false}
+          autoComplete="off"
+          aria-label="Type a command"
+          onChange={(e) => setCmd(e.target.value)}
+          onKeyDown={(e) => {
+            e.stopPropagation();
+            if (e.key === 'Enter' && cmd.trim()) {
+              void shell(cmd.trim());
+              setCmd('');
+            } else if (e.key === 'ArrowUp' && hist.length) {
+              e.preventDefault();
+              const n = hi < 0 ? hist.length - 1 : Math.max(0, hi - 1);
+              setHi(n);
+              setCmd(hist[n]!);
+            } else if (e.key === 'ArrowDown' && hi >= 0) {
+              e.preventDefault();
+              const n = hi + 1;
+              setHi(n >= hist.length ? -1 : n);
+              setCmd(n >= hist.length ? '' : hist[n]!);
+            } else if (e.key === 'Tab' && dial.autocomplete && run.shell.complete) {
+              e.preventDefault();
+              const o = run.shell.complete(cmd);
+              if (o.length === 1) setCmd(cmd.slice(0, cmd.lastIndexOf(' ') + 1) + o[0]! + (o[0]!.endsWith('/') ? '' : ' '));
+            } else if (e.key === 'Escape') {
+              (e.target as HTMLInputElement).blur();
+              setTerminal(() => false);
+            }
+          }}
+        />
+      </div>
+    </div>
+  );
+
+  /** One open window's body. */
+  const body = (id: ToolId) => {
+    switch (id) {
+      case 'logs':
+        return <Logs run={run} tick={p.tick} act={actNow} explain={explain} />;
+      case 'alerts':
+        return (
+          <>
+            <AlertsTool run={run} tick={p.tick} easy={dial.gateSentence} />
+            <Feed run={run} tick={p.tick} />
+          </>
+        );
+      case 'traffic':
+        return <TrafficTool run={run} tick={p.tick} act={actNow} />;
+      case 'cheats':
+        return <CheatSheet />;
+      case 'flags':
+        return <AddressFlags run={run} tick={p.tick} act={actNow} />;
+      case 'uploads':
+        return <UploadsTool run={run} tick={p.tick} act={actNow} />;
+      case 'waf':
+      case 'firewall':
+      case 'features':
+      case 'accounts':
+      case 'sessions':
+      case 'deploy':
+      case 'backups':
+      case 'comms':
+      case 'plug':
+        return <ConsolePanel id={id as ConsoleId} run={run} tick={p.tick} act={actNow} eyes={p.eyes} />;
+      default:
+        return null;
+    }
+  };
+
   return (
-    <div className={`pl-root${p.on ? '' : ' is-off'}`}>
-      <header className="pl-top">
+    <div className={`pl-root has-dock${p.on ? '' : ' is-off'}`}>
+      <Dock tools={dockFor(run.difficulty)} open={new Set(wins.open.map((x) => x.id))} lit={lit} frozen={!!frozen} glow={teaching?.panels.includes('dock')} onPick={pick} />
+      <header className={`pl-top${teaching?.panels.includes('meters') ? ' is-lit' : ''}`}>
         <div className={`pl-meter heart${hb < 35 ? ' is-low' : ''}`} title="The business's health: customers being served">
           <span>🫀 Heartbeat</span>
           <i>
@@ -325,7 +489,7 @@ export function Play({ toasts, ...p }: PlayProps) {
         <div className="pl-threat">
           <span>Death</span>
           <strong>{stage ? `Stage ${stage} · ${STAGE_NAMES[stage as 1]}` : 'Watching'}</strong>
-          <em>{situation.key === 'quiet' ? 'no attack seen' : gate && !hard ? `attacking: ${gate.label}` : 'attack under way'}</em>
+          <em>{situation.key === 'quiet' ? 'no attack seen' : gate ? `attacking: the ${gate}` : 'attack under way'}</em>
         </div>
         <div className="pl-clock">
           <strong>{gameClockLabel(w)}</strong>
@@ -341,23 +505,22 @@ export function Play({ toasts, ...p }: PlayProps) {
           <button type="button" onClick={() => setSound((s) => !s)} aria-expanded={sound}>
             {p.muted ? '🔇' : '🔊'} Sound
           </button>
-          <button type="button" onClick={p.onFiles}>
-            Briefing
-          </button>
-          <button type="button" onClick={p.onTools} title="Logs, consoles, every tool">
-            All tools
-          </button>
         </nav>
         {sound && <SoundPanel volumes={p.volumes} set={p.setVolumes} muted={p.muted} setMuted={p.setMuted} />}
       </header>
 
       <main className="pl-main">
         <section className="pl-centre">
+          <p className="pl-now" aria-live="polite">
+            <span>Now:</span> <b>{NOW_WORDS[w.playbook.phase]}</b>
+            {frozen && <em>🔒 change freeze: no incident declared</em>}
+          </p>
           <div className="pl-field">
             <canvas ref={canvas} className="pl-battle" aria-label="The battlefield: the shop, its seven entrances, Death" />
             <div className={`pl-alert${situation.key === 'quiet' ? ' is-quiet' : ''}`} key={situation.key}>
-              <b>{situation.key === 'quiet' ? 'ALL QUIET' : gate && !hard ? `DEATH IS ATTACKING ${gate.label.toUpperCase()}` : 'ALERT'}</b>
+              <b>{situation.key === 'quiet' ? 'ALL QUIET' : situation.route ? `ALERT · ${situation.route}` : 'ALERT'}</b>
               <span>{situation.alert}</span>
+              {gate && <em className="pl-gate">{gateSentence(gate)}</em>}
             </div>
             {result && (
               <div key={result.id} className={`pl-result ${GOOD.has(result.outcome) ? 'is-good' : result.outcome === 'applied' ? 'is-neutral' : 'is-bad'}`} role="status">
@@ -365,7 +528,7 @@ export function Play({ toasts, ...p }: PlayProps) {
                 {result.detail && <span>{result.detail}</span>}
               </div>
             )}
-            {evidence && !terminal && (
+            {evidence && (
               <div className="pl-evidence" onClick={(e) => e.stopPropagation()}>
                 <header>
                   <span>Evidence · {evidence.note?.toLowerCase()}</span>
@@ -385,77 +548,23 @@ export function Play({ toasts, ...p }: PlayProps) {
                 {act?.needs && <p className="pl-pickhint">{target?.kind === act.needs ? `Target picked: ${target.value}` : `Click ${TARGET_WORDS[act.needs]} above to pick your target.`}</p>}
               </div>
             )}
-            {terminal && (
-              <div className="pl-term" onClick={() => input.current?.focus()}>
-                <div className="pl-term-bar">
-                  <span className="dots" aria-hidden>
-                    <i />
-                    <i />
-                    <i />
-                  </span>
-                  <span>BLACKOUT.exe · night shift · advanced terminal</span>
-                  <button type="button" className="pl-term-close" onClick={() => setTerminal(false)}>
-                    close (T)
-                  </button>
-                </div>
-                <div className="pl-term-out" ref={out}>
-                  {log.length === 0 && <p className="pl-hint">Type any command the workstation allows (try `help`). Click an address, account or file to pick it as a target.</p>}
-                  {log.map((e) => (
-                    <div key={e.id} className="pl-entry">
-                      <div className="pl-cmd">
-                        <span className="pl-prompt">{PROMPT}</span> {e.cmd}
-                        {e.note && <span className="pl-note">← {e.note.toLowerCase()}</span>}
-                      </div>
-                      {e.out && output(e)}
-                    </div>
-                  ))}
-                  {busy && <div className="pl-busy">…</div>}
-                </div>
-                <div className="pl-in">
-                  <span className="pl-prompt">{PROMPT}</span>
-                  <input
-                    ref={input}
-                    value={cmd}
-                    spellCheck={false}
-                    autoComplete="off"
-                    aria-label="Type a command"
-                    onChange={(e) => setCmd(e.target.value)}
-                    onKeyDown={(e) => {
-                      e.stopPropagation();
-                      if (e.key === 'Enter' && cmd.trim()) {
-                        void shell(cmd.trim());
-                        setCmd('');
-                      } else if (e.key === 'ArrowUp' && hist.length) {
-                        e.preventDefault();
-                        const n = hi < 0 ? hist.length - 1 : Math.max(0, hi - 1);
-                        setHi(n);
-                        setCmd(hist[n]!);
-                      } else if (e.key === 'ArrowDown' && hi >= 0) {
-                        e.preventDefault();
-                        const n = hi + 1;
-                        setHi(n >= hist.length ? -1 : n);
-                        setCmd(n >= hist.length ? '' : hist[n]!);
-                      } else if (e.key === 'Tab' && run.shell.complete) {
-                        e.preventDefault();
-                        const o = run.shell.complete(cmd);
-                        if (o.length === 1) setCmd(cmd.slice(0, cmd.lastIndexOf(' ') + 1) + o[0]! + (o[0]!.endsWith('/') ? '' : ' '));
-                      } else if (e.key === 'Escape') {
-                        (e.target as HTMLInputElement).blur();
-                        setTerminal(false);
-                      }
-                    }}
-                  />
-                </div>
-              </div>
-            )}
           </div>
         </section>
 
         <aside className={`pl-kiro mood-${mood}`}>
           <Portrait mood={mood} speaking={lastKiro?.id ?? 0} />
           <div className="pl-kiro-name">Kiro</div>
-          <p className={`pl-kiro-line${lastKiro?.urgent ? ' is-urgent' : ''}`}>{asking ? '…' : (lastKiro?.text ?? situation.kiro)}</p>
-          {lastKiro?.offline && <small className="pl-off">rule-written answer (Kiro offline)</small>}
+          {teaching ? (
+            <>
+              <p className="pl-kiro-line">{teaching.lines.join(' ')}</p>
+              <button type="button" className="pl-lesson" onClick={() => setLesson((n) => n + 1)}>
+                {lesson + 1 < steps.length ? `Next (${lesson + 1}/${steps.length})` : 'Got it'}
+              </button>
+            </>
+          ) : (
+            <p className={`pl-kiro-line${lastKiro?.urgent ? ' is-urgent' : ''}`}>{asking ? '…' : (lastKiro?.text ?? situation.kiro)}</p>
+          )}
+          {!teaching && lastKiro?.offline && <small className="pl-off">rule-written answer (Kiro offline)</small>}
           <input
             className="pl-ask"
             placeholder="Ask Kiro anything…"
@@ -469,6 +578,37 @@ export function Play({ toasts, ...p }: PlayProps) {
           />
         </aside>
       </main>
+
+      <Freeze.Provider value={frozen}>
+        {wins.open.map((win) => {
+          const close = () => setWins((s) => closeTool(s, win.id));
+          const common = {
+            win,
+            title: TOOL_BY_ID[win.id].label,
+            onClose: close,
+            onFocus: () => setWins((s) => focusTool(s, win.id)),
+            onMove: (x: number, y: number) => setWins((s) => moveTool(s, win.id, x, y, view())),
+            lit: lit.has(win.id),
+          };
+          if (win.id === 'terminal')
+            return (
+              <FloatWindow key={win.id} {...common} bare>
+                {terminalWin}
+              </FloatWindow>
+            );
+          if (win.id === 'kiro')
+            return (
+              <FloatWindow key={win.id} {...common} bare>
+                <KiroPanel run={run} lines={p.kiroLines} add={p.addKiro} insert={insert} onClose={close} />
+              </FloatWindow>
+            );
+          return (
+            <FloatWindow key={win.id} {...common}>
+              {body(win.id)}
+            </FloatWindow>
+          );
+        })}
+      </Freeze.Provider>
 
       <div className="pl-toasts" aria-live="polite">
         {toasts.map((t) => (
