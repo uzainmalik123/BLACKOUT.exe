@@ -19,7 +19,7 @@ function keysOf(v: unknown, out = new Set<string>()): Set<string> {
   return out;
 }
 
-/** A player who reads the logs, blocks the busiest address, locks an admin and takes a snapshot: every action kind that carries player input. */
+/** A player who reads the logs, blocks the busiest address, locks an admin and takes a snapshot: every action kind that carries player input. (On a lab run, D-230: Death from 0, no freeze.) */
 const busyPlayer = (world: World, realMs: number): PlayerAction[] => {
   if (realMs === 10_000) return [{ type: 'DEF-01', query: 'tail -n 50 /var/log/nginx/access.log', shown: renderAccessLog(world).split('\n').slice(-50), shownTotal: world.logs.access.length }];
   if (realMs === 20_000) {
@@ -36,7 +36,7 @@ describe('the Kiro snapshot (SYS-12, KIRO-07, D-190)', () => {
   it('never serialises a move, minion or tap id, nor any field saying who did what (property over seeds, levels and run lengths)', () => {
     fc.assert(
       fc.property(fc.integer({ min: 1, max: 40 }), fc.constantFrom('easy', 'medium', 'hard' as const), fc.integer({ min: 15, max: 150 }), (seed, difficulty, seconds) => {
-        const { world } = runSim({ seed, difficulty, player: busyPlayer, maxRealMs: seconds * 1000 });
+        const { world } = runSim({ lab: true, seed, difficulty, player: busyPlayer, maxRealMs: seconds * 1000 });
         const s = snapshotOf(world);
         const json = JSON.stringify(s);
         expect(json).not.toMatch(SPOILER_ID);
@@ -53,7 +53,7 @@ describe('the Kiro snapshot (SYS-12, KIRO-07, D-190)', () => {
   }, WHOLE_RUN_TIMEOUT_MS);
 
   it('shows the alerts as what they look like, newest first, with game-clock times and no id of what they are about', () => {
-    const { world } = runSim({ seed: 3, difficulty: 'medium', player: () => [], maxRealMs: 120_000 });
+    const { world } = runSim({ lab: true, seed: 3, difficulty: 'medium', player: () => [], maxRealMs: 120_000 });
     const s = snapshotOf(world);
     expect(world.alerts.length).toBeGreaterThan(0);
     const kinds = new Set(s.alerts.map((a) => a.kind));
@@ -64,7 +64,7 @@ describe('the Kiro snapshot (SYS-12, KIRO-07, D-190)', () => {
   }, WHOLE_RUN_TIMEOUT_MS);
 
   it('carries the player\'s own input per action and never the judge\'s summary', () => {
-    const { world } = runSim({ seed: 1, difficulty: 'easy', player: busyPlayer, maxRealMs: 60_000 });
+    const { world } = runSim({ lab: true, seed: 1, difficulty: 'easy', player: busyPlayer, maxRealMs: 60_000 });
     const s = snapshotOf(world);
     expect(s.actions.map((a) => a.type)).toEqual(['DEF-01', 'DEF-06', 'DEF-02', 'DEF-05', 'DEF-10', 'DEF-12', 'DEF-13', 'DEF-19']);
     expect(s.actions[0]!.what).toBe('read logs: tail -n 50 /var/log/nginx/access.log');
@@ -78,7 +78,7 @@ describe('the Kiro snapshot (SYS-12, KIRO-07, D-190)', () => {
   }, WHOLE_RUN_TIMEOUT_MS);
 
   it('renders the clock as the player\'s dashboard does', () => {
-    const { world } = runSim({ seed: 2, difficulty: 'hard', player: () => [], maxRealMs: 10_000 });
+    const { world } = runSim({ lab: true, seed: 2, difficulty: 'hard', player: () => [], maxRealMs: 10_000 });
     const s = snapshotOf(world);
     expect(s.clock.gameMs).toBe(world.clock.gameMs);
     expect(s.clock.shown).toBe('5 min');

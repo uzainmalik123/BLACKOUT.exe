@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { MOVE_BY_ID } from '../rules/moves';
-import { anyStopperHolds, footholds, gains, needHolds, needsHold, stopperHolds, usedAccountEmails, type VariantInfo } from './facts';
+import { CONFIG } from './config';
+import { bandage } from './bandages';
+import { anyStopperHolds, blocksPick, footholds, gains, needHolds, needsHold, stopperHolds, usedAccountEmails, type VariantInfo } from './facts';
 import { initialWorld, type World } from './state';
 
-const loud: VariantInfo = { ip: '203.0.113.81', quiet: false, targets: [] };
-const quiet: VariantInfo = { ip: '203.0.113.82', quiet: true, targets: [] };
+const loud: VariantInfo = { ip: '203.0.113.81', quiet: false, targets: [], move: 'ATK-08', variant: 'f', userAgents: ['sqlmap/1.10'] };
+const quiet: VariantInfo = { ip: '203.0.113.82', quiet: true, targets: [], move: 'ATK-08', variant: 'd', userAgents: ['Mozilla/5.0 (X11; Linux x86_64)'] };
 const adminSession = (w: World) => w.sessions.push({ id: 1, email: 'admin@juice-sh.op', kind: 'admin', issuedBy: 'ATK-03', keyVersion: w.signingKey.version });
 
 describe('derived gains and footholds', () => {
@@ -136,24 +138,44 @@ describe('D-30: Needs and stoppers of ATK-09, ATK-11 and ATK-17', () => {
 });
 
 describe('stopperHolds', () => {
-  it('a sqli WAF rule stops a loud variant but not a quiet one on Medium (leaky), and stops both on Easy', () => {
-    const w = initialWorld(1, 'medium');
-    const sqli = { action: 'DEF-12', rule: { kind: 'sqli' } } as const;
-    expect(stopperHolds(w, sqli, loud)).toBe(false);
-    w.waf.push({ kind: 'sqli' });
-    expect(stopperHolds(w, sqli, loud)).toBe(true);
-    expect(stopperHolds(w, sqli, quiet)).toBe(false);
-    const easy = initialWorld(1, 'easy');
-    easy.waf.push({ kind: 'sqli' });
-    expect(stopperHolds(easy, sqli, quiet)).toBe(true);
+  it('a sqli WAF rule stops loud and quiet variants alike on every level until the bandage is evaded; then the quiet ones slip it (D-231)', () => {
+    for (const level of ['easy', 'medium', 'hard'] as const) {
+      const w = initialWorld(1, level);
+      const sqli = { action: 'DEF-12', rule: { kind: 'sqli' } } as const;
+      expect(stopperHolds(w, sqli, loud), level).toBe(false);
+      w.waf.push({ kind: 'sqli' });
+      expect(stopperHolds(w, sqli, loud), level).toBe(true);
+      expect(stopperHolds(w, sqli, quiet), level).toBe(true);
+      bandage(w, 'ATK-08', { kind: 'sqli' }); // the rule cut a visit: the bandage is on
+      expect(stopperHolds(w, sqli, quiet), level).toBe(true); // and holds for now
+      w.clock.gameMs = w.bandages[0]!.evadesAt;
+      expect(stopperHolds(w, sqli, quiet), level).toBe(false); // evaded by the quiet halves
+      expect(stopperHolds(w, sqli, loud), level).toBe(true); // never by the loud ones
+      expect(stopperHolds(w, sqli, { ...quiet, move: 'ATK-03' }), level).toBe(true); // nor by another move's
+    }
   });
 
-  it('block-path is never leaky, and a user-agent rule matches case-insensitively', () => {
+  it('block-path holds for any variant; a user-agent rule matches case-insensitively and only an agent the recording carries (D-231)', () => {
     const w = initialWorld(1, 'medium');
     w.waf.push({ kind: 'block-path', method: 'PUT', path: '/api/Products' }, { kind: 'block-user-agent', pattern: 'fuzz faster u fool' });
     expect(stopperHolds(w, { action: 'DEF-12', rule: { kind: 'block-path', method: 'PUT', path: '/api/Products' } }, quiet)).toBe(true);
-    expect(stopperHolds(w, { action: 'DEF-12', rule: { kind: 'block-user-agent', pattern: 'Fuzz Faster U Fool' } }, loud)).toBe(true);
-    expect(stopperHolds(w, { action: 'DEF-12', rule: { kind: 'block-user-agent', pattern: 'Fuzz Faster U Fool' } }, quiet)).toBe(false);
+    const ffuf = { action: 'DEF-12', rule: { kind: 'block-user-agent', pattern: 'Fuzz Faster U Fool' } } as const;
+    expect(stopperHolds(w, ffuf, { ...loud, userAgents: ['Fuzz Faster U Fool v2.1'] })).toBe(true);
+    expect(stopperHolds(w, ffuf, loud)).toBe(false); // sqlmap's agent: the ffuf rule never saw it
+    expect(stopperHolds(w, ffuf, { ip: '203.0.113.1', quiet: false, targets: [] })).toBe(true); // no agents known: the symbolic row holds
+  });
+
+  it('blocksPick: an untried WAF rule or rate limit does not keep the Director from attempting the move; a tried one does (D-231)', () => {
+    const w = initialWorld(1, 'medium');
+    w.waf.push({ kind: 'sqli' });
+    expect(blocksPick(w, MOVE_BY_ID['ATK-08'], quiet)).toBe(false); // attempted: the rule will cut it
+    bandage(w, 'ATK-08', { kind: 'sqli' });
+    expect(blocksPick(w, MOVE_BY_ID['ATK-08'], quiet)).toBe(true); // tried: not until the breathers are over
+    w.clock.gameMs = w.bandages[0]!.evadesAt;
+    expect(blocksPick(w, MOVE_BY_ID['ATK-08'], quiet)).toBe(false); // evaded
+    expect(blocksPick(w, MOVE_BY_ID['ATK-08'], loud)).toBe(true);
+    w.features.search = false;
+    expect(blocksPick(w, MOVE_BY_ID['ATK-08'], quiet)).toBe(true); // a flag is no bandage: it blocks the pick at once
   });
 
   it('DEF-06 holds for a variant whose IP is blocked', () => {
@@ -221,10 +243,10 @@ describe('stopperHolds', () => {
   });
 });
 
-describe('WAF rules against ATK-08 (D-34, on the halves: D-42)', () => {
+describe('WAF rules against ATK-08 (D-231, on the halves: D-42)', () => {
   const sqli = { action: 'DEF-12', rule: { kind: 'sqli' } } as const;
   const ua = { action: 'DEF-12', rule: { kind: 'block-user-agent', pattern: 'sqlmap' } } as const;
-  const half = (variant: string): VariantInfo => ({ ip: '203.0.113.85', quiet: false, targets: [], move: 'ATK-08', variant });
+  const half = (variant: string): VariantInfo => ({ ip: '203.0.113.85', quiet: 'de'.includes(variant), targets: [], move: 'ATK-08', variant, userAgents: ['de'.includes(variant) ? 'Mozilla/5.0 (Macintosh)' : 'sqlmap/1.10.11#pip'] });
   const quietHalves = [half('d'), half('e')];
   const loudHalves = [half('f'), half('g')];
   const withRules = (difficulty: 'easy' | 'medium' | 'hard') => {
@@ -233,15 +255,21 @@ describe('WAF rules against ATK-08 (D-34, on the halves: D-42)', () => {
     return w;
   };
 
-  it('the SQLi rule set stops the quiet halves ATK-08.d/.e on Easy only; on Medium and Hard their tamper scripts leak through', () => {
-    for (const q of quietHalves) {
-      expect(stopperHolds(withRules('easy'), sqli, q)).toBe(true);
-      expect(stopperHolds(withRules('medium'), sqli, q)).toBe(false);
-      expect(stopperHolds(withRules('hard'), sqli, q)).toBe(false);
+  it('the SQLi rule set stops the quiet halves ATK-08.d/.e on every level until it has cut a visit and the breathers are over (two on Easy)', () => {
+    for (const d of ['easy', 'medium', 'hard'] as const) {
+      const w = withRules(d);
+      for (const q of quietHalves) expect(stopperHolds(w, sqli, q), d).toBe(true);
+      bandage(w, 'ATK-08', { kind: 'sqli' });
+      expect(w.bandages[0]!.evadesAt - w.bandages[0]!.at, d).toBe(CONFIG[d].bandage.breathers * CONFIG[d].breatherGameMs.max);
+      w.clock.gameMs = w.bandages[0]!.evadesAt;
+      for (const q of quietHalves) expect(stopperHolds(w, sqli, q), d).toBe(false);
+      for (const l of loudHalves) expect(stopperHolds(w, sqli, l), d).toBe(true);
     }
+    expect(CONFIG.easy.bandage.breathers).toBe(2);
+    expect(CONFIG.medium.bandage.breathers).toBe(1);
   });
 
-  it('a sqlmap user-agent rule matches only the loud halves ATK-08.f/.g, on every level', () => {
+  it('a sqlmap user-agent rule matches only the loud halves ATK-08.f/.g, on every level: it never saw the quiet halves\' browser agents', () => {
     for (const d of ['easy', 'medium', 'hard'] as const) {
       for (const q of quietHalves) expect(stopperHolds(withRules(d), ua, q), d).toBe(false);
       for (const l of loudHalves) {

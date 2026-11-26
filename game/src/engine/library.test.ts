@@ -24,7 +24,7 @@ describe('the recording library', () => {
     const a = fakeRecording('ATK-05', 'a', { ip: '203.0.113.1' });
     const lib = libraryFrom([b, a]);
     expect(lib.variantsOf('ATK-05').map((v) => v.variant)).toEqual(['a', 'b']);
-    expect(lib.variantsOf('ATK-05')[1]!.info).toEqual({ ip: '203.0.113.2', quiet: true, targets: ['jim@juice-sh.op'], move: 'ATK-05', variant: 'b' });
+    expect(lib.variantsOf('ATK-05')[1]!.info).toEqual({ ip: '203.0.113.2', quiet: true, targets: ['jim@juice-sh.op'], move: 'ATK-05', variant: 'b', userAgents: [] });
   });
 
   it('refuses an invalid recording with its validation errors', () => {

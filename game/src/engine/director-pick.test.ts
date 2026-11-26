@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { applyAction } from './actions';
 import { advance } from './advance';
+import { bandage } from './bandages';
 import { CONFIG } from './config';
 import { directorTick, openAlerts } from './director';
 import { eventsOfKind } from './log';
 import { libraryFrom } from './library';
 import { initialWorld, type World } from './state';
+import { lab } from './test-fixtures/lab';
 import { FIXTURE_LIBRARY } from './test-fixtures/recordings';
 import { WHOLE_RUN_TIMEOUT_MS } from './test-fixtures/timeouts';
 
@@ -14,7 +16,7 @@ const REAL_S = 1000;
 const lib = FIXTURE_LIBRARY;
 
 function run(seed: number, realMs: number, player?: (w: World, t: number) => void): World {
-  const w = initialWorld(seed, 'medium');
+  const w = lab(initialWorld(seed, 'medium'));
   for (let t = 0; t < realMs && !w.ending; t += REAL_S) {
     player?.(w, t);
     advance(w, lib, REAL_S);
@@ -33,13 +35,13 @@ describe('the Director (SYS-02)', () => {
   });
 
   it('prefers later stages among allowed candidates and ties deterministically', () => {
-    const w = initialWorld(1, 'medium');
+    const w = lab(initialWorld(1, 'medium'));
     w.death.knowledge.push('map');
     w.death.played.push({ move: 'ATK-01', variant: 'a', outcome: 'landed' });
     directorTick(w, lib);
     const [started] = eventsOfKind(w, 'move-started');
     expect(started!.stage).toBe(2);
-    const again = initialWorld(1, 'medium');
+    const again = lab(initialWorld(1, 'medium'));
     again.death.knowledge.push('map');
     again.death.played.push({ move: 'ATK-01', variant: 'a', outcome: 'landed' });
     directorTick(again, lib);
@@ -72,15 +74,15 @@ describe('the Director (SYS-02)', () => {
   });
 
   it('pacing: more than 3 open alerts delays the next move once; no open alert for 60 real s brings it forward', () => {
-    const w = initialWorld(1, 'medium');
-    for (let i = 0; i < 4; i++) w.alerts.push({ id: i, about: 'MIN-01', openedAt: 0 });
+    const w = lab(initialWorld(1, 'medium'));
+    for (let i = 0; i < 4; i++) w.alerts.push({ id: i, about: 'MIN-01', openedAt: 0, route: '/', symptom: 'probes', gate: 'front door' });
     expect(openAlerts(w)).toBe(4);
     directorTick(w, lib);
     expect(eventsOfKind(w, 'move-started')).toEqual([]);
     expect(w.death.nextMoveAt).toBe(medium.breatherGameMs.max);
     directorTick(w, lib);
     expect(w.death.nextMoveAt).toBe(medium.breatherGameMs.max); // once, not every tick
-    const q = initialWorld(1, 'medium');
+    const q = lab(initialWorld(1, 'medium'));
     q.death.nextMoveAt = 10 * medium.breatherGameMs.max;
     q.clock.gameMs = medium.pacing.bringForwardAfterQuietGameMs - 3000;
     directorTick(q, lib);
@@ -91,7 +93,7 @@ describe('the Director (SYS-02)', () => {
   });
 
   it('a tip-off lets him skip one stage and play at once', () => {
-    const w = initialWorld(1, 'medium');
+    const w = lab(initialWorld(1, 'medium'));
     w.death.knowledge.push('map');
     w.death.played.push({ move: 'ATK-01', variant: 'a', outcome: 'landed' });
     w.events.push({ id: 1, t: 0, kind: 'move-started', move: 'ATK-01', variant: 'a', stage: 1, ip: '203.0.113.10' }); // D-111: a tip-off needs one of his addresses
@@ -105,7 +107,7 @@ describe('the Director (SYS-02)', () => {
     expect(w.death.stageSkips).toBe(0);
   });
   it('starts nothing while the plug is pulled, and resumes when nginx is back', () => {
-    const w = initialWorld(1, 'medium');
+    const w = lab(initialWorld(1, 'medium'));
     applyAction(w, { type: 'DEF-11' });
     advance(w, lib, 30 * REAL_S); // (the plug flatlines at 50 real s: SYS-06)
     expect(eventsOfKind(w, 'move-started')).toEqual([]);
@@ -130,7 +132,7 @@ describe('the Director (SYS-02)', () => {
 
   it('a library that only covers some stages skips the missing ones instead of ending the run', () => {
     const partial = libraryFrom(['ATK-01', 'ATK-03', 'ATK-08'].flatMap((m) => lib.variantsOf(m as 'ATK-01').map((v) => v.recording)));
-    const w = initialWorld(1, 'medium');
+    const w = lab(initialWorld(1, 'medium'));
     for (let t = 0; t < 10 * 60 * REAL_S && !w.ending; t += REAL_S) advance(w, partial, REAL_S);
     const started = eventsOfKind(w, 'move-started').map((e) => e.move);
     expect(started.slice(0, 3)).toEqual(['ATK-01', 'ATK-03', 'ATK-08']);
@@ -145,7 +147,7 @@ describe('the harvest variant (D-31, D-42: the halves)', () => {
 
   /** A world where ATK-01 has landed, so ATK-08 is the next candidate (stages 2 and 3 have no recording here). */
   function readyToHarvest(difficulty: 'easy' | 'medium' | 'hard'): World {
-    const w = initialWorld(1, difficulty);
+    const w = lab(initialWorld(1, difficulty));
     w.death.knowledge.push('map');
     w.death.played.push({ move: 'ATK-01', variant: 'a', outcome: 'landed' });
     w.events.push({ id: 1, t: 0, kind: 'move-started', move: 'ATK-01', variant: 'a', stage: 1, ip: '203.0.113.10' }); // D-111: a tip-off needs one of his addresses
@@ -173,7 +175,7 @@ describe('the harvest variant (D-31, D-42: the halves)', () => {
   it('never picks ATK-08.a, .b or .c in play, even when the halves have been played or cut', { timeout: WHOLE_RUN_TIMEOUT_MS }, () => {
     for (let seed = 1; seed <= 10; seed++) {
       for (const difficulty of ['easy', 'medium', 'hard'] as const) {
-        const w = initialWorld(seed, difficulty);
+        const w = lab(initialWorld(seed, difficulty));
         for (let t = 0; t < 15 * 60 * REAL_S && !w.ending; t += REAL_S) {
           if (t === 60 * REAL_S) for (const v of lib.variantsOf('ATK-08')) applyAction(w, { type: 'DEF-06', ip: v.info.ip, op: 'add' });
           advance(w, harvestLib, REAL_S);
@@ -183,10 +185,19 @@ describe('the harvest variant (D-31, D-42: the halves)', () => {
     }
   });
 
-  it('a stopper on the pinned halves closes ATK-08: on Easy a SQLi rule stops .d/.e and he does not fall back to .a, .b, .c or the loud halves', () => {
+  it('a SQLi rule on the pinned halves is attempted once (D-231): on Easy he tries .d, and once the rule has cut him he does not fall back to .a, .b, .c or the loud halves until the bandage is evaded', () => {
     const w = readyToHarvest('easy');
     applyAction(w, { type: 'DEF-12', rule: { kind: 'sqli' } });
     directorTick(w, harvestLib);
-    expect(harvest(w)).toBeUndefined();
+    expect(harvest(w)).toMatchObject({ variant: 'd' }); // the attempt the rule will cut
+    const tried = readyToHarvest('easy');
+    applyAction(tried, { type: 'DEF-12', rule: { kind: 'sqli' } });
+    bandage(tried, 'ATK-08', { kind: 'sqli' });
+    directorTick(tried, harvestLib);
+    expect(harvest(tried)).toBeUndefined();
+    tried.clock.gameMs = tried.bandages[0]!.evadesAt;
+    tried.death.nextMoveAt = 0;
+    directorTick(tried, harvestLib);
+    expect(harvest(tried)).toMatchObject({ variant: 'd' }); // evaded: the quiet half again, never .a/.b/.c or the loud ones
   });
 });

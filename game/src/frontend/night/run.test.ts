@@ -3,6 +3,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { Engine } from '../../engine/engine';
+import { lab } from '../../engine/test-fixtures/lab';
 import { ENDINGS, anomalies } from './judge';
 import { readingsOf, runOn } from './run';
 
@@ -12,7 +13,7 @@ const newRun = (difficulty: 'easy' | 'medium' | 'hard' = 'medium', seed = 7) => 
 describe('the night shift on the real engine (D-223)', () => {
   it('the first check reads Death\'s first scan in the live numbers', () => {
     const { engine } = newRun();
-    for (let i = 0; i < 40; i++) engine.advance(250);
+    for (let i = 0; i < 160; i++) engine.advance(250); // 40 real s: past the calm opening (D-230: 20–30 s on Medium)
     const r = readingsOf(engine);
     expect(r.requests).toBeGreaterThan(0);
     expect(r.nginx).toBe('running');
@@ -22,7 +23,7 @@ describe('the night shift on the real engine (D-223)', () => {
 
   it('grep, sqlite3, iptables and systemctl run through the shell and change the world as the engine says', async () => {
     const { engine, shell } = newRun();
-    for (let i = 0; i < 40; i++) engine.advance(250);
+    for (let i = 0; i < 160; i++) engine.advance(250); // past the calm opening and its first alert (D-230, D-232)
     // Juice Shop answers unknown paths with 200: the scan shows as a tool's name, which grep finds
     const grep = await shell.run('grep "Fuzz Faster" /var/log/nginx/access.log | head -3');
     expect(grep.exitCode).toBe(0);
@@ -44,6 +45,7 @@ describe('the night shift on the real engine (D-223)', () => {
 
   it('a console button is an engine action whose answer the screen shows; harmless reads cost nothing', () => {
     const { engine } = newRun();
+    lab(engine.world); // the incident declared: a console action lands at once (the change freeze, D-230)
     engine.advance(1000);
     const before = engine.world.heartbeat;
     const r = engine.act({ type: 'DEF-12', rule: { kind: 'sqli' } });

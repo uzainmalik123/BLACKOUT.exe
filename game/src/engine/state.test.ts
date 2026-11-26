@@ -33,7 +33,7 @@ describe('initialWorld (SYS-04)', () => {
   it('is deterministic for a seed and differs between seeds only in seed and rng', () => {
     expect(initialWorld(3, 'easy')).toEqual(initialWorld(3, 'easy'));
     const blank = { open: [], opened: [], nextAt: 0, rng: 0 }; // D-42: the taps' own stream and first opening follow the seed too
-    const same = (seed: number) => ({ ...initialWorld(seed, 'easy'), seed: 0, rng: 0, taps: blank, customers: { ...initialWorld(seed, 'easy').customers, rng: 0 } }); // D-65: the customers' stream too
+    const same = (seed: number) => ({ ...initialWorld(seed, 'easy'), seed: 0, rng: 0, taps: blank, customers: { ...initialWorld(seed, 'easy').customers, rng: 0 }, shift: { rng: 0 } }); // D-65: the customers' stream too; D-230: the shift's
     expect(same(3)).toEqual(same(4));
     expect(initialWorld(3, 'easy').rng).not.toBe(initialWorld(4, 'easy').rng);
     expect(initialWorld(3, 'easy').customers.rng).not.toBe(initialWorld(4, 'easy').customers.rng);

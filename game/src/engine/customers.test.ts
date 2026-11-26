@@ -364,13 +364,13 @@ describe('the committed customers (REC-06) in whole runs', { timeout: WHOLE_RUN_
   });
 
   it('with search off every customer search answers 503 (the product list does not); with the plug pulled no customer line appears', () => {
-    const off = runSim({ seed: 1, difficulty: 'medium', library: real, maxRealMs: 3 * REAL_MIN, player: (_w, ms) => (ms === 0 ? [{ type: 'DEF-10', feature: 'search', enabled: false }] : []) });
+    const off = runSim({ lab: true, seed: 1, difficulty: 'medium', library: real, maxRealMs: 3 * REAL_MIN, player: (_w, ms) => (ms === 0 ? [{ type: 'DEF-10', feature: 'search', enabled: false }] : []) }); // the lab: no change freeze (D-230)
     const searches = off.world.logs.access.filter((l) => l.by === 'CUST' && /search\?q=.+/.test(l.target));
     expect(searches.length).toBeGreaterThan(5); // fewer than usual: a shopper whose second search fails gives up
     expect(new Set(searches.map((l) => l.status))).toEqual(new Set([503]));
     expect(new Set(off.world.logs.access.filter((l) => l.by === 'CUST' && l.target === '/rest/products/search?q=').map((l) => l.status))).toEqual(new Set([200]));
     expect(off.world.tickets.length).toBeGreaterThan(0);
-    const plug = runSim({ seed: 1, difficulty: 'medium', library: real, maxRealMs: 3 * REAL_MIN, player: (_w, ms) => (ms === 0 ? [{ type: 'DEF-11' }] : []) });
+    const plug = runSim({ lab: true, seed: 1, difficulty: 'medium', library: real, maxRealMs: 3 * REAL_MIN, player: (_w, ms) => (ms === 0 ? [{ type: 'DEF-11' }] : []) });
     expect(plug.world.logs.access.filter((l) => l.by === 'CUST')).toEqual([]);
     expect(plug.world.customers.failed).toBe(0);
   });

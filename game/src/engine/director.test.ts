@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { MOVE_BY_ID } from '../rules/moves';
 import { applyAction } from './actions';
 import { advance } from './advance';
+import { bandage } from './bandages';
 import { CONFIG } from './config';
 import { checkBanishment, playableMoves, playableVariants, returnGrants } from './director';
 import { footholds, gains } from './facts';
@@ -9,6 +10,7 @@ import { eventsOfKind } from './log';
 import { EMPTY_LIBRARY, libraryFrom, type RecordingLibrary } from './library';
 import { startReplay } from './replay';
 import { initialWorld, type World } from './state';
+import { lab } from './test-fixtures/lab';
 import { FIXTURE_LIBRARY } from './test-fixtures/recordings';
 
 const medium = CONFIG.medium;
@@ -24,7 +26,7 @@ function landNow(w: World, lib: RecordingLibrary, move: Parameters<RecordingLibr
 
 describe('playable moves (SYS-07)', () => {
   it('a move is playable when its Needs hold and a variant has no stopper (a blocked IP is not one)', () => {
-    const w = initialWorld(1, 'medium');
+    const w = lab(initialWorld(1, 'medium'));
     expect(playableMoves(w, FIXTURE_LIBRARY).map((m) => m.id)).toEqual(['ATK-01']);
     w.death.knowledge.push('map');
     expect(playableMoves(w, FIXTURE_LIBRARY).map((m) => m.id)).toEqual(['ATK-01', 'ATK-02', 'ATK-03', 'ATK-04', 'ATK-05', 'ATK-06', 'ATK-08', 'ATK-11', 'ATK-13', 'ATK-15', 'ATK-16', 'ATK-17']); // D-30: ATK-11/17 need only map; D-41: ATK-13 too
@@ -33,12 +35,16 @@ describe('playable moves (SYS-07)', () => {
     w.features.search = false;
     expect(playableVariants(w, FIXTURE_LIBRARY, MOVE_BY_ID['ATK-08'])).toEqual([]);
     w.waf.push({ kind: 'sqli' });
-    expect(playableVariants(w, FIXTURE_LIBRARY, MOVE_BY_ID['ATK-03']).map((v) => v.variant)).toEqual(['c']); // the quiet one leaks through
+    expect(playableVariants(w, FIXTURE_LIBRARY, MOVE_BY_ID['ATK-03']).map((v) => v.variant)).toEqual(['a', 'b', 'c']); // D-231: an untried rule is attempted
+    bandage(w, 'ATK-03', { kind: 'sqli' }); // it cut him: tried
+    expect(playableVariants(w, FIXTURE_LIBRARY, MOVE_BY_ID['ATK-03'])).toEqual([]);
+    w.clock.gameMs = w.bandages[0]!.evadesAt;
+    expect(playableVariants(w, FIXTURE_LIBRARY, MOVE_BY_ID['ATK-03']).map((v) => v.variant)).toEqual(['c']); // the quiet one slips it once the breathers are over
     expect(playableMoves(w, EMPTY_LIBRARY)).toEqual([]);
   });
 
   it('a landed move is not playable again', () => {
-    const w = initialWorld(1, 'medium');
+    const w = lab(initialWorld(1, 'medium'));
     landNow(w, FIXTURE_LIBRARY, 'ATK-01');
     expect(gains(w).has('map')).toBe(true);
     expect(playableMoves(w, FIXTURE_LIBRARY).map((m) => m.id)).not.toContain('ATK-01');
@@ -48,7 +54,7 @@ describe('playable moves (SYS-07)', () => {
 describe('banishment and the return (SYS-07)', () => {
   it("win when no move's Needs hold and no foothold is left", () => {
     const lib = only('ATK-01');
-    const w = initialWorld(1, 'medium');
+    const w = lab(initialWorld(1, 'medium'));
     landNow(w, lib, 'ATK-01');
     advance(w, lib, 3100);
     expect(w.ending).toBe('banished');
@@ -58,7 +64,7 @@ describe('banishment and the return (SYS-07)', () => {
 
   it("leaving ATK-11's admin in place always triggers the return", () => {
     const lib = only('ATK-11');
-    const w = initialWorld(1, 'medium');
+    const w = lab(initialWorld(1, 'medium'));
     adminSession(w);
     landNow(w, lib, 'ATK-11');
     expect(footholds(w).has('hidden-admin')).toBe(true);
@@ -79,7 +85,7 @@ describe('banishment and the return (SYS-07)', () => {
 
   it('removing the foothold during the quiet period banishes him for good', () => {
     const lib = only('ATK-11');
-    const w = initialWorld(1, 'medium');
+    const w = lab(initialWorld(1, 'medium'));
     adminSession(w);
     landNow(w, lib, 'ATK-11');
     advance(w, lib, REAL_MIN);
@@ -92,7 +98,7 @@ describe('banishment and the return (SYS-07)', () => {
 
   it('a route reopened during the quiet period clears it: he is not quiet while he can still play', () => {
     const lib = only('ATK-01', 'ATK-02');
-    const w = initialWorld(1, 'medium');
+    const w = lab(initialWorld(1, 'medium'));
     applyAction(w, { type: 'DEF-10', feature: 'ftp', enabled: false });
     w.files.push({ path: 'complaints/x.zip', size: 1, sha256: 'a'.repeat(64), plantedBy: 'ATK-13' });
     landNow(w, lib, 'ATK-01');
@@ -105,7 +111,7 @@ describe('banishment and the return (SYS-07)', () => {
 
   it('a rotated key does not remove the forged token: the return comes through it (SIM-7 shape)', () => {
     const lib = only('ATK-14');
-    const w = initialWorld(1, 'medium');
+    const w = lab(initialWorld(1, 'medium'));
     w.death.knowledge.push('map', 'secrets-leaked');
     landNow(w, lib, 'ATK-14');
     applyAction(w, { type: 'DEF-09' });
@@ -120,7 +126,7 @@ describe('banishment and the return (SYS-07)', () => {
     expect(returnGrants('hijacked-user')).toBe('user-session');
     expect(returnGrants('forged-token')).toBe('admin-session');
     expect(returnGrants('planted-file')).toBe('map');
-    const w = initialWorld(1, 'medium');
+    const w = lab(initialWorld(1, 'medium'));
     checkBanishment(w, FIXTURE_LIBRARY);
     expect(w.ending).toBeUndefined();
     expect(eventsOfKind(w, 'banished')).toEqual([]);

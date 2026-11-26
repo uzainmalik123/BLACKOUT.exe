@@ -23,14 +23,14 @@ const arbIdentifier = fc
   .filter((n) => !LISTED.includes(n));
 
 describe('Property 27: the command list equals the steering list', () => {
-  it('has the same set as the steering line, 31 entries, no duplicates; differences are named', () => {
+  it('has the same set as the steering line, 32 entries, no duplicates; differences are named', () => {
     const steering = steeringCommands();
     const diffs = [
       ...steering.filter((c) => !LISTED.includes(c)).map((c) => `${c}: only in game-shell.md`),
       ...LISTED.filter((c) => !steering.includes(c)).map((c) => `${c}: only in COMMAND_LIST`),
     ];
     expect(diffs, diffs.join('; ')).toEqual([]);
-    expect(LISTED).toHaveLength(31);
+    expect(LISTED).toHaveLength(32);
     expect(new Set(LISTED).size).toBe(LISTED.length);
     expect(new Set(steering).size).toBe(steering.length);
   });

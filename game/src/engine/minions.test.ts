@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { applyAction } from './actions';
+import { stepAlerts } from './alerts';
 import { CONFIG } from './config';
 import { gains } from './facts';
 import { integrateHeartbeat } from './heartbeat';
@@ -19,20 +20,22 @@ function runWaves(w: World, realMs: number): void {
     w.clock.gameMs += medium.tickGameMs;
     stepReplays(w, lib);
     stepWaves(w, lib);
+    stepAlerts(w); // D-232: a wave's alert opens when a detector sees its lines
     integrateHeartbeat(w, medium.tickGameMs);
   }
 }
 const started = (w: World, minion: string) => eventsOfKind(w, 'wave-started').filter((e) => e.minion === minion);
 
 describe('minion waves (PRD §4)', () => {
-  it('waves start at the configured times and repeat with their period, each opening an alert and a replay', () => {
+  it('waves start at the configured times and repeat with their period, each opening an alert (by its probes, D-232) and a replay', () => {
     const w = initialWorld(1, 'medium');
     runWaves(w, 29_000);
     expect(started(w, 'MIN-01')).toEqual([]);
     runWaves(w, 2_000);
     expect(started(w, 'MIN-01')).toMatchObject([{ wave: 1 }]);
     expect(started(w, 'MIN-01')[0]!.ips).toHaveLength(3);
-    expect(w.alerts).toMatchObject([{ about: 'MIN-01' }]);
+    expect(w.alerts).toMatchObject([{ about: 'MIN-01', route: '/', gate: 'front door' }]);
+    expect(w.alerts[0]!.symptom).toMatch(/PHP, WordPress or config paths/);
     expect(w.replays).toMatchObject([{ owner: 'MIN-01', move: 'MIN-01' }]);
     runWaves(w, 120_000);
     expect(started(w, 'MIN-01')).toHaveLength(2);

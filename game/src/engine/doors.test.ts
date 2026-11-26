@@ -247,20 +247,22 @@ describe('the doors, unit by unit (D-42)', () => {
     expect(halves(w)).toEqual([]);
   });
 
-  it('on Medium the SQLi and sqlmap rules leave the quiet halves open: the door stays his (D-34)', { timeout: WHOLE_RUN_TIMEOUT_MS }, () => {
-    const r = run((w) => (w.waf.length === 0 && eventsOfKind(w, 'move-landed').some((e) => e.move === 'ATK-08')
-      ? [{ type: 'DEF-12', rule: { kind: 'sqli' } }, { type: 'DEF-12', rule: { kind: 'block-user-agent', pattern: 'sqlmap' } }] as PlayerAction[]
-      : []), { minutes: 15 });
-    expect(eventsOfKind(r.world, 'door-shut')).toEqual([]);
-    expect(eventsOfKind(r.world, 'move-started').filter((e) => e.move === 'ATK-08').length).toBeGreaterThanOrEqual(3);
-  });
-
-  it('on Easy a SQLi rule after the first visit closes the door (the rule stays, so it stays shut)', { timeout: WHOLE_RUN_TIMEOUT_MS }, () => {
-    const r = run((w) => (w.waf.length === 0 && eventsOfKind(w, 'move-landed').some((e) => e.move === 'ATK-08')
-      ? [{ type: 'DEF-12', rule: { kind: 'sqli' } }] as PlayerAction[] : []), { minutes: 15, difficulty: 'easy' });
-    expect(eventsOfKind(r.world, 'door-shut')).toMatchObject([{ move: 'ATK-08', by: 'DEF-12' }]);
-    expect(eventsOfKind(r.world, 'move-started').filter((e) => e.move === 'ATK-08')).toHaveLength(1);
-  });
+  for (const difficulty of ['medium', 'easy'] as const) {
+    it(`on ${difficulty} the SQLi rule after the first visit shuts the door, the next visit is attempted and cut by it, and after the bandage's breathers the door reopens and the quiet halves rob it (D-231)`, { timeout: WHOLE_RUN_TIMEOUT_MS }, () => {
+      const r = run((w) => (w.waf.length === 0 && eventsOfKind(w, 'move-landed').some((e) => e.move === 'ATK-08')
+        ? [{ type: 'DEF-12', rule: { kind: 'sqli' } }, { type: 'DEF-12', rule: { kind: 'block-user-agent', pattern: 'sqlmap' } }] as PlayerAction[]
+        : []), { minutes: 20, difficulty });
+      expect(eventsOfKind(r.world, 'door-shut')).toMatchObject([{ move: 'ATK-08', by: 'DEF-12' }]);
+      const cut = eventsOfKind(r.world, 'move-cut').find((e) => e.move === 'ATK-08' && e.by === 'DEF-12')!;
+      expect(cut).toBeDefined(); // attempted and cut: the bandage held once
+      const evaded = eventsOfKind(r.world, 'rule-evaded').find((e) => e.move === 'ATK-08')!;
+      expect(evaded).toMatchObject({ rule: { kind: 'sqli' } });
+      expect(evaded.t - cut.t).toBe(CONFIG[difficulty].bandage.breathers * CONFIG[difficulty].breatherGameMs.max);
+      expect(eventsOfKind(r.world, 'door-reopened').some((e) => e.move === 'ATK-08' && e.t >= evaded.t)).toBe(true);
+      expect(eventsOfKind(r.world, 'move-started').filter((e) => e.move === 'ATK-08' && e.t > evaded.t).length).toBeGreaterThanOrEqual(2); // his again
+      expect(new Set(eventsOfKind(r.world, 'move-started').filter((e) => e.move === 'ATK-08').map((e) => e.variant))).toEqual(new Set(['d', 'e']));
+    });
+  }
 
   it('the users API is a door too: the first scrape takes one half, later visits the rest, and the access-control patch closes it', { timeout: WHOLE_RUN_TIMEOUT_MS }, () => {
     const users = only(['ATK-01', 'ATK-03', 'ATK-09']);

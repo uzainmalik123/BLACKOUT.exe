@@ -9,6 +9,7 @@ import { TAP_BY_ID } from '../rules/taps';
 import { FOOTHOLDS, type ActionId, type Feature, type Foothold, type MoveId, type Patch, type PlayerAction, type Stage, type TapId } from '../rules/vocabulary';
 import { CONFIG } from './config';
 import { footholds } from './facts';
+import { falseLeads } from './flags';
 import { eventsOfKind, type GameEvent } from './log';
 import { confirmBreach } from './notification';
 import type { World } from './state';
@@ -124,6 +125,7 @@ export const GRADING = {
   whackAMole: 3, // IP blocks on his addresses (PRD SYS-11)
   downtime: { some: 1 * REAL_MIN, long: 3 * REAL_MIN }, // the plug pulled, in total
   churn: 10, // customers who gave up
+  falseLeads: 2, // D-233: flags on addresses that were never an attacker's
 } as const;
 
 type Action = Extract<GameEvent, { kind: 'action' }>;
@@ -136,7 +138,7 @@ function index(events: GameEvent[]): Kinds {
   for (const kind of KINDS) (k[kind] as GameEvent[] | undefined) ??= [];
   return k;
 }
-const KINDS: readonly GameEvent['kind'][] = ['move-started', 'move-landed', 'move-cut', 'wave-started', 'wave-ended', 'action', 'kiro', 'souls-stolen', 'tip-off', 'alert-opened', 'alert-closed', 'tap-opened', 'tap-closed', 'door-shut', 'door-reopened', 'proxies', 'ticket', 'customer-lost', 'patch-applied', 'banished', 'return', 'ending'];
+const KINDS: readonly GameEvent['kind'][] = ['move-started', 'move-landed', 'move-cut', 'wave-started', 'wave-ended', 'action', 'kiro', 'souls-stolen', 'tip-off', 'alert-opened', 'alert-closed', 'tap-opened', 'tap-closed', 'door-shut', 'door-reopened', 'proxies', 'ticket', 'customer-lost', 'patch-applied', 'banished', 'return', 'ending', 'shift-begun', 'incident-declared', 'flag-confirmed', 'rule-evaded'];
 
 /** Game time as the player saw it on the clock: minutes, or hours and minutes. */
 export function fmtGameMs(ms: number): string {
@@ -261,8 +263,8 @@ export function hurtHim(a: PlayerAction, ctx: RelevanceContext): Set<Hurt> {
   return hit;
 }
 
-/** A relevance verdict: what the action showed or hurt, for the report, the gaps and the breach confirmation. */
-export interface Verdict { relevant: boolean; showed?: Set<HisThing>; hurt?: Set<Hurt>; users?: boolean }
+/** A relevance verdict: what the action showed, hurt or (a confirmed flag, D-233) found, for the report, the gaps and the breach confirmation. */
+export interface Verdict { relevant: boolean; showed?: Set<HisThing>; hurt?: Set<Hurt>; users?: boolean; found?: MoveId }
 
 /**
  * D-115: an action is relevant if (a) it showed the player something of Death's and the output was focused, or (b) it
@@ -276,9 +278,10 @@ export function judgeAction(a: PlayerAction, ctx: RelevanceContext): Verdict {
   return { relevant, ...(showed?.focused && { showed: showed.about }), ...(hurt.size > 0 && { hurt }), ...(a.type === 'DEF-02' && showed?.focused && USERS_SQL.test(a.sql) && { users: true }) };
 }
 
-/** D-116: does a relevant action confirm the breach? On a harvest move (shown or hurt) or on Users. */
+/** D-116: does a relevant action confirm the breach? On a harvest move (shown, hurt or found by a flag) or on Users. */
 function confirms(v: Verdict): boolean {
   if (v.users) return true;
+  if (v.found !== undefined && HARVEST.has(v.found)) return true;
   for (const m of v.showed ?? []) if (HARVEST.has(m as MoveId)) return true;
   for (const m of v.hurt ?? []) if (HARVEST.has(m as MoveId)) return true;
   return false;
@@ -328,6 +331,13 @@ function judgeFrom(world: World, know: Knowledge, judge: AssessState['judge'], f
       const verdict: Verdict = { relevant: true, hurt: new Set<Hurt>([...stopped, ...(token ? ['forged-token' as const] : [])]) };
       out.push({ e: deploy, at: e.t, verdict });
       if (commit && stolen && confirms(verdict)) confirmBreach(world, 'DEF-13', e.t);
+    } else if (e.kind === 'flag-confirmed') {
+      // D-233: the flag that named this address is the discovery of the move that confirmed it, now (flags.ts confirms the breach itself)
+      let flag: Action | undefined;
+      for (let j = i - 1; j >= 0 && !flag; j--) { const x = world.events[j]!; if (x.kind === 'action' && x.ok && x.action.type === 'DEF-21' && x.action.ip === e.ip) flag = x; }
+      if (!flag) continue;
+      const found = e.about.startsWith('ATK-') ? (e.about as MoveId) : undefined;
+      out.push({ e: flag, at: e.t, verdict: { relevant: true, ...(found !== undefined && { found }) } });
     } else if (e.kind === 'action' && e.ok) {
       const verdict = judgeAction(e.action, ctx);
       if (!verdict.relevant) continue;
@@ -346,18 +356,25 @@ function judgeFrom(world: World, know: Knowledge, judge: AssessState['judge'], f
 /**
  * The relevant action events, in order: the verdicts stepAssess made as they happened (judged against what he had done
  * by then, never revised), plus a judgement now of any action it hasn't seen yet (inside one tick, the same thing).
+ * `at` is when each became relevant: a deploy when its patch landed, a flag when it was confirmed (D-233), else its own time.
  */
-function relevantActions(world: World, know: Knowledge): Action[] {
+function relevantActions(world: World, know: Knowledge): { actions: Action[]; at: Map<number, number> } {
   const a = world.assess;
   const judged = new Set(a.relevant);
   const last = world.events.at(-1)?.id ?? 0;
   const fresh = last > a.judgedUpTo ? new Set(judgeFrom(world, know, structuredClone(a.judge), a.judgedUpTo, false).map((x) => x.e.id)) : new Set<number>();
-  return world.events.filter((e): e is Action => e.kind === 'action' && e.ok && (judged.has(e.id) || fresh.has(e.id)));
+  const at = new Map<number, number>();
+  for (const e of world.events) {
+    if (e.kind === 'patch-applied') { for (let j = world.events.indexOf(e) - 1; j >= 0; j--) { const x = world.events[j]!; if (x.kind === 'action' && x.ok && x.action.type === 'DEF-13' && x.action.patch === e.patch) { at.set(x.id, e.t); break; } } }
+    else if (e.kind === 'flag-confirmed') { for (let j = world.events.indexOf(e) - 1; j >= 0; j--) { const x = world.events[j]!; if (x.kind === 'action' && x.ok && x.action.type === 'DEF-21' && x.action.ip === e.ip) { at.set(x.id, e.t); break; } } }
+  }
+  return { actions: world.events.filter((e): e is Action => e.kind === 'action' && e.ok && (judged.has(e.id) || fresh.has(e.id))), at };
 }
 
-/** Did a relevant read show this soul door: its lines were about it (its addresses, or its route), by the summary the event kept or the lines themselves. */
+/** Did a relevant read show this soul door: its lines were about it (its addresses, or its route), by the summary the event kept or the lines themselves. A confirmed flag of the door's address counts too (D-233). */
 function lookShowedDoor(a: Action, door: MoveId, know: Knowledge, doorIps: Set<string>): boolean {
   const act = a.action;
+  if (act.type === 'DEF-21') return doorIps.has(act.ip);
   if (act.type !== 'DEF-01' && act.type !== 'DEF-02' && act.type !== 'DEF-03') return false;
   if (act.shown) return act.shown.some((line) => line.includes(DOOR_PATH[door]!) || [...doorIps].some((ip) => line.includes(ip)) || [...know.addresses].some((ip) => line.includes(ip) && know.moves.get(ip) === door));
   return (act.shownAbout ?? []).includes(door);
@@ -376,7 +393,8 @@ export function evaluate(world: World): Assessment {
   const points: Record<Phase, number> = { detect: 0, contain: 0, eradicate: 0, recover: 0 };
   const actions = k.action.filter((a) => a.ok);
   const know = learn(world);
-  const relevant = relevantActions(world, know);
+  const { actions: relevant, at: relevantAt } = relevantActions(world, know);
+  const whenRelevant = (a: Action) => relevantAt.get(a.id) ?? a.t;
   const starts = k['move-started'];
   const landed = k['move-landed'];
   const firstStart = starts[0]?.t;
@@ -393,8 +411,8 @@ export function evaluate(world: World): Assessment {
   const notices: number[] = [];
   for (const stage of stagesPlayed) {
     const first = starts.find((e) => e.stage === stage)!;
-    const noticed = relevant.find((a) => a.id > first.id);
-    const took = noticed ? noticed.t - first.t : undefined;
+    const noticed = relevant.find((a) => whenRelevant(a) > first.t || (a.id > first.id && whenRelevant(a) === first.t));
+    const took = noticed ? whenRelevant(noticed) - first.t : undefined;
     notices.push(took ?? end - first.t);
     facts.push({ label: `Time to notice stage ${stage}`, value: took === undefined ? 'never' : fmtGameMs(took) });
     phases.detect.evidence.push(took === undefined ? `stage ${stage}: unnoticed for ${fmtGameMs(end - first.t)}` : `stage ${stage}: noticed ${fmtGameMs(took)} after it started`);
@@ -407,6 +425,15 @@ export function evaluate(world: World): Assessment {
   if (starts.length > 0) phases.detect.status = gaps.some((g) => g.type === 'stage-unseen') ? 'behind' : 'current';
   const meanNotice = notices.length > 0 ? notices.reduce((a, b) => a + b, 0) / notices.length : undefined;
   const detectBase: Grade = starts.length === 0 ? 'A' : bandOf(meanNotice, GRADING.notice);
+  // False leads (D-233): flags on addresses that were never an attacker's. Two or more cost detect a letter.
+  const leads = falseLeads(world);
+  const confirmedFlags = world.flags.filter((f) => f.confirmedAt !== undefined).length;
+  facts.push({ label: 'Addresses flagged', value: world.flags.length === 0 ? 'none' : `${world.flags.length} (${confirmedFlags} confirmed)` });
+  facts.push({ label: 'False leads chased', value: `${leads}` });
+  if (leads >= GRADING.falseLeads) {
+    mistakes.push({ phase: 'detect', title: `Chased ${leads} false leads`, why: 'Every address flagged on a hunch is time spent watching a customer while the attacker works. Confirm an address by its behaviour (its requests, its errors, its pace) before you flag it, and act on what the data shows (NIST SP 800-61, detection and analysis: avoid false positives).' });
+    phases.detect.evidence.push(`${leads} flags on addresses that were never his`);
+  }
 
   // --- Contain: from his first move to the first fix that held (a cut by anything but an IP block, a door shut, or banishment).
   const held = events.find((e) => (e.kind === 'move-cut' && e.by !== 'DEF-06') || e.kind === 'door-shut' || e.kind === 'banished');
@@ -612,11 +639,12 @@ export function evaluate(world: World): Assessment {
     eradicate: letter(points.eradicate),
     recover: letter(points.recover),
   };
+  if (leads >= GRADING.falseLeads) grades.detect = letter('ABCDF'.indexOf(grades.detect) + 1); // D-233: a letter off whatever the timing earned
   const failed = ending ? ENDING_FAILS[ending.ending] : undefined;
   if (failed) grades[failed] = 'F';
   mistakes.sort((a, b) => PHASES.indexOf(a.phase) - PHASES.indexOf(b.phase));
   gaps.sort((a, b) => GAP_TYPES.indexOf(a.type) - GAP_TYPES.indexOf(b.type) || a.since - b.since);
-  const lastRelevantActionAt = Math.max(world.assess.lastRelevantActionAt, relevant.at(-1)?.t ?? 0); // a deploy counts from the moment its patch landed (stepAssess keeps that time)
+  const lastRelevantActionAt = Math.max(world.assess.lastRelevantActionAt, ...relevant.map(whenRelevant), 0); // a deploy counts from the moment its patch landed, a flag from its confirmation
   return { facts, grades, mistakes, missed, phases, gaps, ...(gaps[0] && { gap: gaps[0] }), lastRelevantActionAt, relevant: relevant.map((a) => a.id) };
 }
 

@@ -1,10 +1,8 @@
 // Every number the engine uses, per difficulty. PRD values cite their row; the rest are D-24 (all "tune").
-import type { ActionId, Difficulty, MinionId, MoveId, RequestClass, WafRule } from '../rules/vocabulary';
+import type { ActionId, Difficulty, MinionId, MoveId, RequestClass } from '../rules/vocabulary';
 
 const REAL_S = 30_000; // one real second in game ms (SYS-01: 1 real s = 30 game s)
 const GAME_MIN = 60_000;
-const QUIET_LEAKS: Array<WafRule['kind']> = ['sqli', 'block-user-agent']; // D-34 on Medium/Hard: the quiet harvest's tamper scripts and random agent
-const EASY_LEAKS: Array<WafRule['kind']> = ['block-user-agent']; // D-34 on Easy: the SQLi rule set stops it
 
 export interface EngineConfig {
   gameMsPerRealMs: number; // SYS-01
@@ -16,7 +14,9 @@ export interface EngineConfig {
   pacing: { delayAtOpenAlerts: number; bringForwardAfterQuietGameMs: number }; // SYS-02; D-43: the delay fires at this many open alerts
   returnDelayGameMs: number; // SYS-07: 2 real min
   patchDurationGameMs: number; // DEF-13: ≈ 20 game min
-  leakyWaf: boolean; // DEF-12: quiet variants get through on Medium/Hard
+  firstMoveDelayRealMs: { min: number; max: number }; // SYS-22, D-230: Death's first move waits this long (real ms) after engine.beginShift(), drawn from the shift's own seeded stream
+  bandage: { breathers: number }; // SYS-23, D-231: a WAF rule or the rate limit that cut a move is evaded by its quiet variants after this many of the level's longest breathers
+  alerts: AlertThresholds; // SYS-20, D-232: the per-route detectors that open an alert (the same on every level)
   heartbeat: {
     drainPerRealMin: { openDoor: number; minion: number; plug: number; defaced: number; recover: number }; // SYS-06, per REAL minute (D-33)
     dip: Partial<Record<ActionId, number>>; // D-24: one-off costs
@@ -61,9 +61,30 @@ export interface EngineConfig {
   scenarioStartIso: string; // D-24
   /** SYS-08, D-31, D-42: the only variants Death may play of these moves, normally and once tipped off. Other variants stay for reference. */
   pinnedVariants: Partial<Record<MoveId, { normal: string[]; tippedOff: string[] }>>;
-  /** SYS-08, D-34: the WAF rule kinds each variant of these moves slips past. A move listed here ignores D-24's generic quiet-variant leak. */
-  wafEvasion: Partial<Record<MoveId, Record<string, Array<WafRule['kind']>>>>;
 }
+
+/** D-232 (tune): each detector's count within its window, in real seconds. Per address unless said otherwise. */
+export interface AlertThresholds {
+  burst: { count: number; windowRealS: number }; // requests from one address
+  probes: { count: number; windowRealS: number }; // probe-looking paths (/wp-, .php, /.env, /.git, phpmyadmin, .bak, /.htaccess) from any address (a crawler wave rotates its addresses; no shopper asks for these)
+  failedLogins: { count: number; windowRealS: number }; // 401s on /rest/user/login from one address
+  failedLoginsAll: { count: number; windowRealS: number }; // 401s on /rest/user/login from any address (credential stuffing)
+  slowFailedLogins: { count: number; windowRealS: number }; // 401s on /rest/user/login from one address over a long window: a slow password spray (ATK-04.b, one try every 10–12 s)
+  searchErrors: { count: number; windowRealS: number }; // 5xx on /rest/products/search from one address (KI-236: customers' quoted searches answer 500 too, a few per address)
+  apiPace: { count: number; windowRealS: number }; // requests to one scraped API route (/api/Users, /api/Products, /rest/memories, /support/logs), any address: waves rotate theirs
+  feedback: { count: number; windowRealS: number }; // POST /api/Feedbacks, any address
+}
+
+const ALERTS: AlertThresholds = {
+  burst: { count: 50, windowRealS: 10 }, // CUST.a's busiest address peaks at 38 in 10 s; the scans at 400+
+  probes: { count: 10, windowRealS: 30 },
+  failedLogins: { count: 5, windowRealS: 30 }, // a fumbling shopper fails three times in 15 s at most
+  failedLoginsAll: { count: 20, windowRealS: 30 }, // CUST.a peaks at 4 in 30 s
+  slowFailedLogins: { count: 8, windowRealS: 120 }, // (tune) ATK-04.b crosses it at its 8th try, ~80 s in; a fumbling shopper fails three times at most
+  searchErrors: { count: 5, windowRealS: 60 },
+  apiPace: { count: 15, windowRealS: 60 },
+  feedback: { count: 5, windowRealS: 30 },
+};
 
 const MEDIUM: EngineConfig = {
   gameMsPerRealMs: 30,
@@ -75,7 +96,9 @@ const MEDIUM: EngineConfig = {
   pacing: { delayAtOpenAlerts: 2, bringForwardAfterQuietGameMs: 60 * REAL_S },
   returnDelayGameMs: 120 * REAL_S,
   patchDurationGameMs: 20 * GAME_MIN,
-  leakyWaf: true,
+  firstMoveDelayRealMs: { min: 20_000, max: 30_000 },
+  bandage: { breathers: 1 },
+  alerts: ALERTS,
   heartbeat: {
     drainPerRealMin: { openDoor: 3, minion: 1.5, plug: 33, defaced: 20, recover: 2 },
     dip: { 'DEF-07': 2, 'DEF-09': 10, 'DEF-13': 3, 'DEF-14': 10, 'DEF-16': 1 },
@@ -109,14 +132,13 @@ const MEDIUM: EngineConfig = {
   backupEveryGameMs: 60 * GAME_MIN,
   scenarioStartIso: '2026-10-31T22:00:00Z',
   pinnedVariants: { 'ATK-08': { normal: ['d', 'e'], tippedOff: ['f', 'g'] } }, // D-42: the halves (D-63); .b/.c retired, .a test-only
-  // .d/.e's tamper scripts leak through the SQLi rules; only .f/.g are loud. ATK-01.b's browser agent slips past the ffuf rule (D-46).
-  wafEvasion: { 'ATK-01': { a: [], b: ['block-user-agent'] }, 'ATK-08': { d: QUIET_LEAKS, e: QUIET_LEAKS, f: [], g: [] } },
 };
 
 export const CONFIG: Readonly<Record<Difficulty, EngineConfig>> = {
   easy: {
-    ...MEDIUM, pausable: true, breatherGameMs: { min: 45 * REAL_S, max: 60 * REAL_S }, leakyWaf: false,
-    minions: { ...MEDIUM.minions, alongsideDeath: false }, customers: { ...MEDIUM.customers, share: 0.2 }, wafEvasion: { 'ATK-01': { a: [], b: ['block-user-agent'] }, 'ATK-08': { d: EASY_LEAKS, e: EASY_LEAKS, f: [], g: [] } },
+    ...MEDIUM, pausable: true, breatherGameMs: { min: 45 * REAL_S, max: 60 * REAL_S },
+    firstMoveDelayRealMs: { min: 25_000, max: 30_000 }, bandage: { breathers: 2 }, // D-230, D-231: the longest calm, and a rule that holds for two breathers
+    minions: { ...MEDIUM.minions, alongsideDeath: false }, customers: { ...MEDIUM.customers, share: 0.2 },
     taps: { ...MEDIUM.taps, everyGameMs: { min: 240 * REAL_S, max: 300 * REAL_S } },
     struggle: { ...MEDIUM.struggle, unlocks: false }, // SYS-13: on Easy Kiro helps anyway (KIRO-03); nothing to unlock
     shiftGameMs: 20 * 60 * REAL_S, // D-118: idle Easy runs flatline at 16.5–18 real min
@@ -124,6 +146,7 @@ export const CONFIG: Readonly<Record<Difficulty, EngineConfig>> = {
   medium: MEDIUM,
   hard: {
     ...MEDIUM, breatherGameMs: { min: 20 * REAL_S, max: 35 * REAL_S }, minions: { ...MEDIUM.minions, successesPerWave: 2 }, customers: { ...MEDIUM.customers, share: 0.8 },
+    firstMoveDelayRealMs: { min: 15_000, max: 25_000 },
     pinnedVariants: { 'ATK-08': { normal: ['f', 'g'], tippedOff: ['f', 'g'] } },
     shiftGameMs: 13 * 60 * REAL_S, // D-118: idle Hard runs flatline at 11.7–12.8 real min
     taps: { ...MEDIUM.taps, everyGameMs: { min: 120 * REAL_S, max: 180 * REAL_S } },

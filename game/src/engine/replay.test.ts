@@ -29,11 +29,13 @@ describe('the replay engine (SYS-03)', () => {
   it('plays ATK-03.a: one access line at its recorded offset × 30, rendered as an nginx combined line, then lands with an admin session', () => {
     const w = playing(COMMITTED, 'ATK-03');
     expect(eventsOfKind(w, 'move-started')).toMatchObject([{ move: 'ATK-03', variant: 'a', stage: 2, ip: '203.0.113.23' }]);
-    expect(w.alerts).toMatchObject([{ about: 'ATK-03', openedAt: 0 }]);
+    expect(w.alerts).toEqual([]); // D-232: no alert at move start
     advance(w, COMMITTED, 507); // 508 recorded ms → 15240 game ms; 507 real ms = 15210 game ms
     expect(w.logs.access).toHaveLength(0);
     advance(w, COMMITTED, 1);
     expect(w.logs.access).toHaveLength(1);
+    expect(w.alerts).toMatchObject([{ about: 'ATK-03', openedAt: 15240, route: '/rest/user/login', gate: 'login' }]); // the line opened it: a login from a command-line client
+    expect(w.alerts[0]!.symptom).toMatch(/command-line client \(curl\)/);
     expect(w.logs.access[0]!.t).toBe(15240);
     expect(renderAccessLog(w)).toBe('203.0.113.23 - - [31/Oct/2026:22:00:15 +0000] "POST /rest/user/login HTTP/1.1" 200 784 "-" "curl/8.23.0"\n');
     advance(w, COMMITTED, 300);
@@ -79,7 +81,7 @@ describe('the replay engine (SYS-03)', () => {
     expect(w.logs.access).toHaveLength(n);
     expect(eventsOfKind(w, 'move-cut')).toMatchObject([{ move: 'ATK-08', variant: 'a', by: 'DEF-06' }]);
     expect(w.death.played).toEqual([{ move: 'ATK-08', variant: 'a', outcome: 'cut' }]);
-    expect(w.alerts[0]!.closedAt).toBeDefined();
+    expect(w.alerts.every((a) => a.closedAt !== undefined)).toBe(true); // a cut move's alert, if a detector had opened one, closes with it
     expect(w.death.nextMoveAt).toBeLessThanOrEqual(w.clock.gameMs + medium.ipResumeGameMs);
     expect(w.death.nextMoveAt).toBeGreaterThan(w.clock.gameMs);
     advance(w, COMMITTED, 2000);
@@ -107,21 +109,22 @@ describe('the replay engine (SYS-03)', () => {
     }
   });
 
-  it('a quiet variant keeps playing through a leaky sqli rule on Medium and is cut on Easy', () => {
+  it('a quiet variant is cut by an untried sqli rule on every level, and that cut puts the bandage on; once evaded, the quiet variant plays through (D-231)', () => {
     const quiet = FIXTURE_LIBRARY.variantsOf('ATK-03')[2]!; // ATK-08 would end the run (all souls) before landing
     expect(quiet.info.quiet).toBe(true);
-    const w = initialWorld(1, 'medium');
-    w.waf.push({ kind: 'sqli' });
-    startReplay(w, quiet, 'death');
-    advance(w, FIXTURE_LIBRARY, 2000);
-    expect(eventsOfKind(w, 'move-cut')).toEqual([]);
-    expect(eventsOfKind(w, 'move-landed')).toHaveLength(1);
-    const easy = initialWorld(1, 'easy');
-    easy.waf.push({ kind: 'sqli' });
-    startReplay(easy, quiet, 'death');
-    advance(easy, FIXTURE_LIBRARY, GRACE_REAL_MS);
-    expect(eventsOfKind(easy, 'move-cut')).toMatchObject([{ by: 'DEF-12' }]);
-    expect(eventsOfKind(easy, 'move-landed')).toEqual([]);
+    for (const level of ['easy', 'medium', 'hard'] as const) {
+      const w = initialWorld(1, level);
+      w.waf.push({ kind: 'sqli' });
+      startReplay(w, quiet, 'death');
+      advance(w, FIXTURE_LIBRARY, GRACE_REAL_MS);
+      expect(eventsOfKind(w, 'move-cut'), level).toMatchObject([{ move: 'ATK-03', by: 'DEF-12' }]);
+      expect(w.bandages, level).toMatchObject([{ move: 'ATK-03', rule: { kind: 'sqli' } }]);
+      w.clock.gameMs = w.bandages[0]!.evadesAt;
+      startReplay(w, quiet, 'death');
+      advance(w, FIXTURE_LIBRARY, 2000);
+      expect(eventsOfKind(w, 'move-cut'), level).toHaveLength(1); // not again
+      expect(eventsOfKind(w, 'move-landed'), level).toHaveLength(1);
+    }
   });
 
   it('db and file events shape the world: ATK-06 adds own-admin, ATK-11 the hidden admin, ATK-16 xss-live, ATK-13 a planted file, ATK-05 a user session, ATK-12 a hijack', () => {
