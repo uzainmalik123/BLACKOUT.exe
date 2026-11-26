@@ -211,6 +211,7 @@ export interface World {
     forgedToken: boolean;
     played: Array<{ move: MoveId; variant: string; outcome: 'landed' | 'cut' }>;
     nextMoveAt: number;
+    alongsideAt: number; // D-259: the earliest a second move may start beside a running one (a breather after his last start; Medium, Hard)
     stageSkips: number; // tip-offs not yet spent (D-19)
     pacingDelayed: boolean; // SYS-02, D-43: the delay for 2+ open alerts has been applied since his last move started
     skipWait: boolean; // a tip-off during an active move: the next wait is skipped when it ends
@@ -294,7 +295,7 @@ export function initialWorld(seed: number, difficulty: Difficulty): World {
     comms: { notifiedAt: {} },
     assess: initialAssess(),
     struggle: { suggestions: 0 },
-    death: { knowledge: [], forgedToken: false, played: [], nextMoveAt: 0, stageSkips: 0, pacingDelayed: false, skipWait: false, tippedOff: false, resume: {}, shutDoors: [], ipCutsInRow: 0, proxies: false, nextId: 1 },
+    death: { knowledge: [], forgedToken: false, played: [], nextMoveAt: 0, alongsideAt: 0, stageSkips: 0, pacingDelayed: false, skipWait: false, tippedOff: false, resume: {}, shutDoors: [], ipCutsInRow: 0, proxies: false, nextId: 1 },
     replays: [],
     waves: [],
     nextWaveAt: { ...config.minions.firstWaveGameMs },

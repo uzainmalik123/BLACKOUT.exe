@@ -4,7 +4,7 @@ import { evaluate } from './assess';
 // They assert only from the event log (SYS-10); SIM-2's and SIM-5's report lines read SYS-11's grading of it.
 import { describe, expect, it } from 'vitest';
 import { MINION_BY_ID } from '../rules/minions';
-import { MOVE_BY_ID } from '../rules/moves';
+import { MOVE_BY_ID, SOUL_DOORS } from '../rules/moves';
 import { TAP_BY_ID } from '../rules/taps';
 import { FOOTHOLDS, type Difficulty, type Feature, type MinionId, type MoveId, type Patch, type PlayerAction, type Stopper } from '../rules/vocabulary';
 import type { GameEvent } from './log';
@@ -366,26 +366,33 @@ describe('D-41: pacing and fairness, in whole runs', { timeout: WHOLE_RUN_TIMEOU
   const LEVELS: Difficulty[] = ['easy', 'medium', 'hard'];
 
   /** Walks the log counting running waves and Death moves; returns the most of each ever running at once. */
-  function overlaps(events: GameEvent[]): { waves: number; moves: number; waveWithMove: boolean } {
-    let waves = 0, moves = 0, maxWaves = 0, maxMoves = 0, waveWithMove = false;
+  function overlaps(events: GameEvent[]): { waves: number; moves: number; waveWithMove: boolean; sameTwice: boolean; twoDoors: boolean } {
+    let waves = 0, maxWaves = 0, maxMoves = 0, waveWithMove = false, sameTwice = false, twoDoors = false;
+    const running: MoveId[] = [];
     for (const e of events) {
       if (e.kind === 'wave-started') waves++;
       if (e.kind === 'wave-ended') waves--;
-      if (e.kind === 'move-started') moves++;
-      if (e.kind === 'move-landed' || e.kind === 'move-cut') moves--;
+      if (e.kind === 'move-started') {
+        if (running.includes(e.move)) sameTwice = true;
+        running.push(e.move);
+        if (running.filter((m) => SOUL_DOORS.includes(m)).length > 1) twoDoors = true;
+      }
+      if (e.kind === 'move-landed' || e.kind === 'move-cut') running.splice(running.indexOf(e.move), 1);
       maxWaves = Math.max(maxWaves, waves);
-      maxMoves = Math.max(maxMoves, moves);
-      if (waves > 0 && moves > 0) waveWithMove = true;
+      maxMoves = Math.max(maxMoves, running.length);
+      if (waves > 0 && running.length > 0) waveWithMove = true;
     }
-    return { waves: maxWaves, moves: maxMoves, waveWithMove };
+    return { waves: maxWaves, moves: maxMoves, waveWithMove, sameTwice, twoDoors };
   }
 
-  it('an idle run never has two minion waves at once nor two Death moves at once; Easy never runs a wave alongside a move', () => {
+  it('an idle run never has two minion waves at once; his moves at once: one on Easy, two on Medium and Hard (D-259), never the same twice nor two soul doors; Easy never runs a wave alongside a move', () => {
     for (const difficulty of LEVELS) {
       for (const seed of [1, 2, 3, 4, 5]) {
         const o = overlaps(idle(seed, difficulty).events);
         expect(o.waves, `${difficulty} seed ${seed}`).toBe(1);
-        expect(o.moves, `${difficulty} seed ${seed}`).toBe(1);
+        expect(o.moves, `${difficulty} seed ${seed}`).toBe(CONFIG[difficulty].movesAtOnce); // D-259: and the overlap does happen
+        expect(o.sameTwice, `${difficulty} seed ${seed}`).toBe(false);
+        expect(o.twoDoors, `${difficulty} seed ${seed}`).toBe(false);
         if (difficulty === 'easy') expect(o.waveWithMove, `easy seed ${seed}`).toBe(false);
       }
     }
@@ -400,13 +407,17 @@ describe('D-41: pacing and fairness, in whole runs', { timeout: WHOLE_RUN_TIMEOU
         const events = idle(seed, difficulty).events;
         events.forEach((e, i) => {
           if (e.kind !== 'move-landed' && !(e.kind === 'move-cut' && e.by !== 'DEF-06')) return;
-          const next = events.slice(i + 1).find((x) => x.kind === 'move-started');
-          if (!next) return;
+          const at = events.slice(i + 1).findIndex((x) => x.kind === 'move-started');
+          if (at < 0) return;
+          const next = events[i + 1 + at]!;
           checked++;
           expect(next.t - e.t, `${difficulty} seed ${seed}`).toBeGreaterThanOrEqual(min);
           // Easy may also wait for a wave to end (no combo); Medium/Hard only for the Director's next 3 s tick, plus at most
-          // one pacing delay (D-43: 2 or more open alerts, e.g. a wave and a leaky tap, add one longest breather).
-          if (difficulty !== 'easy') expect(next.t - e.t, `${difficulty} seed ${seed}`).toBeLessThanOrEqual(2 * max + CONFIG[difficulty].directorPeriodGameMs);
+          // one pacing delay (D-43: 2 or more open alerts, e.g. a wave and a leaky tap, add one longest breather). D-259: with
+          // two of his moves at once, the one still running may be all he could pick (one soul door at a time): the wait
+          // then counts from its end, his latest move to end before the next start.
+          const last = events.slice(i, i + 1 + at).findLast((x) => x.kind === 'move-landed' || x.kind === 'move-cut')!;
+          if (difficulty !== 'easy') expect(next.t - last.t, `${difficulty} seed ${seed}`).toBeLessThanOrEqual(2 * max + CONFIG[difficulty].directorPeriodGameMs);
         });
       }
       expect(checked, difficulty).toBeGreaterThanOrEqual(10);

@@ -9,13 +9,15 @@ export interface EngineConfig {
   pausable: boolean; // SYS-01: only Easy
   tickGameMs: number; // D-24: the engine's sub-step (100 real ms)
   directorPeriodGameMs: number; // SYS-02: every 3 real s
-  breatherGameMs: { min: number; max: number }; // D-41: the seeded wait after each of Death's moves, landed or cut (replaces D-24's gaps)
+  breatherGameMs: { min: number; max: number }; // D-41: the seeded wait after each of Death's moves, landed or cut (replaces D-24's gaps); D-259: from each start where he overlaps
+  movesAtOnce: number; // D-259: how many of Death's moves may run at once; above 1 his breather counts from the start of each move
   ipResumeGameMs: number; // D-24, D-41: the wait before an IP-blocked move carries on from a fresh address
   pacing: { delayAtOpenAlerts: number; bringForwardAfterQuietGameMs: number }; // SYS-02; D-43: the delay fires at this many open alerts
   returnDelayGameMs: number; // SYS-07: 2 real min
   patchDurationGameMs: number; // DEF-13: ≈ 20 game min
   firstMoveDelayRealMs: { min: number; max: number }; // SYS-22, D-230: Death's first move waits this long (real ms) after engine.beginShift(), drawn from the shift's own seeded stream
   bandage: { breathers: number }; // SYS-23, D-231: a WAF rule or the rate limit that cut a move is evaded by its quiet variants after this many of the level's longest breathers
+  flag: { cooldownRealMs: number }; // DEF-21, D-239 (tune): the least real time between two accepted flags, so spam-flagging the top talkers takes real time
   alerts: AlertThresholds; // SYS-20, D-232: the per-route detectors that open an alert (the same on every level)
   heartbeat: {
     drainPerRealMin: { openDoor: number; minion: number; plug: number; defaced: number; recover: number }; // SYS-06, per REAL minute (D-33)
@@ -54,7 +56,7 @@ export interface EngineConfig {
     dripFraction: number; // D-42: each drip takes this share of the total souls (rounded, at least 1)
   };
   assess: { everyGameMs: number }; // SYS-21 (D-114): the assessor refreshes its snapshot this often (and at once on an action or the ending)
-  shiftGameMs: number; // D-118: the shift ends here (Easy ~20, Medium ~16, Hard ~13 real min); the judge then picks a handover verdict
+  shiftGameMs: number; // D-118: the shift ends here (Easy ~20, Medium ~11, Hard ~9 real min, D-259); the judge then picks a handover verdict
   notification: { windowGameMs: number }; // SYS-14 (D-112): the breach-notification window after confirmation, GDPR's 72 h compressed to the run length
   struggle: { idleGameMs: number; soulsWindowGameMs: number; soulsFraction: number; gapGameMs: number; unlocks: boolean }; // SYS-13 (D-113, D-114): struggling = no RELEVANT action for idleGameMs, souls down by soulsFraction within soulsWindowGameMs, or the same biggest gap standing for gapGameMs; unlocks (and shows) a suggestion on Medium/Hard only
   backupEveryGameMs: number; // DEF-17: hourly snapshots
@@ -92,12 +94,14 @@ const MEDIUM: EngineConfig = {
   tickGameMs: 3_000,
   directorPeriodGameMs: 3 * REAL_S,
   breatherGameMs: { min: 15 * REAL_S, max: 25 * REAL_S }, // D-258 (approved 2026-11-26): was 30-45 s
+  movesAtOnce: 2, // D-259 (approved 2026-11-26): a second move while a long one plays (was 1, D-41)
   ipResumeGameMs: 10 * REAL_S,
   pacing: { delayAtOpenAlerts: 2, bringForwardAfterQuietGameMs: 60 * REAL_S },
   returnDelayGameMs: 120 * REAL_S,
   patchDurationGameMs: 20 * GAME_MIN,
   firstMoveDelayRealMs: { min: 6_000, max: 9_000 }, // D-252 (approved 2026-11-26): the calm kept, shortened from 20-30 s
   bandage: { breathers: 1 },
+  flag: { cooldownRealMs: 15_000 }, // D-239 (tune): the same on every level
   alerts: ALERTS,
   heartbeat: {
     drainPerRealMin: { openDoor: 3, minion: 1.5, plug: 33, defaced: 20, recover: 2 },
@@ -126,7 +130,7 @@ const MEDIUM: EngineConfig = {
   stuckBreathers: 2,
   taps: { everyGameMs: { min: 180 * REAL_S, max: 240 * REAL_S }, maxOpen: 2, dripEveryGameMs: 60 * REAL_S, dripFraction: 0.01 },
   assess: { everyGameMs: 1 * REAL_S },
-  shiftGameMs: 16 * 60 * REAL_S, // D-118 (tune): idle Medium runs flatline at 14–15.3 real min on seeds 1–5
+  shiftGameMs: 11 * 60 * REAL_S, // D-118 (tune), D-259: idle Medium runs flatline at 8.9–9.8 real min on seeds 1–5 (was 16 min at 14–15.3)
   notification: { windowGameMs: 6 * 60 * GAME_MIN }, // D-112: a run is about 6 game hours (PRD §1), so the 72 h clock runs 12× game time
   struggle: { idleGameMs: 90 * REAL_S, soulsWindowGameMs: 120 * REAL_S, soulsFraction: 0.1, gapGameMs: 180 * REAL_S, unlocks: true }, // SYS-13
   backupEveryGameMs: 60 * GAME_MIN,
@@ -137,6 +141,7 @@ const MEDIUM: EngineConfig = {
 export const CONFIG: Readonly<Record<Difficulty, EngineConfig>> = {
   easy: {
     ...MEDIUM, pausable: true, breatherGameMs: { min: 25 * REAL_S, max: 35 * REAL_S }, // D-258: was 45-60 s
+    movesAtOnce: 1, // D-259: Easy keeps one thing at a time
     firstMoveDelayRealMs: { min: 8_000, max: 10_000 }, bandage: { breathers: 2 }, // D-230, D-231, D-252: the longest calm (was 25-30 s), and a rule that holds for two breathers
     minions: { ...MEDIUM.minions, alongsideDeath: false }, customers: { ...MEDIUM.customers, share: 0.2 },
     taps: { ...MEDIUM.taps, everyGameMs: { min: 240 * REAL_S, max: 300 * REAL_S } },
@@ -148,7 +153,7 @@ export const CONFIG: Readonly<Record<Difficulty, EngineConfig>> = {
     ...MEDIUM, breatherGameMs: { min: 10 * REAL_S, max: 18 * REAL_S } /* D-258: was 20-35 s */, minions: { ...MEDIUM.minions, successesPerWave: 2 }, customers: { ...MEDIUM.customers, share: 0.8 },
     firstMoveDelayRealMs: { min: 5_000, max: 8_000 }, // D-252: was 15-25 s
     pinnedVariants: { 'ATK-08': { normal: ['f', 'g'], tippedOff: ['f', 'g'] } },
-    shiftGameMs: 13 * 60 * REAL_S, // D-118: idle Hard runs flatline at 11.7–12.8 real min
+    shiftGameMs: 9 * 60 * REAL_S, // D-118, D-259: idle Hard runs flatline at 7.5–8.1 real min (was 13 min at 11.7–12.8)
     taps: { ...MEDIUM.taps, everyGameMs: { min: 120 * REAL_S, max: 180 * REAL_S } },
   },
 };

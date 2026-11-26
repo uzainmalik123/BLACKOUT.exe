@@ -8,7 +8,7 @@ import { blocksPick, footholds, needsHold } from './facts';
 import type { RecordingLibrary, Variant } from './library';
 import { emit, endRun } from './log';
 import { bump, customerAddresses } from './pool';
-import { activeDeathReplay, proxyPool, startReplay } from './replay';
+import { deathReplays, proxyPool, startReplay } from './replay';
 import { nextRandom, pick } from './rng';
 import type { World } from './state';
 
@@ -169,7 +169,7 @@ export function isStuck(world: World): boolean {
   return world.death.stuckSince !== undefined && world.clock.gameMs - world.death.stuckSince >= stuckBreathers * breatherGameMs.max;
 }
 
-function pace(world: World): void {
+function pace(world: World, running: boolean): void {
   const { pacing, breatherGameMs } = CONFIG[world.difficulty];
   const now = world.clock.gameMs;
   const open = openAlerts(world);
@@ -180,7 +180,8 @@ function pace(world: World): void {
     world.death.nextMoveAt = Math.max(world.death.nextMoveAt, now) + breatherGameMs.max;
   }
   if (open > 0) world.quietAlertsSince = now;
-  else if (now - world.quietAlertsSince >= pacing.bringForwardAfterQuietGameMs) world.death.nextMoveAt = Math.min(world.death.nextMoveAt, now);
+  // the bring-forward only while none of his moves runs (D-259: one may run while he picks another)
+  else if (!running && now - world.quietAlertsSince >= pacing.bringForwardAfterQuietGameMs) world.death.nextMoveAt = Math.min(world.death.nextMoveAt, now);
 }
 
 /** D-42: the open door a visit goes to: the one whose playable halves hold the most unstolen souls (the lower id on a tie). */
@@ -191,10 +192,18 @@ function doorToVisit(world: World, library: RecordingLibrary, doors: Move[]): Mo
 
 export function directorTick(world: World, library: RecordingLibrary): void {
   if (world.shift.beganAt === undefined) return; // SYS-22 (D-230): nothing of his before engine.beginShift()
-  if (world.ending || world.nginx === 'stopped' || activeDeathReplay(world)) return; // nothing reaches a stopped server
-  pace(world);
-  const candidates = candidateMoves(world, library);
-  if (pickableMoves(world, library).length === 0) {
+  if (world.ending || world.nginx === 'stopped') return; // nothing reaches a stopped server
+  // D-259: as many of his moves at once as the level allows (Easy one, Medium and Hard two); never the same move twice
+  const running = deathReplays(world);
+  if (running.length >= CONFIG[world.difficulty].movesAtOnce) return;
+  pace(world, running.length > 0);
+  const busy = new Set<string>(running.map((r) => r.move));
+  // and one soul door at a time: two visits at once would take far more than half of what is left (D-42)
+  const robbing = MOVES.some((m) => busy.has(m.id) && isDoor(m));
+  const free = (m: Move) => !busy.has(m.id) && !(robbing && isDoor(m));
+  const candidates = candidateMoves(world, library).filter(free);
+  if (pickableMoves(world, library).filter(free).length === 0) {
+    if (running.length > 0) return; // D-259: stuck and banishment are judged once nothing of his is running
     world.death.stuckSince ??= world.clock.gameMs; // D-46: nothing he can play; after two breathers only what he can reach counts
     checkBanishment(world, library);
     return;
@@ -202,6 +211,7 @@ export function directorTick(world: World, library: RecordingLibrary): void {
   delete world.death.stuckSince;
   delete world.death.quietSince;
   if (world.clock.gameMs < world.death.nextMoveAt) return;
+  if (running.length > 0 && world.clock.gameMs < world.death.alongsideAt) return; // D-259: a second one a breather after his last start
   if (!CONFIG[world.difficulty].minions.alongsideDeath && world.waves.length > 0) return; // D-41: Easy never overlaps a wave
   // D-42, D-45: a paused visit to one of his doors carries on first; it is the same visit, not a new move.
   const resumed = candidates.find((m) => isHisDoor(world, m) && world.death.resume[m.id] !== undefined);

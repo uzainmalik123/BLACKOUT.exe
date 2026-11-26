@@ -445,8 +445,8 @@ export function evaluate(world: World): Assessment {
     phases.contain.evidence.push(held ? `first fix held ${fmtGameMs(contained!)} after his first move (${held.kind}${'by' in held ? ` by ${held.by}` : ''})` : 'no fix has held yet');
     for (const d of world.death.shutDoors) phases.contain.evidence.push(`${MOVE_BY_ID[d].name.toLowerCase()}: shut for now`);
   }
-  const active = world.replays.find((r) => r.owner === 'death' && r.frozenSince === undefined);
-  if (active) {
+  // D-259: on Medium and Hard two of his moves may be running; each is a gap of its own
+  for (const active of world.replays.filter((r) => r.owner === 'death' && r.frozenSince === undefined)) {
     const start = [...starts].reverse().find((e) => e.move === active.move);
     gaps.push({ type: 'move-uncontained', since: start?.t ?? active.startedAt });
     phases.contain.evidence.push(`${MOVE_BY_ID[active.move as MoveId].name.toLowerCase()} is running now`);

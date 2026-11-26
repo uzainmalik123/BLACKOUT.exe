@@ -178,11 +178,21 @@ describe('the robber: an open door is visited until it is empty (D-42)', { timeo
       const seen = new Set<MoveId>();
       const isVisit = (e: (typeof starts)[number]) => { const v = SOUL_DOORS.includes(e.move) && seen.has(e.move); seen.add(e.move); return v; };
       const kinds = starts.map((e) => ({ e, visit: isVisit(e) })).filter((x) => x.e.t > firstDoor.t);
+      // D-259: on Medium a story move may start beside one of his doors; one running then counts as his visit
+      const robbing = new Set<number>(); // the moves that started while a soul door of his was playing
+      let door: MoveId | undefined;
+      for (const e of r.world.events) {
+        if (e.kind === 'move-started') {
+          if (door) robbing.add(e.id);
+          if (SOUL_DOORS.includes(e.move)) door = e.move;
+        } else if ((e.kind === 'move-landed' || e.kind === 'move-cut') && e.move === door) door = undefined;
+      }
       expect(kinds[0]!.visit, `seed ${seed}`).toBe(true); // straight back to his new door
       for (let i = 1; i < kinds.length; i++) {
         if (ransom && kinds[i]!.e.t > ransom.t) expect(kinds[i]!.visit, `seed ${seed} after the ransom`).toBe(true);
-        else if (!kinds[i]!.visit) expect(kinds[i - 1]!.visit, `seed ${seed}: two story moves in a row at ${kinds[i]!.e.t}`).toBe(true);
+        else if (!kinds[i]!.visit) expect(kinds[i - 1]!.visit || robbing.has(kinds[i]!.e.id), `seed ${seed}: two story moves in a row at ${kinds[i]!.e.t}`).toBe(true);
       }
+      expect(robbing.size, `seed ${seed}`).toBeGreaterThan(0); // and he does rob and advance at once
     }
   });
 });
