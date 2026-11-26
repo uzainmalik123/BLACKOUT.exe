@@ -11,7 +11,7 @@ import { TAPS } from '../../rules/taps';
 import { COMMAND_NAMES, COMMANDS } from '../../shell/registry';
 import { NO_FILTER, filterWords, passes } from './Desk';
 import { cheatRows } from './Tools';
-import { BAR, NO_WINDOWS, PANEL_TOOL, TOOLS, TOOL_BY_ID, clamp, closeTool, dockFor, focusTool, moveTool, openTool, startingTools, toggleTool, topTool, type ToolId } from './windows';
+import { BAR, DOCK_GROUPS, DOCK_RIGHT, MIN_H, MIN_W, NO_WINDOWS, PANEL_TOOL, TOOLS, TOOL_BY_ID, clamp, closeTool, dockFor, focusTool, moveTool, openTool, resizeTool, startingTools, toggleTool, topTool, type ToolId } from './windows';
 import { NOW_WORDS, battleGate, freezeReason, gateConsole, gateSentence } from './words';
 
 const baseline = () => new Uint8Array(readFileSync(new URL('../../recordings/juiceshop.sqlite', import.meta.url)));
@@ -80,6 +80,39 @@ describe('the window manager (UI-11, D-240)', () => {
     expect(new Set(ids).size).toBe(ids.length);
     for (const id of ['logs', 'alerts', 'terminal', 'waf', 'features', 'flags', 'accounts', 'sessions', 'deploy', 'backups', 'comms', 'plug', 'kiro', 'files', 'traffic', 'cheats'] satisfies ToolId[]) expect(ids).toContain(id);
     expect(TOOL_BY_ID.flags.change).toBeFalsy(); // flagging works during the freeze (DEF-21)
+  });
+
+  it('the dock fits: Kiro is not on it, every entry sits in one of four groups, two columns of at most nine rows (D-260)', () => {
+    for (const level of ['easy', 'medium', 'hard'] as const) {
+      const dock = dockFor(level);
+      expect(dock.map((t) => t.id)).not.toContain('kiro');
+      expect(dock.map((t) => t.id)).toContain('files');
+      for (const t of dock) expect(DOCK_GROUPS.map((g) => g.id)).toContain(t.group);
+      // each group's entries are together, the groups in DOCK_GROUPS's order
+      const order = dock.map((t) => DOCK_GROUPS.findIndex((g) => g.id === t.group));
+      expect(order).toEqual([...order].sort((a, b) => a - b));
+      const rows = DOCK_GROUPS.reduce((n, g) => n + Math.ceil(dock.filter((t) => t.group === g.id).length / 2), 0);
+      expect(rows).toBeLessThanOrEqual(9);
+    }
+    expect(TOOL_BY_ID.kiro.group).toBeUndefined(); // still a window, opened from her column
+    // the first windows open right of the wider dock
+    for (const view of [VIEW, { w: 1366, h: 768 }]) for (const id of ['logs', 'alerts'] as const) expect(openTool(NO_WINDOWS, id, view).open[0]!.x).toBeGreaterThanOrEqual(DOCK_RIGHT(view));
+  });
+
+  it('resizes a window from its edge or corner, above the minimum and inside the view, and keeps the size (D-262)', () => {
+    let s = moveTool(openTool(NO_WINDOWS, 'waf', VIEW), 'waf', 400, 200, VIEW);
+    s = resizeTool(s, 'waf', 700, 500, VIEW);
+    expect(s.open[0]).toMatchObject({ x: 400, y: 200, w: 700, h: 500 });
+    s = resizeTool(s, 'waf', 10, 10, VIEW);
+    expect(s.open[0]).toMatchObject({ w: MIN_W, h: MIN_H });
+    s = resizeTool(s, 'waf', 99999, 99999, VIEW);
+    expect(s.open[0]!.x + s.open[0]!.w).toBeLessThanOrEqual(VIEW.w);
+    expect(s.open[0]!.y + s.open[0]!.h).toBeLessThanOrEqual(VIEW.h);
+    const sized = s.open[0]!;
+    s = focusTool(openTool(s, 'logs', VIEW), 'waf');
+    s = moveTool(s, 'waf', 300, 150, VIEW);
+    expect(s.open.find((w) => w.id === 'waf')).toMatchObject({ w: sized.w, h: sized.h, x: 300, y: 150 });
+    expect(resizeTool(s, 'plug', 500, 500, VIEW).open).toEqual(s.open); // a closed tool: nothing changes
   });
 
   it('every tutorial panel lights a dock entry, the meters, or the dock itself (CON-03, D-238)', () => {

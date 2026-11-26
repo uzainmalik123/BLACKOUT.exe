@@ -10,7 +10,6 @@
 // The shift begins when this screen shows (`engine.beginShift()`, D-243).
 
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
-import { OPENING_TUTORIAL } from '../../content/kiro-fallback';
 import { gameClockLabel } from '../../engine/clock';
 import type { GameEvent } from '../../engine/log';
 import type { PlayerAction } from '../../rules/vocabulary';
@@ -25,13 +24,12 @@ import { OUTCOME_KIRO, OUTCOME_WORDS, READS, liveAttacks, outcomeOf, type Outcom
 import { readingsOf, type Run } from './run';
 import { STAGE_NAMES, commandFor, forLevel, situationOf, tokens, type Step, type TargetKind } from './situations';
 import { AddressFlags, AlertsTool, CheatSheet, Freeze, TrafficTool, UploadsTool, type Act } from './Tools';
-import { PANEL_TOOL, TOOL_BY_ID, closeTool, dockFor, focusTool, isOpen, moveTool, openTool, toggleTool, type ToolId, type Wins } from './windows';
+import { TOOL_BY_ID, closeTool, dockFor, focusTool, isOpen, moveTool, openTool, resizeTool, toggleTool, type ToolId, type Wins } from './windows';
 import { NOW_WORDS, battleGate, freezeReason, gateConsole, gateSentence, shiftLeft } from './words';
 import { CONFIG } from '../../engine/config';
 import { KiroCanvas } from '../shared/KiroCanvas';
 import { deathPortrait } from '../shared/reaper';
 import type { Rect } from './presence';
-import { markSeen, seen } from '../shared/seen';
 
 export interface Volumes {
   rain: number;
@@ -47,7 +45,7 @@ export interface PlayProps {
   /** Death's line now, shown in the Now strip (D-254), and the first alert's warning there. */
   taunt?: string | null;
   alarm?: boolean;
-  /** The first shift's tutorial is open: hold the night's clock (D-252). */
+  /** The drill's coach is waiting for the player to read: hold the night's clock (D-264). */
   onHold?: (on: boolean) => void;
   tick: number;
   on: boolean;
@@ -102,9 +100,6 @@ export function Play({ toasts, ...p }: PlayProps) {
   const [hist, setHist] = useState<string[]>([]);
   const [hi, setHi] = useState(-1);
   const [sound, setSound] = useState(false);
-  const [lesson, setLesson] = useState(0);
-  // the tutorial plays on the player's first shift only; Kiro's panel can bring it back (D-252)
-  const [tutorial, setTutorial] = useState(() => !seen('tutorial'));
   const { wins, setWins } = p;
   const terminal = isOpen(wins, 'terminal');
   const view = () => ({ w: window.innerWidth, h: window.innerHeight });
@@ -325,29 +320,12 @@ export function Play({ toasts, ...p }: PlayProps) {
     void run.kiro.explain(line).then((r) => p.addKiro({ who: 'kiro', text: r.text, offline: r.offline }));
   };
 
-  // ---- the opening's tutorial (CON-03, D-238): during the freeze, one step at a time, lighting what it names
-  const steps = OPENING_TUTORIAL[run.difficulty];
-  const teaching = tutorial && lesson < steps.length ? steps[lesson]! : null;
-  const endTutorial = () => {
-    markSeen('tutorial');
-    setTutorial(false);
-  };
-  // while it is open before anything has happened (the freeze), the clock waits for the player
-  const holding = !!teaching && !!frozen;
-  const { onHold } = p;
-  useEffect(() => {
-    onHold?.(holding);
-  }, [holding, onHold]);
-  useEffect(() => () => onHold?.(false), [onHold]);
+  // the opening's tutorial left Kiro's column (D-263): the training shift is offered when a shift starts
   const lit = new Set<ToolId>();
-  for (const panel of teaching?.panels ?? []) {
-    const t = PANEL_TOOL[panel];
-    if (t) lit.add(t);
-  }
   if (gate && dial.gateSentence) lit.add(gateConsole(gate));
 
   // the terminal takes the keyboard only when the player opens it (T, its button, a click in it, Kiro's insert): opened
-  // by the level or the tutorial it leaves 1, 2 and 3 to the actions (D-258, KI-251)
+  // by the level it leaves 1, 2 and 3 to the actions (D-258, KI-251)
   const openedByPlayer = useRef(false);
   const toggleTerminal = () => {
     openedByPlayer.current = true;
@@ -526,8 +504,8 @@ export function Play({ toasts, ...p }: PlayProps) {
 
   return (
     <div className={`pl-root has-dock${p.on ? '' : ' is-off'}`}>
-      <Dock tools={dockFor(run.difficulty)} open={new Set(wins.open.map((x) => x.id))} lit={lit} frozen={!!frozen} glow={teaching?.panels.includes('dock')} onPick={pick} />
-      <header className={`pl-top${teaching?.panels.includes('meters') ? ' is-lit' : ''}`}>
+      <Dock tools={dockFor(run.difficulty)} open={new Set(wins.open.map((x) => x.id))} lit={lit} frozen={!!frozen} onPick={pick} />
+      <header className="pl-top" data-coach="meters">
         <div className={`pl-meter heart${hb < 35 ? ' is-low' : ''}`} title="The business's health: customers being served">
           <span>🫀 Heartbeat</span>
           <i>
@@ -620,38 +598,14 @@ export function Play({ toasts, ...p }: PlayProps) {
         </section>
 
         <aside className={`pl-kiro mood-${mood}`}>
-          <KiroCanvas className="pl-portrait" mood={mood} line={teaching ? teaching.lines.join(' ') : (lastKiro?.text ?? situation.kiro)} />
+          <KiroCanvas className="pl-portrait" mood={mood} line={lastKiro?.text ?? situation.kiro} />
           <div className="pl-kiro-name">Kiro</div>
-          {teaching ? (
-            <>
-              <p className="pl-kiro-line">{teaching.lines.join(' ')}</p>
-              <span className="pl-lesson-row">
-                <button type="button" className="pl-lesson" onClick={() => (lesson + 1 < steps.length ? setLesson((n) => n + 1) : endTutorial())}>
-                  {lesson + 1 < steps.length ? `Next (${lesson + 1}/${steps.length})` : 'Got it'}
-                </button>
-                {lesson + 1 < steps.length && (
-                  <button type="button" className="pl-lesson-skip" onClick={endTutorial}>
-                    Skip
-                  </button>
-                )}
-              </span>
-            </>
-          ) : (
-            <p className={`pl-kiro-line${lastKiro?.urgent ? ' is-urgent' : ''}`}>{asking ? '…' : (lastKiro?.text ?? situation.kiro)}</p>
-          )}
-          {!teaching && lastKiro?.offline && <small className="pl-off">rule-written answer (Kiro offline)</small>}
-          {!teaching && (
-            <button
-              type="button"
-              className="pl-lesson-again"
-              onClick={() => {
-                setLesson(0);
-                setTutorial(true);
-              }}
-            >
-              Show the tutorial
-            </button>
-          )}
+          <p className={`pl-kiro-line${lastKiro?.urgent ? ' is-urgent' : ''}`}>{asking ? '…' : (lastKiro?.text ?? situation.kiro)}</p>
+          {lastKiro?.offline && <small className="pl-off">rule-written answer (Kiro offline)</small>}
+          {/* her conversation window (drafts, explain, apply on Easy) opens from her column: she is not on the dock (D-260) */}
+          <button type="button" className="pl-lesson-again" onClick={() => openWin('kiro')}>
+            Open the conversation
+          </button>
           <input
             className="pl-ask"
             placeholder="Ask Kiro anything…"
@@ -675,6 +629,7 @@ export function Play({ toasts, ...p }: PlayProps) {
             onClose: close,
             onFocus: () => setWins((s) => focusTool(s, win.id)),
             onMove: (x: number, y: number) => setWins((s) => moveTool(s, win.id, x, y, view())),
+            onResize: (w: number, h: number) => setWins((s) => resizeTool(s, win.id, w, h, view())),
             lit: lit.has(win.id),
           };
           if (win.id === 'terminal')

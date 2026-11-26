@@ -4,7 +4,11 @@
 
 /* ---- room for the dock on the left */
 .pl-root.has-dock {
-  padding-left: calc(2vw + 74px);
+  padding-left: calc(2vw + 136px);
+}
+/* the second dock column takes width from the actions row: the terminal's button keeps room for its name */
+.pl-root.has-dock .pl-actions {
+  grid-template-columns: repeat(3, minmax(0, 1fr)) minmax(215px, 0.55fr);
 }
 .pl-root.has-dock .pl-tools button {
   white-space: nowrap;
@@ -19,15 +23,30 @@
   z-index: 6;
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  width: 66px;
+  gap: 6px;
+  width: 128px;
   padding: 6px 4px;
   overflow-y: auto;
-  scrollbar-width: none;
   box-sizing: border-box;
   background: rgba(8, 10, 14, 0.86);
   border: 1px solid rgba(255, 255, 255, 0.07);
   border-radius: 10px;
+}
+/* D-260: two columns of the same entries, in four labelled groups, so all of them fit at 1366×768 */
+.pl-dock-group {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+}
+.pl-dock-cap {
+  grid-column: 1 / -1;
+  padding: 0 2px;
+  font-family: var(--mono);
+  font-size: 8.5px;
+  letter-spacing: 1.5px;
+  line-height: 1.2;
+  text-transform: uppercase;
+  color: rgba(236, 229, 211, 0.45);
 }
 .pl-dock.is-lit {
   border-color: var(--amber);
@@ -157,6 +176,74 @@
   height: auto;
   flex: 1;
   min-height: 0;
+}
+
+/* ---- D-262: resizing from the right edge, the bottom edge and the corner */
+.ns-win-grip {
+  position: absolute;
+  z-index: 3;
+  touch-action: none;
+}
+.ns-win-grip.is-e {
+  top: 0;
+  right: -6px;
+  bottom: 14px;
+  width: 10px;
+  cursor: ew-resize;
+}
+.ns-win-grip.is-s {
+  left: 0;
+  right: 14px;
+  bottom: -6px;
+  height: 10px;
+  cursor: ns-resize;
+}
+.ns-win-grip.is-se {
+  right: -6px;
+  bottom: -6px;
+  width: 20px;
+  height: 20px;
+  cursor: nwse-resize;
+  background: linear-gradient(135deg, transparent 52%, rgba(70, 232, 255, 0.4) 52% 58%, transparent 58% 68%, rgba(70, 232, 255, 0.4) 68% 74%, transparent 74%);
+}
+.ns-win.is-bare .ns-win-grip.is-e,
+.ns-win.is-bare .ns-win-grip.is-se {
+  right: 0;
+}
+.ns-win.is-bare .ns-win-grip.is-s,
+.ns-win.is-bare .ns-win-grip.is-se {
+  bottom: 0;
+}
+
+/* ---- D-261: thin scrollbars in the screen's own colours, on every scrolling panel and window */
+.ns-root,
+.ns-root *,
+.ns-report,
+.ns-report * {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--cyan, #46e8ff) 35%, transparent) transparent;
+}
+.ns-root ::-webkit-scrollbar,
+.ns-report ::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+.ns-root ::-webkit-scrollbar-track,
+.ns-report ::-webkit-scrollbar-track {
+  background: transparent;
+}
+.ns-root ::-webkit-scrollbar-thumb,
+.ns-report ::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--cyan, #46e8ff) 35%, transparent);
+  border-radius: 4px;
+}
+.ns-root ::-webkit-scrollbar-thumb:hover,
+.ns-report ::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--cyan, #46e8ff) 60%, transparent);
+}
+.ns-root ::-webkit-scrollbar-corner,
+.ns-report ::-webkit-scrollbar-corner {
+  background: transparent;
 }
 
 /* ---- the "Now:" strip */
