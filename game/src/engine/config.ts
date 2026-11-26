@@ -17,6 +17,7 @@ export interface EngineConfig {
   patchDurationGameMs: number; // DEF-13: ≈ 20 game min
   firstMoveDelayRealMs: { min: number; max: number }; // SYS-22, D-230: Death's first move waits this long (real ms) after engine.beginShift(), drawn from the shift's own seeded stream
   bandage: { breathers: number }; // SYS-23, D-231: a WAF rule or the rate limit that cut a move is evaded by its quiet variants after this many of the level's longest breathers
+  flag: { cooldownRealMs: number }; // DEF-21, D-239 (tune): the least real time between two accepted flags, so spam-flagging the top talkers takes real time
   alerts: AlertThresholds; // SYS-20, D-232: the per-route detectors that open an alert (the same on every level)
   heartbeat: {
     drainPerRealMin: { openDoor: number; minion: number; plug: number; defaced: number; recover: number }; // SYS-06, per REAL minute (D-33)
@@ -100,6 +101,7 @@ const MEDIUM: EngineConfig = {
   patchDurationGameMs: 20 * GAME_MIN,
   firstMoveDelayRealMs: { min: 6_000, max: 9_000 }, // D-252 (approved 2026-11-26): the calm kept, shortened from 20-30 s
   bandage: { breathers: 1 },
+  flag: { cooldownRealMs: 15_000 }, // D-239 (tune): the same on every level
   alerts: ALERTS,
   heartbeat: {
     drainPerRealMin: { openDoor: 3, minion: 1.5, plug: 33, defaced: 20, recover: 2 },
