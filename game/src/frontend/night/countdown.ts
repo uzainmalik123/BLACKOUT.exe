@@ -27,6 +27,7 @@ export const URGENT_S = 3;
  * there is nothing to decide. Under reduced motion the share moves in whole seconds.
  */
 export function countdownOf(world: World, reduce = false): Countdown | null {
+  if (world.training) return null; // the training shift (SYS-24) waits for the trainee: no timer (D-261)
   const { gameMsPerRealMs, decision } = CONFIG[world.difficulty];
   const now = world.clock.gameMs;
   const realS = (gameMs: number) => gameMs / gameMsPerRealMs / 1000;

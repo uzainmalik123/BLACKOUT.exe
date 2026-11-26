@@ -1209,5 +1209,6 @@
   2. **Answered:** any accepted player action other than a read (DEF-01, DEF-02, DEF-03) taken while an alert is open and inside its window answers it (`answeredAt`); one action answers every alert then waiting. A refused action, a read, or asking Kiro does not.
   3. **Missed:** an alert still open and unanswered when its window ends costs the shop a heartbeat dip (Easy **2**, Medium **3**, Hard **4**, `decision.dip`), once, and logs `decision-missed`. An alert that closes first (his move landed or was cut, a wave ended) needed no decision. The engine's clock runs it, so a pause or the tutorial's hold holds it.
   4. **On screen** (UI-15): a bar across the choices empties over the window of the alert the screen shows, with the seconds left; red in the last 3 s, no flashing; "In time" when answered, "Too late" when missed, with Death's taunt in the Now strip and the dip in the meters. Kiro's reaction is the action's real outcome (D-225): Death recoils only when the action really stops him.
-  5. **The report** shows "Decisions in time: X of Y" as a fact; no grade changes (D-256's formula is untouched).
+  5. **The report** shows "Decisions in time: X of Y" as a fact and on its damage strip; no grade changes (D-256's formula is untouched).
+  6. **Not in the training shift** (SYS-24, D-236): the drill waits for the trainee, like its other exceptions (no pests, no endings, no judge): no window, no dip, no countdown.
 - **Why the engine:** the dip changes the heartbeat, which only the engine may (SYS-06); deterministic and tested like every rule.
