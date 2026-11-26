@@ -35,7 +35,9 @@ address the attacker gets in the recording (always inside `203.0.113.0/24`).
 | ATK-01.a | `attacks/ATK-01.a.sh` | 203.0.113.11 | ffuf root scan with `common.txt` and auto-calibration, ffuf's own user agent |
 | ATK-01.b | `attacks/ATK-01.b.sh` | 203.0.113.13 | The quiet scan (D-46, KI-77): the same ffuf scan and list with a browser user agent, 2 threads at 40 requests a second, ~2 min; same hits as .a |
 | ATK-03.a | `attacks/ATK-03.a.sh` | 203.0.113.23 | Login SQLi, one request, curl's own user agent (its `before.sqlite` is the baseline) |
+| ATK-03.b | `attacks/ATK-03.b.sh` | 203.0.113.26 | **Quiet** login SQLi (D-237): the quote and the comment as JSON unicode escapes, so a SQLi rule set reading the body misses it; browser user agent and headers, one request |
 | ATK-04.a | `attacks/ATK-04.a.sh` | 203.0.113.44 | Hydra against the admin login, 30 passwords, 4 tasks, Hydra's own user agent |
+| ATK-04.b | `attacks/ATK-04.b.sh` | 203.0.113.45 | **Quiet** password spraying (D-237): 3 passwords over 6 staff accounts, one try every 10–12 s (under the login rate limit), browser user agent, stops at `admin123`; 18 requests, ~3 min |
 | ATK-06.a | `attacks/ATK-06.a.sh` | 203.0.113.61 | Admin sign-up by mass assignment, then its login and the admin page's data |
 | ATK-08.a | `attacks/ATK-08.a.sh` | 203.0.113.81 | sqlmap UNION dump of Users through search, sqlmap's own user agent, full speed (test-only, D-32) |
 | ATK-08.b | `attacks/ATK-08.b.sh` | 203.0.113.82 | Low and slow, quiet: the same dump with `--random-agent`, `--tamper=randomcase`, `--delay=0.36`, ~2.5 min (D-35) |
@@ -55,9 +57,10 @@ address the attacker gets in the recording (always inside `203.0.113.0/24`).
 | MIN-03.a | `attacks/MIN-03.a.sh` | 203.0.113.177 | Scraper wave: `GET /api/Products` 30 times, 2 a second, Scrapy user agent (D-132) |
 | MIN-04.a | `attacks/MIN-04.a.sh` | 203.0.113.187 | Spam wave: 10 link-spam feedbacks, each through the CAPTCHA the shop answers for it, python-requests user agent (D-132) |
 | CUST.b | `attacks/CUST.b.sh` (+ `.setup.sh`) | 20 addresses in 203.0.113.2 to .127, none an attacker's | **Not an attack:** ~3.5 min of customers incl. 5 forgot-password flows and 5 `/ftp` visits (KI-82, D-131); setup gives the 5 resetters a security answer; converted to `traffic/CUST.b.json` |
+| CUST.c | `attacks/CUST.c.sh` | 12 addresses in 203.0.113.2 to .127, none an attacker's | **Not an attack:** ~2 min of customers whose searches and feedback hold quotes (D-237): the false positives of a SQLi rule; an apostrophe search answers `500` (the shop's search is injectable) and the shopper retries without it; converted to `traffic/CUST.c.json` |
 | CUST.a | `attacks/CUST.a.sh` | 64 addresses in 203.0.113.2 to .127, none an attacker's | **Not an attack:** ~10 min of ordinary customers (REC-06, D-61), `lib/shoppers.py`; converted to `game/src/recordings/traffic/CUST.a.json` (D-62) |
 
-Customer traffic is recorded the same way: `recording/record.sh CUST a 203.0.113.1` (or `CUST b`) (the third argument is
+Customer traffic is recorded the same way: `recording/record.sh CUST a 203.0.113.1` (or `CUST b`, `CUST c`) (the third argument is
 only the header's `attackerIp`; every request names its own customer address). `CUST_SCALE=0.05` in the tools
 container's environment runs the same visits 20 times faster, for a quick check of the script.
 

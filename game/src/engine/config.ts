@@ -69,6 +69,7 @@ export interface AlertThresholds {
   probes: { count: number; windowRealS: number }; // probe-looking paths (/wp-, .php, /.env, /.git, phpmyadmin, .bak, /.htaccess) from any address (a crawler wave rotates its addresses; no shopper asks for these)
   failedLogins: { count: number; windowRealS: number }; // 401s on /rest/user/login from one address
   failedLoginsAll: { count: number; windowRealS: number }; // 401s on /rest/user/login from any address (credential stuffing)
+  slowFailedLogins: { count: number; windowRealS: number }; // 401s on /rest/user/login from one address over a long window: a slow password spray (ATK-04.b, one try every 10–12 s)
   searchErrors: { count: number; windowRealS: number }; // 5xx on /rest/products/search from one address (KI-236: customers' quoted searches answer 500 too, a few per address)
   apiPace: { count: number; windowRealS: number }; // requests to one scraped API route (/api/Users, /api/Products, /rest/memories, /support/logs), any address: waves rotate theirs
   feedback: { count: number; windowRealS: number }; // POST /api/Feedbacks, any address
@@ -79,6 +80,7 @@ const ALERTS: AlertThresholds = {
   probes: { count: 10, windowRealS: 30 },
   failedLogins: { count: 5, windowRealS: 30 }, // a fumbling shopper fails three times in 15 s at most
   failedLoginsAll: { count: 20, windowRealS: 30 }, // CUST.a peaks at 4 in 30 s
+  slowFailedLogins: { count: 8, windowRealS: 120 }, // (tune) ATK-04.b crosses it at its 8th try, ~80 s in; a fumbling shopper fails three times at most
   searchErrors: { count: 5, windowRealS: 60 },
   apiPace: { count: 15, windowRealS: 60 },
   feedback: { count: 5, windowRealS: 30 },
