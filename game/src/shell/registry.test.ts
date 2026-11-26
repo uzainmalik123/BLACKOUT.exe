@@ -56,7 +56,11 @@ describe('steering files (KDEV-01)', () => {
   const read = (name: string) => readFileSync(new URL(`../../../.kiro/steering/${name}`, import.meta.url), 'utf8');
 
   it('both files exist and are always included', () => {
-    for (const name of ['project.md', 'game-shell.md']) expect(read(name), name).toMatch(/^---\ninclusion: always\n---\n/);
+    for (const name of ['project.md', 'game-shell.md']) {
+      // a Windows checkout with core.autocrlf once turned these into CRLF; .gitattributes keeps them LF (D-251)
+      expect(read(name).includes('\r'), `${name} has CRLF line endings: check it out again under .gitattributes`).toBe(false);
+      expect(read(name), name).toMatch(/^---\ninclusion: always\n---\n/);
+    }
   });
 
   it('the project rules point at AGENTS.md and the PRD', () => {

@@ -6,6 +6,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import type { KiroDraft } from '../../kiro/client';
+import { KiroIcon } from '../shared/KiroCanvas';
 import type { Run } from './run';
 
 export interface KiroLine {
@@ -67,9 +68,9 @@ export function KiroPanel({ run, lines, add, insert, onClose }: { run: Run; line
   };
   return (
     <aside className="ns-kiro" aria-label="Kiro">
-      <header>
+      <header data-drag>
         <span className="ns-kiro-sigil" aria-hidden>
-          ☾
+          <KiroIcon size={22} />
         </span>
         <div>
           <b>Kiro</b>

@@ -1,18 +1,78 @@
 // The words the desk shows for the engine's state (UI-04, D-223): alerts, incident events and the clocks, worded the
 // way the player can see them. Like Kiro's snapshot (D-190), nothing here names a move, minion or tap, or says who an
-// address belongs to: an alert is a kind and a time, an event is what the player could have noticed.
+// address belongs to: an alert is its route and symptom (D-232), an event is what the player could have noticed.
 
+import { FREEZE_MESSAGE } from '../../engine/actions';
 import { CONFIG } from '../../engine/config';
 import type { GameEvent } from '../../engine/log';
-import type { World } from '../../engine/state';
+import { changeFrozen } from '../../engine/shift';
+import type { PlaybookPhase, World } from '../../engine/state';
 import { describeAction } from '../../kiro/snapshot';
+import type { GateId } from './battle';
+import type { ToolId } from './windows';
 
-/** An alert's kind, as the snapshot gives it to Kiro (D-190). */
-export function alertWords(about: string): string {
-  if (about.startsWith('ATK-')) return 'Suspicious activity';
-  if (about.startsWith('TAP-')) return 'Data leaving the shop';
-  if (about.startsWith('MIN-')) return 'Automated traffic';
-  return 'Unusual traffic';
+/** The "Now:" strip's words for the playbook phase (UI-11, D-233): never a move, a gate or the assessor's state. */
+export const NOW_WORDS: Readonly<Record<PlaybookPhase, string>> = {
+  watch: 'Look around',
+  identify: 'Identify: find out who and how',
+  contain: 'Contain',
+  eradicate: 'Eradicate',
+  recover: 'Recover',
+};
+
+/** Easy's extra sentence (D-235): the gate the alert's route belongs to, from the engine's `alert.gate`. */
+export function gateSentence(gate: string): string {
+  return `This looks like an attack on the ${gate}${/door$/.test(gate) ? '' : ' gate'}.`;
+}
+
+/** The console the dock lights for an alert's gate on Easy (D-235, D-242): where that gate's first defence lives. */
+export function gateConsole(gate: string): ToolId {
+  switch (gate) {
+    case 'front door':
+      return 'firewall';
+    case 'login':
+    case 'passwords':
+    case 'search':
+      return 'waf';
+    case 'sign-up':
+      return 'accounts';
+    case 'admin API':
+      return 'sessions';
+    case 'products':
+      return 'backups';
+    case 'uploads':
+      return 'uploads';
+    case 'feedback':
+      return 'features';
+    default:
+      return 'waf'; // a leaky tap's name: a WAF path rule closes it (D-42)
+  }
+}
+
+/** The battlefield's entrance (D-225's seven) for an alert's gate, focused on Easy only (D-235). */
+export function battleGate(gate: string): GateId {
+  switch (gate) {
+    case 'login':
+      return 'login';
+    case 'passwords':
+      return 'passwords';
+    case 'sign-up':
+      return 'signup';
+    case 'search':
+      return 'search';
+    case 'admin API':
+    case 'products':
+      return 'admin';
+    case 'uploads':
+      return 'uploads';
+    default:
+      return 'front';
+  }
+}
+
+/** Why a change control is locked right now (SYS-22): the engine's own refusal, or null when changes are allowed. */
+export function freezeReason(world: World): string | null {
+  return changeFrozen(world) ? FREEZE_MESSAGE : null;
 }
 
 /** One line for the incident feed, or null for events the player could not have seen. */
@@ -27,7 +87,7 @@ export function eventWords(e: GameEvent): { text: string; tone: 'bad' | 'good' |
     case 'souls-stolen':
       return { text: `${e.count} customer record${e.count === 1 ? '' : 's'} taken (${e.stolen} of ${e.total} gone)`, tone: 'bad' };
     case 'alert-opened':
-      return { text: `Alert #${e.alert}: ${alertWords(e.about).toLowerCase()}`, tone: 'bad' };
+      return { text: `Alert #${e.alert}: ${e.symptom}`, tone: 'bad' };
     case 'alert-closed':
       return { text: `Alert #${e.alert} closed`, tone: 'good' };
     case 'tap-opened':
@@ -73,4 +133,44 @@ export function shiftLeft(world: World): string {
 /** A game time as the log stamps it, "HH:MM:SS". */
 export function clockAt(world: World, gameMs: number): string {
   return new Date(Date.parse(CONFIG[world.difficulty].scenarioStartIso) + gameMs).toISOString().slice(11, 19);
+}
+
+export interface TimelineEntry {
+  id: number;
+  t: number;
+  /** For a merged run: when it ended. */
+  until?: number;
+  text: string;
+  tone: 'bad' | 'good' | 'info';
+}
+
+/**
+ * The incident's timeline for the report (UI-07, D-226): every event the player could have seen, worded, with runs
+ * of consecutive thefts merged into one line ("47 customer records taken"), so the turning points stand out.
+ */
+export function timelineOf(events: readonly GameEvent[]): TimelineEntry[] {
+  const out: TimelineEntry[] = [];
+  let run: { first: Extract<GameEvent, { kind: 'souls-stolen' }>; last: Extract<GameEvent, { kind: 'souls-stolen' }>; count: number } | null = null;
+  const flush = () => {
+    if (!run) return;
+    const { first, last, count } = run;
+    out.push({ id: first.id, t: first.t, ...(last.t !== first.t && { until: last.t }), text: `${count} customer record${count === 1 ? '' : 's'} taken (${last.stolen} of ${last.total} gone)`, tone: 'bad' });
+    run = null;
+  };
+  for (const e of events) {
+    if (e.kind === 'alert-closed' || e.kind === 'ticket') continue;
+    if (e.kind === 'souls-stolen') {
+      if (run) {
+        run.last = e;
+        run.count += e.count;
+      } else run = { first: e, last: e, count: e.count };
+      continue;
+    }
+    const words = eventWords(e);
+    if (!words) continue;
+    flush();
+    out.push({ id: e.id, t: e.t, ...words });
+  }
+  flush();
+  return out;
 }

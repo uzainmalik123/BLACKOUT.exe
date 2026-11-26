@@ -1,7 +1,9 @@
 // The battlefield (UI-05, D-225): the fight with Death drawn as a place, in the centre of the play screen. The Juice
 // Shop in the middle, its seven entrances round it, the vault of souls inside, a barrier as strong as the business
-// is healthy, customers coming and going, Death outside, coming closer stage by stage, his shadows running at the
-// entrance he is attacking. Everything on it is read from the engine: an entrance is sealed when the engine says a
+// is healthy, customers coming and going, his shadows running at the entrance he is attacking. Death himself is
+// placed by his presence (presence.ts, D-254): away in the calm, back out of the dark when an attack begins, at the
+// gate under attack, striking when it lands, torn into the dark when the player's fix stops it, looming when the
+// business is close to failing; always under the windows, where he can be seen. Everything on it is read from the engine: an entrance is sealed when the engine says a
 // fix holds for every attack on it (`anyStopperHolds`), the stolen admin key is the engine's `gains`, the roots are
 // its `footholds`, the souls are its count. The effects (a shield, a gate slamming, the key shattering, a root
 // breaking, souls pulled out) play only on the engine events or the state changes that mean them.
@@ -12,6 +14,10 @@ import type { World } from '../../engine/state';
 import { MOVE_BY_ID } from '../../rules/moves';
 import type { Foothold, MoveId } from '../../rules/vocabulary';
 import { drawDeath } from '../screen3-briefing/cinema/characters';
+import { envStep, lightAt, startEnv, type Env } from './environment';
+import { danger as dangerOf } from './judge';
+import { HOLD, placeDeath, presenceStep, startPresence, type Presence, type Rect, type Spot } from './presence';
+import { liveAttacks } from './results';
 
 type G = CanvasRenderingContext2D;
 
@@ -98,6 +104,37 @@ interface Fx {
   n?: number;
 }
 
+/**
+ * How much an engine event moves Death's menace (0 far and weak, 1 at the barrier): his successes bring him closer,
+ * the player's cuts and fixes push him back (D-226). Nothing else moves it.
+ */
+export function menaceStep(e: GameEvent): number {
+  switch (e.kind) {
+    case 'move-started':
+      return 0.04;
+    case 'move-landed':
+      return 0.16;
+    case 'souls-stolen':
+      return Math.min(0.08, 0.01 * e.count);
+    case 'return':
+      return 0.5;
+    case 'customer-lost':
+      return 0.02;
+    case 'move-cut':
+      return -0.12;
+    case 'door-shut':
+      return -0.15;
+    case 'patch-applied':
+      return -0.06;
+    case 'tap-closed':
+      return e.by ? -0.04 : 0;
+    case 'banished':
+      return -1;
+    default:
+      return 0;
+  }
+}
+
 /** Which effect an engine event plays on the battlefield, and where. */
 export function fxOf(e: GameEvent): Array<{ kind: FxKind; gate?: GateId; n?: number }> {
   switch (e.kind) {
@@ -144,6 +181,19 @@ export class Battle {
   private lastGates: Partial<Record<GateId, GateState>> = {};
   private lastFrozen = new Set<number>();
   private started = false;
+  /** Death's menace from the engine's events, and the value drawn (eased toward it). */
+  menace = 0.15;
+  private shown = 0.15;
+  private lastT = 0;
+  private endedAt = -1;
+  /** Death's presence (D-254) and where he is drawn (eased toward his spot). */
+  presence: Presence = startPresence();
+  /** How the field's light answers the fight (D-255). */
+  env: Env = startEnv();
+  private target: Spot | null = null;
+  private targetKey = '';
+  private targetAt = -1;
+  private at: Spot | null = null;
 
   /** Read the world: new events become effects, and state changes (the key gone, a root removed) do too. */
   update(world: World, t: number): BattleView {
@@ -153,17 +203,41 @@ export class Battle {
       this.seen = evs.length;
       this.started = true;
     }
-    for (let i = this.seen; i < evs.length; i++) for (const f of fxOf(evs[i]!)) this.fx.push({ ...f, start: t });
+    const fresh = evs.slice(this.seen);
+    for (const ev of fresh) {
+      for (const f of fxOf(ev)) this.fx.push({ ...f, start: t });
+      this.menace = clamp(this.menace + menaceStep(ev));
+    }
     this.seen = evs.length;
+    const dt = Math.min(0.1, Math.max(0, t - this.lastT));
+    this.lastT = t;
+    this.shown += (this.menace - this.shown) * (1 - Math.exp(-dt * 1.6));
+    if (world.ending && this.endedAt < 0) this.endedAt = t;
     if (this.lastKey && !v.key) this.fx.push({ kind: 'key', start: t });
     for (const r of this.lastRoots) if (!v.roots.includes(r)) this.fx.push({ kind: 'root', start: t, n: ROOTS.indexOf(r) });
     for (const g of GATES) if (this.lastGates[g.id] && this.lastGates[g.id] !== 'sealed' && v.gates[g.id] === 'sealed') this.fx.push({ kind: 'seal', gate: g.id, start: t });
     // an attack the engine has just frozen: a shield at its gate, and he recoils
     const frozen = new Set(world.replays.filter((r) => r.frozenSince !== undefined).map((r) => r.id));
+    let frozeHis = 0;
     for (const r of world.replays) {
-      if (r.frozenSince !== undefined && !this.lastFrozen.has(r.id)) this.fx.push({ kind: 'shield', gate: gateOf(r.move)?.id, start: t }, { kind: 'recoil', start: t });
+      if (r.frozenSince !== undefined && !this.lastFrozen.has(r.id)) {
+        this.fx.push({ kind: 'shield', gate: gateOf(r.move)?.id, start: t }, { kind: 'recoil', start: t });
+        if (r.owner === 'death') {
+          this.menace = clamp(this.menace - 0.08);
+          frozeHis++;
+        }
+      }
     }
     this.lastFrozen = frozen;
+    this.env = envStep(this.env, t, fresh, frozeHis);
+    if (!world.ending)
+      this.presence = presenceStep(this.presence, {
+        t,
+        events: fresh,
+        frozen: frozeHis,
+        danger: dangerOf(world.heartbeat, world.souls.stolen.length, world.souls.total),
+        live: liveAttacks(world).length,
+      });
     this.lastKey = v.key;
     this.lastRoots = new Set(v.roots);
     this.lastGates = { ...v.gates };
@@ -176,9 +250,57 @@ export class Battle {
     return this.fx.filter((f) => t - f.start < s).map((f) => f.kind);
   }
 
-  paint(g: G, w: number, h: number, dpr: number, t: number, v: BattleView, focus: GateId | null): void {
-    paintBattle(g, w, h, dpr, t, v, this.fx, focus);
+  /**
+   * Paint the battlefield. `cover` is what lies over it on screen (windows, the alert, the evidence card), in its own
+   * pixels: Death is placed where he can be seen past them (he is drawn under them, so he never covers their text).
+   */
+  paint(g: G, w: number, h: number, dpr: number, t: number, v: BattleView, focus: GateId | null, ending: { kind: string; through?: Foothold } | null = null, cover: readonly Rect[] = [], reduce = false): void {
+    paintBattle(g, w, h, dpr, t, v, this.fx, focus, this.shown, ending && this.endedAt >= 0 ? { ...ending, e: t - this.endedAt } : null, this.death(w, h, t, cover), reduce, lightAt(this.env, t, reduce));
   }
+
+  /** How Death is drawn this frame: his spot for his mode, eased; his form, tearing and gesture by the mode. */
+  private death(w: number, h: number, t: number, cover: readonly Rect[]): DeathDraw | null {
+    const p = this.presence;
+    if (p.mode === 'away') {
+      this.at = null;
+      return null;
+    }
+    const L = layout(w, h);
+    const gate = p.move ? L.gates.get(gateOf(p.move)?.id ?? 'front') : undefined;
+    // the place is chosen when the mode or the visit changes, and looked at again now and then (windows move)
+    const key = `${p.mode}:${p.visit}:${p.move ?? ''}:${Math.round(w)}x${Math.round(h)}`;
+    if (key !== this.targetKey || t - this.targetAt > 1.5 || !this.target) {
+      const place = p.mode === 'recoiling' && this.at ? this.at : placeDeath(p.sudden ? 'striking' : p.mode, p.visit, { w, h }, cover, { shop: L.shop, gate });
+      this.target = place;
+      this.targetKey = key;
+      this.targetAt = t;
+    }
+    const target = this.target!;
+    const e = t - p.since;
+    const dt = Math.min(0.1, Math.max(0, t - (this.lastPaint ?? t)));
+    this.lastPaint = t;
+    if (!this.at || p.mode === 'returning') this.at = { ...target };
+    else {
+      const k = 1 - Math.exp(-dt * (p.mode === 'striking' ? 6 : 2.2));
+      this.at = { ...this.at, x: this.at.x + (target.x - this.at.x) * k, y: this.at.y + (target.y - this.at.y) * k, s: this.at.s + (target.s - this.at.s) * k, lean: this.at.lean + (target.lean - this.at.lean) * k };
+    }
+    const at = this.at;
+    switch (p.mode) {
+      case 'returning':
+        return { ...at, form: ease(e / HOLD.returning), fragment: 0, point: p.sudden ? 1 : 0, menace: this.shown };
+      case 'striking':
+        return { ...at, form: 1, fragment: 0, point: 1, menace: Math.max(0.7, this.shown) };
+      case 'recoiling': {
+        const u = ease(e / HOLD.recoiling);
+        return { ...at, x: at.x + w * 0.06 * u, form: 1 - 0.3 * u, fragment: 0.85 * u, point: 0, menace: this.shown };
+      }
+      case 'critical':
+        return { ...at, form: 1, fragment: 0, point: Math.sin(t * 0.7) > 0.6 ? 1 : 0, menace: 1 };
+      default:
+        return { ...at, form: 1, fragment: 0, point: 0, menace: this.shown };
+    }
+  }
+  private lastPaint: number | null = null;
 }
 
 const ROOTS: Foothold[] = ['hidden-admin', 'hijacked-user', 'planted-file', 'forged-token'];
@@ -188,18 +310,22 @@ export const ROOT_WORDS: Record<Foothold, string> = { 'hidden-admin': 'a hidden 
 
 /** Where things stand on the battlefield, in fractions of its width and height. */
 function layout(w: number, h: number) {
-  const shop = { x: w * 0.36, y: h * 0.56 };
-  const R = Math.min(w * 0.27, h * 0.42);
+  const shop = { x: w * 0.42, y: h * 0.5 };
+  const R = Math.min(w * 0.26, h * 0.4);
   const gates = new Map<GateId, { x: number; y: number; a: number }>();
   GATES.forEach((gd, i) => {
     const a = -Math.PI * 0.42 + (i / (GATES.length - 1)) * Math.PI * 0.84; // an arc facing Death, on the right
-    gates.set(gd.id, { x: shop.x + Math.cos(a) * R, y: shop.y + Math.sin(a) * R * 0.78, a });
+    gates.set(gd.id, { x: shop.x + Math.cos(a) * R, y: shop.y + Math.sin(a) * R * 0.66, a });
   });
   return { shop, R, gates };
 }
 
-function deathAt(w: number, h: number, stage: number) {
-  return { x: w * (0.93 - 0.035 * stage), y: h * 0.62 };
+/** How Death is drawn on the battlefield this frame (D-254). */
+interface DeathDraw extends Spot {
+  form: number;
+  fragment: number;
+  point: number;
+  menace: number;
 }
 
 function glow(g: G, x: number, y: number, r: number, c: string): void {
@@ -216,8 +342,22 @@ const ease = (u: number) => {
   return x * x * (3 - 2 * x);
 };
 
-function paintBattle(g: G, w: number, h: number, dpr: number, t: number, v: BattleView, fx: Fx[], focus: GateId | null): void {
+interface EndingView {
+  kind: string;
+  through?: Foothold;
+  /** Seconds since the ending. */
+  e: number;
+}
+
+function paintBattle(g: G, w: number, h: number, dpr: number, t: number, v: BattleView, fx: Fx[], focus: GateId | null, menace: number, ending: EndingView | null, dd: DeathDraw | null, reduce: boolean, light = 1): void {
   const L = layout(w, h);
+  // the camera breathes: a slow drift and the slightest scale (none under reduced motion)
+  g.save();
+  if (!reduce) {
+    g.translate(w / 2 + Math.sin(t * 0.07) * w * 0.004, h / 2 + Math.cos(t * 0.05) * h * 0.005);
+    g.scale(1.012, 1.012);
+    g.translate(-w / 2, -h / 2);
+  }
   const health = clamp(v.heartbeat / 100);
   // the ground: night fog, a grid of streets fading out
   const bg = g.createRadialGradient(L.shop.x, L.shop.y, h * 0.05, L.shop.x, L.shop.y, w * 0.8);
@@ -286,24 +426,27 @@ function paintBattle(g: G, w: number, h: number, dpr: number, t: number, v: Batt
     gate(g, p.x, p.y, h * 0.05, v.gates[gd.id], gd.label, t, focus === gd.id);
   }
 
-  // Death, coming closer each stage, and his shadows running at the gates he is attacking
-  const d = deathAt(w, h, v.stage);
-  const recoil = fx.filter((f) => f.kind === 'recoil').map((f) => t - f.start).find((e) => e < 1);
-  const lunge = fx.filter((f) => f.kind === 'lunge').map((f) => t - f.start).find((e) => e < 1);
-  const dx = recoil !== undefined ? Math.sin(recoil * Math.PI) * w * 0.04 : lunge !== undefined ? -Math.sin(lunge * Math.PI) * w * 0.05 : 0;
-  if (v.stage > 0 || v.raids.length > 0) {
-    g.save();
-    g.globalAlpha = 0.9;
-    drawDeath(g, d.x + dx, d.y + h * 0.3, h * (0.42 + 0.04 * v.stage), { t, form: 1, point: lunge !== undefined ? 1 : 0, fragment: recoil !== undefined ? 0.4 : 0.05, eyes: 1 }, dpr);
-    g.restore();
-    if (v.key) key(g, d.x - h * 0.07 + dx, d.y - h * 0.08, h * 0.05, t, 1);
+  // Death (D-254): where his presence puts him, or, in an ending, where the ending takes him. No aura, nothing round
+  // him: a shadow under him, his robe, his eyes.
+  const d = dd ? { x: dd.x, y: dd.y - dd.s * 0.5 } : { x: w * 0.9, y: h * 0.62 };
+  const end = ending ? endingDeath(ending, d, w, h, L) : null;
+  if (ending?.kind === 'return' && ending.e >= 2.8) returnCrack(g, L, h, ending, t);
+  if (end) {
+    if (end.form > 0.01) {
+      const size = h * (0.34 + 0.3 * menace + 0.02 * v.stage) * end.scale;
+      drawDeath(g, end.x, end.y + size * 0.5, size, { t, form: end.form, point: end.point > 0.5 ? 1 : 0, fragment: end.fragment, eyes: 0.4 + 0.6 * menace, menace, reduce }, dpr);
+    }
+  } else if (dd && dd.form > 0.01) {
+    drawDeath(g, dd.x, dd.y, dd.s, { t, form: dd.form, point: dd.point, fragment: dd.fragment, eyes: 0.3 + 0.7 * dd.menace, menace: dd.menace, lean: dd.lean, rim: '120, 200, 230', reduce }, dpr);
   }
   for (const raid of v.raids) {
     const p = L.gates.get(raid.gate)!;
+    // his shadows come in out of the dark at the field's edge, never out of him
+    const from = { x: w + h * 0.05, y: p.y + h * 0.1 };
     for (let i = 0; i < (raid.death ? 5 : 3); i++) {
       const u = (t * 0.35 + i / 5) % 1;
-      const x = d.x + (p.x - d.x) * u;
-      const y = d.y + (p.y - d.y) * u + Math.sin(u * 9 + i) * h * 0.02;
+      const x = from.x + (p.x - from.x) * u;
+      const y = from.y + (p.y - from.y) * u + Math.sin(u * 9 + i) * h * 0.02;
       shadow(g, x, y, h * (raid.death ? 0.035 : 0.022), raid.death, u);
     }
   }
@@ -326,14 +469,15 @@ function paintBattle(g: G, w: number, h: number, dpr: number, t: number, v: Batt
         soulsFx(g, L.shop.x, L.shop.y, d.x, d.y - h * 0.1, e, f.n ?? 3);
         break;
       case 'key':
-        shatterFx(g, d.x - h * 0.07, d.y - h * 0.08, h * 0.06, e);
+        // the stolen key revoked: the shop's lights steady (the key itself is a line in the top bar, not a symbol by him)
+        glow(g, L.shop.x, L.shop.y, h * 0.25 * (1 - clamp(e / 1.5)), 'rgba(70, 232, 255, 0.35)');
         break;
       case 'root':
         root(g, L.shop.x, L.shop.y, h, f.n ?? 0, t, 1 - ease(e / 1.5));
         shatterFx(g, L.shop.x + Math.cos((f.n ?? 0) * 1.6 + 2.2) * h * 0.18, L.shop.y + h * 0.12, h * 0.04, e);
         break;
       case 'evidence':
-        glow(g, w * 0.08, h * 0.2, h * 0.2 * (1 - clamp(e / 2.5)), 'rgba(255, 210, 120, 0.6)');
+        glow(g, w * 0.08, h * 0.78, h * 0.2 * (1 - clamp(e / 2.5)), 'rgba(255, 210, 120, 0.6)');
         break;
       case 'recover':
         glow(g, L.shop.x, L.shop.y, L.R * 1.4 * ease(e / 1.2), `rgba(61, 220, 151, ${(0.35 * (1 - clamp(e / 2.5))).toFixed(3)})`);
@@ -350,12 +494,25 @@ function paintBattle(g: G, w: number, h: number, dpr: number, t: number, v: Batt
     g.fillStyle = 'rgba(255, 210, 120, 0.12)';
     g.strokeStyle = 'rgba(255, 210, 120, 0.6)';
     g.lineWidth = 1.5;
-    g.fillRect(w * 0.03, h * 0.08, w * 0.1, h * 0.2);
-    g.strokeRect(w * 0.03, h * 0.08, w * 0.1, h * 0.2);
+    g.fillRect(w * 0.03, h * 0.68, w * 0.1, h * 0.2);
+    g.strokeRect(w * 0.03, h * 0.68, w * 0.1, h * 0.2);
     g.fillStyle = 'rgba(255, 220, 150, 0.85)';
     g.font = `${Math.max(10, h * 0.025)}px "Share Tech Mono", monospace`;
     g.textAlign = 'center';
-    g.fillText(`EVIDENCE ×${v.evidence}`, w * 0.08, h * 0.31);
+    g.fillText(`EVIDENCE ×${v.evidence}`, w * 0.08, h * 0.91);
+  }
+  if (ending) paintEnding(g, w, h, t, v, ending, L, end ? { x: end.x, y: end.y } : d);
+  g.restore();
+  // the field's light answers the fight (D-255): a flicker at a breach, a lift when the player stops an attack
+  if (light < 0.999) {
+    g.fillStyle = `rgba(0, 0, 0, ${(0.85 * (1 - light)).toFixed(3)})`;
+    g.fillRect(0, 0, w, h);
+  } else if (light > 1.001) {
+    g.save();
+    g.globalCompositeOperation = 'lighter';
+    g.fillStyle = `rgba(70, 180, 230, ${(0.35 * (light - 1)).toFixed(3)})`;
+    g.fillRect(0, 0, w, h);
+    g.restore();
   }
   // the vignette
   const vg = g.createRadialGradient(w / 2, h / 2, h * 0.3, w / 2, h / 2, w * 0.7);
@@ -456,7 +613,7 @@ function gate(g: G, x: number, y: number, s: number, state: GateState, label: st
   g.fillStyle = `rgba(${r}, ${gg}, ${b}, 0.95)`;
   g.font = `${Math.max(10, s * 0.32)}px "Share Tech Mono", monospace`;
   g.textAlign = 'center';
-  g.fillText(label.toUpperCase(), 0, s * 1.05);
+  g.fillText(label.toUpperCase(), 0, s * 1.45);
   g.restore();
 }
 
@@ -475,24 +632,6 @@ function shadow(g: G, x: number, y: number, s: number, his: boolean, u: number):
   g.restore();
 }
 
-function key(g: G, x: number, y: number, s: number, t: number, a: number): void {
-  glow(g, x, y, s * 1.6, `rgba(255, 200, 80, ${(0.4 * a * (0.7 + 0.3 * Math.sin(t * 4))).toFixed(3)})`);
-  g.save();
-  g.translate(x, y);
-  g.rotate(-0.6);
-  g.strokeStyle = `rgba(255, 210, 110, ${a.toFixed(3)})`;
-  g.lineWidth = s * 0.15;
-  g.beginPath();
-  g.arc(0, -s * 0.4, s * 0.3, 0, Math.PI * 2);
-  g.moveTo(0, -s * 0.1);
-  g.lineTo(0, s * 0.8);
-  g.moveTo(0, s * 0.55);
-  g.lineTo(s * 0.25, s * 0.55);
-  g.moveTo(0, s * 0.75);
-  g.lineTo(s * 0.2, s * 0.75);
-  g.stroke();
-  g.restore();
-}
 
 function root(g: G, x: number, y: number, h: number, i: number, t: number, a: number): void {
   if (a <= 0.01) return;
@@ -574,4 +713,142 @@ function shatterFx(g: G, x: number, y: number, s: number, e: number): void {
     g.fillRect(x + Math.cos(a) * r, y + Math.sin(a) * r, 3, 3);
   }
   g.restore();
+}
+
+// ------------------------------------------------------------------ the endings, on the battlefield (D-226)
+
+type Layout = ReturnType<typeof layout>;
+
+/** Where Death is, and how much of him, during each ending. */
+function endingDeath(en: EndingView, d: { x: number; y: number }, w: number, h: number, L: Layout): { x: number; y: number; scale: number; form: number; fragment: number; point: number } {
+  const e = en.e;
+  switch (en.kind) {
+    case 'banished':
+      // he comes apart and is gone
+      return { x: d.x, y: d.y, scale: 1, form: clamp(1 - e / 4), fragment: clamp(0.1 + e / 3), point: 0 };
+    case 'return': {
+      // it looks like the banishment... then he rises from inside the shop, through the way back he kept
+      if (e < 2.8) return { x: d.x, y: d.y, scale: 1, form: clamp(1 - e / 2.8) * 0.85 + 0.15, fragment: clamp(0.1 + e / 2.2), point: 0 };
+      const u = ease((e - 3) / 2.5);
+      return { x: L.shop.x, y: L.shop.y + h * 0.1 - u * h * 0.08, scale: 0.6 + 1.3 * u, form: clamp((e - 2.9) / 0.8), fragment: 0.05, point: e > 5 ? 1 : 0 };
+    }
+    case 'souls-lost':
+    case 'flatline': {
+      // he walks up to the barrier and leans over the shop
+      const u = ease(e / 3.5);
+      return { x: d.x + (L.shop.x + L.R * 1.15 - d.x) * u, y: d.y, scale: 1 + 0.45 * u, form: 1, fragment: 0.05, point: e > 3 ? 1 : 0 };
+    }
+    case 'clean-handover':
+      return { x: d.x + w * 0.35 * ease(e / 4), y: d.y, scale: 1, form: clamp(1 - e / 4), fragment: 0.2, point: 0 };
+    default:
+      // a rough handover, or he walked the halls: he steps back into the fog, still watching
+      return { x: d.x + w * 0.12 * ease(e / 4), y: d.y, scale: 0.9, form: 1 - 0.5 * ease(e / 4), fragment: 0.1, point: 0 };
+  }
+}
+
+/** The return's twist, under him (D-254: nothing over his face): the root of the way back he kept splits the shop's floor. */
+function returnCrack(g: G, L: Layout, h: number, en: EndingView, t: number): void {
+  const k = ROOTS.indexOf(en.through ?? 'hidden-admin');
+  root(g, L.shop.x, L.shop.y, h, k < 0 ? 0 : k, t, 1);
+  const crack = clamp((en.e - 2.8) / 0.4);
+  g.strokeStyle = `rgba(255, 40, 60, ${(0.9 * crack).toFixed(3)})`;
+  g.lineWidth = 3;
+  g.beginPath();
+  g.moveTo(L.shop.x - h * 0.08 * crack, L.shop.y + h * 0.1);
+  g.lineTo(L.shop.x, L.shop.y - h * 0.02);
+  g.lineTo(L.shop.x + h * 0.06 * crack, L.shop.y + h * 0.12);
+  g.stroke();
+}
+
+/** The ending's scene over the battlefield: light, darkness, the heart line, the souls, the twist. */
+function paintEnding(g: G, w: number, h: number, t: number, v: BattleView, en: EndingView, L: Layout, death: { x: number; y: number }): void {
+  const e = en.e;
+  const dawn = (a: number) => {
+    const gr = g.createLinearGradient(0, h, 0, 0);
+    gr.addColorStop(0, `rgba(255, 190, 150, ${(0.28 * a).toFixed(3)})`);
+    gr.addColorStop(0.5, `rgba(140, 170, 220, ${(0.18 * a).toFixed(3)})`);
+    gr.addColorStop(1, 'rgba(40, 60, 110, 0)');
+    g.fillStyle = gr;
+    g.fillRect(0, 0, w, h);
+  };
+  switch (en.kind) {
+    case 'banished': {
+      // every gate flashes shut in turn, and the light comes up from the shop
+      GATES.forEach((gd, i) => {
+        const p = L.gates.get(gd.id)!;
+        sealFx(g, p.x, p.y, h * 0.06, e - 0.3 - i * 0.22);
+      });
+      glow(g, L.shop.x, L.shop.y, L.R * 2.2 * ease((e - 1.5) / 3), `rgba(190, 240, 255, ${(0.35 * clamp((e - 1.5) / 3)).toFixed(3)})`);
+      dawn(clamp((e - 3) / 3));
+      break;
+    }
+    case 'return': {
+      if (e < 2.8) {
+        glow(g, L.shop.x, L.shop.y, L.R * 1.8 * ease(e / 2.5), `rgba(190, 240, 255, ${(0.3 * clamp(e / 2.5)).toFixed(3)})`);
+        break;
+      }
+      // the floor's split is drawn under him (returnCrack); here the light dies from inside out
+      if (e < 3.3) {
+        g.fillStyle = `rgba(255, 20, 40, ${(0.35 * (1 - (e - 2.8) / 0.5)).toFixed(3)})`;
+        g.fillRect(0, 0, w, h);
+      }
+      const dark = clamp((e - 3.2) / 3);
+      const rg = g.createRadialGradient(L.shop.x, L.shop.y, h * 0.05, L.shop.x, L.shop.y, w * 0.9 * dark + 1);
+      rg.addColorStop(0, `rgba(30, 0, 6, ${(0.55 * dark).toFixed(3)})`);
+      rg.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      g.fillStyle = rg;
+      g.fillRect(0, 0, w, h);
+      if (e > 4) {
+        g.fillStyle = `rgba(255, 190, 196, ${clamp((e - 4) / 0.8).toFixed(3)})`;
+        g.font = `${Math.max(12, h * 0.03)}px "Share Tech Mono", monospace`;
+        g.textAlign = 'center';
+        g.fillText(`THE WAY BACK YOU MISSED: ${ROOT_WORDS[en.through ?? 'hidden-admin'].toUpperCase()}`, w / 2, h * 0.1);
+      }
+      break;
+    }
+    case 'souls-lost': {
+      // what was left of the souls streams out to him; the vault goes dark
+      for (let i = 0; i < 18; i++) {
+        const u = clamp((e - i * 0.18) / 2.2);
+        if (u <= 0 || u >= 1) continue;
+        const x = L.shop.x + (death.x - L.shop.x) * u;
+        const y = L.shop.y + (death.y - h * 0.15 - L.shop.y) * u - Math.sin(u * Math.PI) * h * 0.1;
+        glow(g, x, y, h * 0.02, `rgba(200, 235, 255, ${(0.8 * Math.sin(u * Math.PI)).toFixed(3)})`);
+      }
+      g.fillStyle = `rgba(60, 0, 10, ${(0.4 * clamp(e / 5)).toFixed(3)})`;
+      g.fillRect(0, 0, w, h);
+      break;
+    }
+    case 'flatline': {
+      // the heart line across the field, beating, then flat
+      const y0 = h * 0.86;
+      const len = clamp(e / 4) * w;
+      g.strokeStyle = e < 2.4 ? 'rgba(61, 220, 151, 0.9)' : 'rgba(200, 60, 70, 0.9)';
+      g.lineWidth = 2.5;
+      g.shadowColor = g.strokeStyle;
+      g.shadowBlur = 10;
+      g.beginPath();
+      g.moveTo(0, y0);
+      for (let x = 0; x < len; x += 4) {
+        const beat = x < w * 0.45 ? Math.max(0, Math.sin((x / w) * 40)) ** 12 : 0;
+        g.lineTo(x, y0 - beat * h * 0.08);
+      }
+      g.stroke();
+      g.shadowBlur = 0;
+      g.fillStyle = `rgba(0, 0, 0, ${(0.45 * clamp((e - 2) / 4)).toFixed(3)})`;
+      g.fillRect(0, 0, w, h);
+      break;
+    }
+    case 'clean-handover':
+      dawn(clamp(e / 4));
+      break;
+    default:
+      dawn(clamp(e / 4) * 0.5);
+      // his eyes, still there in the fog
+      if (e > 2) {
+        glow(g, w * 0.93, h * 0.42, h * 0.02, `rgba(255, 40, 60, ${(0.8 * (0.6 + 0.4 * Math.sin(t * 3))).toFixed(3)})`);
+        glow(g, w * 0.95, h * 0.42, h * 0.02, `rgba(255, 40, 60, ${(0.8 * (0.6 + 0.4 * Math.sin(t * 3))).toFixed(3)})`);
+      }
+  }
+  void v;
 }
