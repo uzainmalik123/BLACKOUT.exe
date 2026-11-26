@@ -160,7 +160,10 @@ export function kiroMood(i: MoodInput): Mood {
   return 'calm';
 }
 
-export function kiroVerdict(grades: Record<string, 'A' | 'B' | 'C' | 'D' | 'F'>): string {
-  const good = Object.values(grades).filter((g) => g === 'A' || g === 'B').length;
-  return good >= 3 ? "You followed the evidence. That's why you're still here." : 'You panicked when you needed to think. Death counted on that.';
+/** Kiro's verdict on the report: the grades, and (D-256) the ending, so she never praises a night that was lost. */
+export function kiroVerdict(grades: Record<string, 'A' | 'B' | 'C' | 'D' | 'F'>, ending?: Ending): string {
+  const good = Object.values(grades).filter((g) => g === 'A' || g === 'B').length >= 3;
+  const lost = ending !== undefined && !WON.has(ending) && ending !== 'rough-handover';
+  if (lost) return good ? 'You read the evidence well. He only needed the one way in you missed.' : 'You panicked when you needed to think. Death counted on that.';
+  return good ? "You followed the evidence. That's why you're still here." : 'You got through it. Next time, follow the evidence sooner.';
 }

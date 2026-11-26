@@ -114,7 +114,11 @@ describe('the room reacts to the engine, and the endings are the engine\'s', () 
     expect(ENDINGS.banished).toMatchObject({ won: true, title: 'Death banished', line: 'The system survived. Did you?' });
     for (const e of ['souls-lost', 'flatline', 'return'] as const) expect(ENDINGS[e].scene).toBe('taken');
     expect(kiroVerdict({ detect: 'A', contain: 'B', eradicate: 'B', recover: 'D' })).toMatch(/followed the evidence/);
-    expect(kiroVerdict({ detect: 'C', contain: 'F', eradicate: 'B', recover: 'D' })).toMatch(/panicked/);
+    expect(kiroVerdict({ detect: 'C', contain: 'F', eradicate: 'B', recover: 'D' }, 'flatline')).toMatch(/panicked/);
+    // D-256: she never praises a lost night, and never scolds a won one as a panic
+    expect(kiroVerdict({ detect: 'A', contain: 'F', eradicate: 'A', recover: 'A' }, 'return')).toMatch(/one way in you missed/);
+    expect(kiroVerdict({ detect: 'A', contain: 'F', eradicate: 'A', recover: 'A' }, 'return')).not.toMatch(/still here/);
+    expect(kiroVerdict({ detect: 'C', contain: 'F', eradicate: 'B', recover: 'D' }, 'clean-handover')).toMatch(/follow the evidence sooner/);
   });
 });
 

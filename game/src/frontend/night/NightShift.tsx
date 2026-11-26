@@ -60,6 +60,12 @@ export function NightShift({ difficulty, skipPrologue = false, onMenu, onAgain }
   const [ending, setEnding] = useState<Scene | null>(null);
   const [card, setCard] = useState(false);
   const [report, setReport] = useState(false);
+  // the report is the night's last screen (D-256): the ending's card shows the outcome, then the report opens
+  useEffect(() => {
+    if (!card || report) return;
+    const t = window.setTimeout(() => setReport(true), 6000);
+    return () => window.clearTimeout(t);
+  }, [card, report]);
   const [eyesInAccounts, setEyesInAccounts] = useState(false);
   const [shakeDesk, setShakeDesk] = useState(false);
   const [glitch, setGlitch] = useState(false);
@@ -278,14 +284,9 @@ export function NightShift({ difficulty, skipPrologue = false, onMenu, onAgain }
           <h1>{run?.engine.world.ending === 'banished' ? 'DEATH BANISHED' : end.scene === 'taken' ? 'YOU LOST' : end.title.toUpperCase()}</h1>
           <p>{end.line}</p>
           <nav>
-            <button type="button" onClick={() => onAgain(difficulty)}>
-              Try again
-            </button>
-            <button type="button" onClick={() => setReport(true)}>
-              View incident report
-            </button>
-            <button type="button" onClick={onMenu}>
-              Main menu
+            {/* retry, another level and the menu are on the report, the night's last screen (D-256) */}
+            <button type="button" autoFocus onClick={() => setReport(true)}>
+              Post-incident report ▸
             </button>
           </nav>
         </div>
