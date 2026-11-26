@@ -74,3 +74,43 @@ export function shiftLeft(world: World): string {
 export function clockAt(world: World, gameMs: number): string {
   return new Date(Date.parse(CONFIG[world.difficulty].scenarioStartIso) + gameMs).toISOString().slice(11, 19);
 }
+
+export interface TimelineEntry {
+  id: number;
+  t: number;
+  /** For a merged run: when it ended. */
+  until?: number;
+  text: string;
+  tone: 'bad' | 'good' | 'info';
+}
+
+/**
+ * The incident's timeline for the report (UI-07, D-226): every event the player could have seen, worded, with runs
+ * of consecutive thefts merged into one line ("47 customer records taken"), so the turning points stand out.
+ */
+export function timelineOf(events: readonly GameEvent[]): TimelineEntry[] {
+  const out: TimelineEntry[] = [];
+  let run: { first: Extract<GameEvent, { kind: 'souls-stolen' }>; last: Extract<GameEvent, { kind: 'souls-stolen' }>; count: number } | null = null;
+  const flush = () => {
+    if (!run) return;
+    const { first, last, count } = run;
+    out.push({ id: first.id, t: first.t, ...(last.t !== first.t && { until: last.t }), text: `${count} customer record${count === 1 ? '' : 's'} taken (${last.stolen} of ${last.total} gone)`, tone: 'bad' });
+    run = null;
+  };
+  for (const e of events) {
+    if (e.kind === 'alert-closed' || e.kind === 'ticket') continue;
+    if (e.kind === 'souls-stolen') {
+      if (run) {
+        run.last = e;
+        run.count += e.count;
+      } else run = { first: e, last: e, count: e.count };
+      continue;
+    }
+    const words = eventWords(e);
+    if (!words) continue;
+    flush();
+    out.push({ id: e.id, t: e.t, ...words });
+  }
+  flush();
+  return out;
+}

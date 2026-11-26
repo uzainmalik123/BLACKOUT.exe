@@ -203,10 +203,10 @@ function cityImage(h: number, dpr: number): CityCache {
   const yOf = (el: number) => (CITY_TOP - el) * ppr;
   // the sky: black-blue above, the city's sodium glow bleeding into the low cloud
   const sky = c.createLinearGradient(0, 0, 0, H);
-  sky.addColorStop(0, '#05070d');
-  sky.addColorStop(0.45, '#0c1222');
-  sky.addColorStop(0.78, '#2a2233');
-  sky.addColorStop(1, '#3a2a2c');
+  sky.addColorStop(0, '#070a14');
+  sky.addColorStop(0.45, '#141c33');
+  sky.addColorStop(0.75, '#3a2c44');
+  sky.addColorStop(1, '#5a3a3a');
   c.fillStyle = sky;
   c.fillRect(0, 0, W, H);
   // low cloud, lit from below
@@ -222,9 +222,9 @@ function cityImage(h: number, dpr: number): CityCache {
   }
   // three bands of buildings, the far ones paler in the haze
   const bands = [
-    { top: 0.2, base: 0.0, haze: 0.55, lit: 0.1, step: 0.05 },
-    { top: 0.3, base: -0.02, haze: 0.3, lit: 0.16, step: 0.07 },
-    { top: 0.46, base: -0.08, haze: 0.0, lit: 0.22, step: 0.11 },
+    { top: 0.2, base: 0.0, haze: 0.55, lit: 0.18, step: 0.05 },
+    { top: 0.3, base: -0.02, haze: 0.3, lit: 0.26, step: 0.07 },
+    { top: 0.46, base: -0.08, haze: 0.0, lit: 0.34, step: 0.11 },
   ];
   bands.forEach((band, bi) => {
     let az = -CITY_AZ;
@@ -279,9 +279,11 @@ function paintOutside(g: G, L: Lens, v: OfficeView, w: number, h: number, dpr: n
   const t = v.t;
   // the far city, at infinity: it moves only as the head turns
   const cc = cityImage(h, dpr);
-  const tl = L.sky(cc.az0, cc.el0);
-  const scale = (L.f / cc.ppr) * 1;
-  g.drawImage(cc.img, tl.x, tl.y, cc.img.width * scale, cc.img.height * scale);
+  const scale = L.f / cc.ppr;
+  // the image is linear in angle: put its centre (azimuth 0) where the camera's yaw puts it, its horizon at the pitch
+  const x0 = L.cx - L.f * L.c.yaw - CITY_AZ * L.f;
+  const y0 = L.cy + L.f * L.c.pitch - CITY_TOP * L.f;
+  g.drawImage(cc.img, x0, y0, cc.img.width * scale, cc.img.height * scale);
   // the aviation lights, blinking
   for (let i = 0; i < 5; i++) {
     if (Math.sin(t * 2 + i * 1.7) < 0.7) continue;
@@ -384,12 +386,14 @@ function tree(g: G, x: number, y: number, k: number, sway: number, i: number): v
   g.fillRect(-k * 0.12, -k * 2.6, k * 0.24, k * 2.6);
   g.translate(0, -k * 2.4);
   g.rotate(sway * 0.3);
-  for (let j = 0; j < 7; j++) {
-    const a = -Math.PI / 2 + (rand(i * 10 + j) - 0.5) * 2.2 + sway * 0.6;
-    const r = k * (1.1 + rand(i * 10 + j + 4) * 0.8);
+  for (let j = 0; j < 28; j++) {
+    const a = rand(i * 31 + j) * Math.PI * 2;
+    const r = k * (0.3 + 1.1 * Math.sqrt(rand(i * 17 + j)));
+    const cx = Math.cos(a) * r * 0.9 + sway * k * 0.3 * (r / k);
+    const cy = Math.sin(a) * r * 0.55 - k * 0.7;
     g.beginPath();
-    g.ellipse(Math.cos(a) * r * 0.7, Math.sin(a) * r * 0.6 - k * 0.6, r * 0.75, r * 0.6, a, 0, Math.PI * 2);
-    g.fillStyle = j % 2 ? '#08090a' : '#0b0d0c';
+    g.ellipse(cx, cy, k * (0.22 + 0.2 * rand(j + i)), k * (0.16 + 0.14 * rand(j * 3 + i)), a, 0, Math.PI * 2);
+    g.fillStyle = j % 3 ? 'rgba(6, 10, 9, 0.72)' : 'rgba(12, 18, 15, 0.6)';
     g.fill();
   }
   g.restore();
@@ -625,17 +629,50 @@ function paintShell(g: G, L: Lens, v: OfficeView): void {
         g.scale(1, 0.32);
         glow(g, 0, 0, f.k * 2.2, `rgba(${tubeCol[0]}, ${tubeCol[1]}, ${tubeCol[2]}, ${(0.07 * on).toFixed(3)})`);
         g.restore();
-        const r = L.at(x, -0.9, z);
-        if (r) {
-          const sg = g.createLinearGradient(0, f.y, 0, r.y);
-          sg.addColorStop(0, `rgba(${tubeCol[0]}, ${tubeCol[1]}, ${tubeCol[2]}, ${(0.07 * on).toFixed(3)})`);
-          sg.addColorStop(1, `rgba(${tubeCol[0]}, ${tubeCol[1]}, ${tubeCol[2]}, 0)`);
-          g.fillStyle = sg;
-          g.fillRect(f.x - f.k * 0.5, f.y, f.k, r.y - f.y);
+        // the tube's reflection in the polished floor: a soft streak, not a box (only for tubes well ahead)
+        if (f.d > 3.5) {
+        g.save();
+        g.globalCompositeOperation = 'lighter';
+        g.translate(f.x, f.y);
+        g.scale(0.25, 1);
+        glow(g, 0, 0, f.k * 1.2, `rgba(${tubeCol[0]}, ${tubeCol[1]}, ${tubeCol[2]}, ${(0.05 * on).toFixed(3)})`);
+        g.restore();
+        }
+        // a faint cone of light down through the haze
+        const top = L.at(x, ceil - 0.05, z);
+        if (top && top.d > 3.5) {
+          // only for tubes well ahead: one overhead would fill the frame with a wedge
+          const cone = g.createLinearGradient(0, top.y, 0, f.y);
+          cone.addColorStop(0, `rgba(${tubeCol[0]}, ${tubeCol[1]}, ${tubeCol[2]}, ${(0.035 * on).toFixed(3)})`);
+          cone.addColorStop(1, `rgba(${tubeCol[0]}, ${tubeCol[1]}, ${tubeCol[2]}, 0)`);
+          g.fillStyle = cone;
+          g.beginPath();
+          g.moveTo(top.x - top.k * 0.6, top.y);
+          g.lineTo(top.x + top.k * 0.6, top.y);
+          g.lineTo(f.x + f.k * 0.9, f.y);
+          g.lineTo(f.x - f.k * 0.9, f.y);
+          g.closePath();
+          g.fill();
         }
       }
     }
   }
+}
+
+/** The exit sign over the far door on the left wall, red in the dark, and its spill on the wall. */
+function exitSign(g: G, L: Lens, t: number, lights: number): void {
+  const p = L.at(-5.98, 2.45, 5.2);
+  if (!p) return;
+  const k = p.k;
+  const flick = Math.sin(t * 31) > 0.95 ? 0.5 : 1;
+  glow(g, p.x, p.y, k * 1.4, `rgba(255, 40, 50, ${(0.22 * flick).toFixed(3)})`);
+  L.fill(g, [[-5.97, 2.32, 4.85], [-5.97, 2.32, 5.55], [-5.97, 2.58, 5.55], [-5.97, 2.58, 4.85]], `rgba(${Math.round(160 + 60 * flick)}, 20, 30, 0.95)`);
+  g.fillStyle = `rgba(255, 220, 220, ${(0.85 * flick).toFixed(3)})`;
+  g.font = `700 ${Math.max(6, k * 0.13)}px "Share Tech Mono", monospace`;
+  g.textAlign = 'center';
+  g.fillText('EXIT', p.x, p.y + k * 0.05);
+  // the door under it, a darker rectangle
+  L.fill(g, [[-5.99, 0, 4.7], [-5.99, 0, 5.7], [-5.99, 2.2, 5.7], [-5.99, 2.2, 4.7]], `rgba(4, 4, 6, ${(0.6 + 0.2 * lights).toFixed(2)})`);
 }
 
 /** The server rack on the dark side of the room, its LEDs. */
@@ -704,8 +741,17 @@ function monitor(g: G, L: Lens, cx: number, z: number, wid: number, hgt: number,
     content(g, wid * c.k * Math.cos(angle), hgt * c.k);
     g.restore();
   }
-  // the glow it throws on the desk and the air
-  glow(g, c.x, c.y, c.k * wid * 0.9, `rgba(${r}, ${gg}, ${b}, ${(0.1 * a).toFixed(3)})`);
+  // the glow it throws on the desk and the air, and a pool on the floor in front
+  glow(g, c.x, c.y, c.k * wid * 0.9, `rgba(${r}, ${gg}, ${b}, ${(0.12 * a).toFixed(3)})`);
+  const fl = L.at(cx, 0, z - 0.9);
+  if (fl) {
+    g.save();
+    g.globalCompositeOperation = 'lighter';
+    g.translate(fl.x, fl.y);
+    g.scale(1, 0.3);
+    glow(g, 0, 0, fl.k * 1.1, `rgba(${r}, ${gg}, ${b}, ${(0.06 * a).toFixed(3)})`);
+    g.restore();
+  }
 }
 
 function chair(g: G, L: Lens, x: number, z: number, turn: number, lights: number): void {
@@ -877,6 +923,7 @@ export function paintOffice(g: G, w: number, h: number, dpr: number, v: OfficeVi
   g.restore();
   paintWindowWall(g, L, v, h);
   paintShell(g, L, v);
+  exitSign(g, L, v.t, v.lights);
   paintRack(g, L, v.t);
   // furniture and people, far to near
   const items: Array<{ z: number; draw: () => void }> = [];
@@ -1043,7 +1090,7 @@ export function paintEyes(g: G, w: number, h: number, t: number, open: number, l
  * layered so that her fingers close over the back of the player's hand and the player's thumb lies over hers.
  * `reach` brings them together, `grip` closes the fingers, `pump` (0..1) shakes them twice, `release` opens them.
  */
-export function paintHands(g: G, w: number, h: number, t: number, reach: number, grip: number, pump: number, release: number): void {
+export function paintHands(g: G, w: number, h: number, t: number, reach: number, grip: number, pump: number, release: number, shoulder?: { x: number; y: number }): void {
   const r = ease(clamp(reach)) * (1 - 0.35 * ease(clamp(release)));
   const close = clamp(grip) * (1 - ease(clamp(release)));
   const bob = pump > 0 ? Math.sin(pump * Math.PI * 4) * h * 0.022 : 0;
@@ -1051,8 +1098,9 @@ export function paintHands(g: G, w: number, h: number, t: number, reach: number,
   const S = h * 0.42;
   const mx = w * 0.53;
   const my = h * 0.66 + bob;
-  // where each hand is: hers comes from the left and a little above, the player's from the lower right, near the eye
-  const her = { x: mix(-S * 0.7, mx - S * 0.12, r), y: mix(h * 0.42, my - S * 0.02, r) };
+  // her arm starts at her own shoulder (projected from the room); her hand rises from her side to the meeting point
+  const sh = shoulder ?? { x: w * 0.4, y: h * 0.62 };
+  const her = { x: mix(sh.x + S * 0.02, mx - S * 0.12, r), y: mix(sh.y + S * 0.5, my - S * 0.02, r) };
   const you = { x: mix(w + S * 0.5, mx + S * 0.12, r), y: mix(h + S * 0.6, my + S * 0.02, r) };
   // the darkness round the meeting, so the hands read against the room
   const pool = g.createRadialGradient(mx, my, S * 0.1, mx, my, S * 1.6);
@@ -1061,29 +1109,63 @@ export function paintHands(g: G, w: number, h: number, t: number, reach: number,
   g.fillStyle = pool;
   g.fillRect(mx - S * 1.6, my - S * 1.6, S * 3.2, S * 3.2);
 
-  // ---- Kiro's arm and hand (behind the player's fingers)
+  // ---- Kiro's arm: shoulder, a bent elbow below the line, the forearm reaching toward the camera (wider as it nears)
+  const wrist = { x: her.x - S * 0.2, y: her.y + S * 0.01 };
+  const elbow = { x: mix(sh.x, wrist.x, 0.45) - S * 0.04, y: Math.max(sh.y, wrist.y) + S * (0.16 - 0.08 * r) };
+  const limb = (a: { x: number; y: number }, b: { x: number; y: number }, wa: number, wb: number, fill: string | CanvasGradient) => {
+    const ang = Math.atan2(b.y - a.y, b.x - a.x) + Math.PI / 2;
+    const ca = Math.cos(ang);
+    const sa = Math.sin(ang);
+    g.fillStyle = fill;
+    g.beginPath();
+    g.moveTo(a.x + ca * wa, a.y + sa * wa);
+    g.lineTo(b.x + ca * wb, b.y + sa * wb);
+    g.arc(b.x, b.y, wb, ang, ang + Math.PI);
+    g.lineTo(a.x - ca * wa, a.y - sa * wa);
+    g.arc(a.x, a.y, wa, ang + Math.PI, ang);
+    g.closePath();
+    g.fill();
+  };
+  const skin = g.createLinearGradient(sh.x, sh.y, wrist.x, wrist.y);
+  skin.addColorStop(0, '#7c7e78');
+  skin.addColorStop(0.6, '#5d5f5a');
+  skin.addColorStop(0.85, '#2c2a28');
+  skin.addColorStop(1, '#141211');
+  limb(sh, elbow, S * 0.038, S * 0.046, skin);
+  limb(elbow, wrist, S * 0.046, S * 0.07, skin);
+  // the light from the monitors along the top of her arm
+  g.strokeStyle = 'rgba(150, 220, 235, 0.25)';
+  g.lineWidth = Math.max(1, S * 0.005);
+  g.beginPath();
+  g.moveTo(sh.x, sh.y - S * 0.036);
+  g.quadraticCurveTo(elbow.x, elbow.y - S * 0.05, wrist.x, wrist.y - S * 0.068);
+  g.stroke();
+  // chain bands round the forearm, as in her portrait
+  for (const u of [0.35, 0.62]) {
+    const px = mix(elbow.x, wrist.x, u);
+    const py = mix(elbow.y, wrist.y, u);
+    const wd = S * (0.046 + 0.024 * u);
+    g.strokeStyle = 'rgba(170, 160, 130, 0.8)';
+    g.lineWidth = Math.max(1, S * 0.007);
+    g.setLineDash([S * 0.012, S * 0.007]);
+    g.beginPath();
+    g.ellipse(px, py, wd * 0.35, wd * 1.02, Math.atan2(wrist.y - elbow.y, wrist.x - elbow.x), 0, Math.PI * 2);
+    g.stroke();
+  }
+  g.setLineDash([]);
+
+  // ---- her hand (behind the player's fingers)
   g.save();
   g.translate(her.x, her.y);
   g.rotate(0.12 + tilt);
-  // the sleeve: torn black layers, chains over it
-  const sl = g.createLinearGradient(-S * 1.5, 0, -S * 0.1, 0);
-  sl.addColorStop(0, '#040306');
-  sl.addColorStop(1, '#141019');
-  g.fillStyle = sl;
-  g.beginPath();
-  g.moveTo(-S * 1.8, -S * 0.42);
-  g.quadraticCurveTo(-S * 0.9, -S * 0.2, -S * 0.24, -S * 0.11);
-  g.lineTo(-S * 0.22, S * 0.12);
-  g.quadraticCurveTo(-S * 0.9, S * 0.2, -S * 1.8, S * 0.22);
-  g.closePath();
-  g.fill();
-  for (let i = 0; i < 3; i++) {
-    g.strokeStyle = `rgba(190, 190, 200, ${0.35 - i * 0.08})`;
+  // a chain bracelet at the wrist
+  for (let i = 0; i < 2; i++) {
+    g.strokeStyle = `rgba(200, 200, 210, ${0.45 - i * 0.12})`;
     g.lineWidth = Math.max(1, S * 0.008);
     g.setLineDash([S * 0.018, S * 0.01]);
     g.beginPath();
-    g.moveTo(-S * (0.3 + i * 0.12), -S * 0.12);
-    g.quadraticCurveTo(-S * (0.26 + i * 0.12), S * 0.02, -S * (0.3 + i * 0.12), S * 0.13);
+    g.moveTo(-S * (0.2 + i * 0.05), -S * 0.1);
+    g.quadraticCurveTo(-S * (0.17 + i * 0.05), S * 0.02, -S * (0.2 + i * 0.05), S * 0.11);
     g.stroke();
   }
   g.setLineDash([]);

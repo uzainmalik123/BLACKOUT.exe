@@ -12,7 +12,7 @@ import { drawKiro } from '../screen3-briefing/cinema/characters';
 import { DIFFICULTY_LABEL } from '../screen2-menu/menu';
 import { ENDINGS, kiroVerdict } from './judge';
 import type { Run } from './run';
-import { clockAt, eventWords } from './words';
+import { clockAt, timelineOf } from './words';
 
 const PHASE_WORDS: Record<string, string> = { detect: 'Detect', contain: 'Contain', eradicate: 'Eradicate', recover: 'Recover' };
 
@@ -36,14 +36,7 @@ export function ReportWall({ run, onAgain, onMenu }: { run: Run; onAgain: (d: Di
   const ending = w.ending ? ENDINGS[w.ending] : null;
   const stolen = w.souls.stolen.length;
   const stages = useMemo(() => Math.max(0, ...w.events.map((e) => (e.kind === 'move-started' ? e.stage : 0))), [w]);
-  const timeline = useMemo(
-    () =>
-      w.events
-        .map((e) => ({ e, words: eventWords(e) }))
-        .filter((x): x is { e: (typeof w.events)[number]; words: NonNullable<ReturnType<typeof eventWords>> } => x.words !== null && x.e.kind !== 'alert-closed' && x.e.kind !== 'ticket')
-        .slice(-60),
-    [w],
-  );
+  const timeline = useMemo(() => timelineOf(w.events).slice(-60), [w]);
   const actions = w.events.filter((e) => e.kind === 'action');
   const good = actions.filter((e) => e.kind === 'action' && e.ok).length;
   const markdown = report && debrief ? renderMarkdown(report, debrief) : report?.markdown;
@@ -131,10 +124,13 @@ export function ReportWall({ run, onAgain, onMenu }: { run: Run; onAgain: (d: Di
         <section className="ns-rep-timeline">
           <h2>Timeline</h2>
           <ol>
-            {timeline.map(({ e, words }) => (
-              <li key={e.id} className={`is-${words.tone}${open === e.id ? ' is-open' : ''}`} onClick={() => setOpen(open === e.id ? null : e.id)}>
-                <time>{clockAt(w, e.t)}</time>
-                <span>{words.text}</span>
+            {timeline.map((x) => (
+              <li key={x.id} className={`is-${x.tone}${open === x.id ? ' is-open' : ''}`} onClick={() => setOpen(open === x.id ? null : x.id)}>
+                <time>
+                  {clockAt(w, x.t)}
+                  {x.until !== undefined && <small>–{clockAt(w, x.until).slice(0, 5)}</small>}
+                </time>
+                <span>{x.text}</span>
               </li>
             ))}
           </ol>

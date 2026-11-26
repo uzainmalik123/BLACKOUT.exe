@@ -1171,18 +1171,28 @@ function paintGate(g: G, W: number, H: number): void {
     g.lineTo(W, y);
     g.stroke();
   }
-  // ivy, rust and crimson in autumn, thickest on the left, climbing round the arch
-  for (let k = 0; k < 2600; k++) {
-    const x = rand(k * 1.3) * W;
-    const y = top + rand(k * 2.1 + 5) * (ground - top);
-    const density = 0.85 - x / W * 0.6 + (Math.abs(x - vx) < archW * 0.75 ? 0.25 : 0);
-    if (rand(k * 3.7) > density) continue;
-    const hue = rand(k + 11);
-    g.fillStyle = hue < 0.35 ? 'rgba(130, 30, 24, 0.85)' : hue < 0.6 ? 'rgba(160, 70, 30, 0.8)' : hue < 0.8 ? 'rgba(70, 60, 30, 0.8)' : 'rgba(30, 50, 32, 0.85)';
-    const r = H * (0.004 + 0.005 * rand(k + 17));
+  // bare vine stems creeping up the stone, dark, no leaves (D-224: the only leaves in the shot are the five on the ground)
+  g.strokeStyle = 'rgba(14, 20, 16, 0.85)';
+  g.lineCap = 'round';
+  for (let k = 0; k < 14; k++) {
+    let x = (k < 7 ? rand(k) * W * 0.3 : W * 0.55 + rand(k) * W * 0.18) + (rand(k + 40) - 0.5) * W * 0.02;
+    let y = ground;
+    g.lineWidth = Math.max(1, H * (0.002 + 0.002 * rand(k + 3)));
     g.beginPath();
-    g.ellipse(x, y, r * 1.3, r, rand(k) * 3, 0, Math.PI * 2);
-    g.fill();
+    g.moveTo(x, y);
+    const reach = (0.25 + 0.45 * rand(k + 9)) * (ground - top);
+    for (let j = 0; j < 9; j++) {
+      x += (rand(k * 13 + j) - 0.5) * W * 0.025;
+      y -= reach / 9;
+      g.lineTo(x, y);
+      // a short tendril now and then
+      if (rand(k * 7 + j) > 0.7) {
+        g.moveTo(x, y);
+        g.quadraticCurveTo(x + W * 0.01, y - H * 0.01, x + W * 0.018 * (rand(j) > 0.5 ? 1 : -1), y - H * 0.025);
+        g.moveTo(x, y);
+      }
+    }
+    g.stroke();
   }
   g.restore();
   // the arch's stone mouldings
@@ -1250,16 +1260,20 @@ function leaf(g: G, x: number, y: number, s: number, turn: number, colour: strin
   g.ellipse(s * 0.08, s * 0.12, s * 0.95, s * 0.8, 0, 0, Math.PI * 2);
   g.fill();
   g.beginPath();
+  // five rounded lobes with shallow notches between them: a maple leaf, not a star
   const lobes = 5;
-  for (let i = 0; i <= lobes * 2; i++) {
-    const a = -Math.PI / 2 + ((i / (lobes * 2)) * Math.PI * 1.6 - Math.PI * 0.8);
-    const r = i % 2 === 0 ? s * (i === lobes ? 1 : 0.82) : s * 0.38;
-    const px = Math.cos(a) * r;
-    const py = Math.sin(a) * r;
-    if (i === 0) g.moveTo(px, py);
-    else g.lineTo(px, py);
+  const span = Math.PI * 1.55;
+  for (let i = 0; i <= lobes; i++) {
+    const a = -Math.PI / 2 - span / 2 + (i / lobes) * span;
+    const r = s * (i === 0 || i === lobes ? 0.55 : i === Math.floor(lobes / 2) + 0 ? 1 : 0.85);
+    const notch = a - span / lobes / 2;
+    if (i === 0) g.moveTo(Math.cos(a) * r, Math.sin(a) * r);
+    else {
+      g.quadraticCurveTo(Math.cos(notch) * s * 0.62, Math.sin(notch) * s * 0.62, Math.cos(a) * r * 0.92, Math.sin(a) * r * 0.92);
+      g.arc(Math.cos(a) * r * 0.8, Math.sin(a) * r * 0.8, r * 0.16, a - 1.2, a + 1.2);
+    }
   }
-  g.lineTo(0, s * 0.15);
+  g.quadraticCurveTo(s * 0.2, s * 0.1, 0, s * 0.15);
   g.closePath();
   const body = g.createRadialGradient(0, -s * 0.2, s * 0.05, 0, 0, s);
   body.addColorStop(0, colour);
@@ -1377,7 +1391,7 @@ function gate(f: Frame): void {
     const tone = red > 0.5 ? CRIMSON : AMBER;
     plaque('FIREWALL', FACTS.firewall.state, W * 0.22, H * 0.4, tone);
     plaque('WAF', FACTS.waf.state, W * 0.81, H * 0.24, tone);
-    plaque('WEB SERVER · THE GATE · OPEN', FACTS.parts[1]?.sub ?? '', vx, ground + H * 0.05, CYAN);
+    plaque('WEB SERVER · THE GATE · OPEN', FACTS.parts[1]?.sub ?? '', vx, ground - H * 0.06, CYAN); // above the subtitles
     label(g, 'DATABASE · THE VAULT', vx, H * 0.33, fs, '#dff6ff', 'center', SANS, 800);
     label(g, 'BACKUP · EVERY HOUR', bx + H * 0.06, by, fs * 0.85, EMERALD, 'left', SANS, 800);
     hot.push({ id: 'firewall', x: W * 0.16, y: H * 0.36, w: W * 0.12, h: ground - H * 0.36, title: 'Firewall', body: `${FACTS.firewall.where} · ${FACTS.firewall.state}`, tone: 'crimson' });

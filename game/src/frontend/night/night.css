@@ -125,12 +125,15 @@
   color: #ffd8d8;
   letter-spacing: 0.5px;
 }
+/* at the desk: subtitles sit in the battlefield under the alert; Kiro's lines are in her panel, so only Death's show */
 .phase-shift .ns-sub,
-.phase-alarm .ns-sub,
-.phase-check .ns-sub,
-.phase-verdict .ns-sub {
+.phase-alarm .ns-sub {
   bottom: auto;
-  top: 2.2vh;
+  top: calc(2vh + 210px);
+  z-index: 7;
+}
+.phase-shift .ns-sub.who-kiro {
+  display: none;
 }
 
 /* the login and the first check sit on the centre monitor */
@@ -1356,6 +1359,8 @@ button.is-armed {
   --amber: #ffb23e;
   --crimson: #ff2a4a;
   --emerald: #3ddc97;
+  /* the report renders outside .ns-root, so it needs its own: without it the text fell back to black */
+  --bone: #ece5d3;
   --mono: 'Share Tech Mono', ui-monospace, Consolas, monospace;
   --caps: Cinzel, Georgia, serif;
 }

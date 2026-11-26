@@ -9,7 +9,7 @@ import { deltaWords, metersOf } from './Desk';
 import { CAMS, lerpCam, onScreen, walkCam } from './office';
 import { runOn } from './run';
 import { Soundscape, heartAt } from './sound';
-import { alertWords, clockAt, eventWords, shiftLeft } from './words';
+import { alertWords, clockAt, eventWords, shiftLeft, timelineOf } from './words';
 
 const baseline = () => new Uint8Array(readFileSync(new URL('../../recordings/juiceshop.sqlite', import.meta.url)));
 const IDS = /\b(ATK|MIN|TAP|DEF)-\d/;
@@ -37,6 +37,20 @@ describe('the desk words what the player could see, and nothing more (D-223)', (
     expect(eventWords(ev({ kind: 'action', action: { type: 'DEF-06', ip: '203.0.113.9', op: 'add' }, ok: true }))).toEqual({ text: '✓ firewall add 203.0.113.9', tone: 'info' });
     expect(eventWords(ev({ kind: 'souls-stolen', by: 'ATK-08', count: 3, stolen: 9, total: 312 }))?.text).toBe('3 customer records taken (9 of 312 gone)');
     expect(eventWords(ev({ kind: 'kiro', call: 'chat' }))).toBeNull();
+  });
+
+  it('merges a run of thefts into one line of the timeline, and keeps the turning points', () => {
+    const ev = (id: number, t: number, body: object) => ({ id, t, ...body }) as GameEvent;
+    const tl = timelineOf([
+      ev(1, 0, { kind: 'move-started', move: 'ATK-08', variant: 'd', stage: 4, ip: '1.2.3.4' }),
+      ev(2, 10, { kind: 'souls-stolen', by: 'ATK-08', count: 3, stolen: 3, total: 325 }),
+      ev(3, 20, { kind: 'souls-stolen', by: 'ATK-08', count: 4, stolen: 7, total: 325 }),
+      ev(4, 25, { kind: 'ticket', ticket: 1, about: 'search', status: 503 }),
+      ev(5, 30, { kind: 'move-cut', move: 'ATK-08', variant: 'd', by: 'DEF-12' }),
+      ev(6, 40, { kind: 'souls-stolen', by: 'TAP-01', count: 1, stolen: 8, total: 325 }),
+    ]);
+    expect(tl.map((x) => x.text)).toEqual(['Something has started moving in the traffic', '7 customer records taken (7 of 325 gone)', 'An intrusion was cut off', '1 customer record taken (8 of 325 gone)']);
+    expect(tl[1]).toMatchObject({ t: 10, until: 20 });
   });
 
   it('reads the clocks from the engine', () => {

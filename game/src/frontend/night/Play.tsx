@@ -11,7 +11,7 @@ import { gameClockLabel } from '../../engine/clock';
 import type { GameEvent } from '../../engine/log';
 import { metersOf, type Meters, type Toast } from './Desk';
 import { Battle, gateOf, type FxKind, type GateId } from './battle';
-import { anomalies, whatKiroSees } from './judge';
+import { anomalies, danger as dangerOf, whatKiroSees } from './judge';
 import type { KiroLine } from './KiroPanel';
 import { OUTCOME_KIRO, OUTCOME_WORDS, READS, liveAttacks, outcomeOf, type Outcome, type Pending } from './results';
 import { readingsOf, type Run } from './run';
@@ -122,7 +122,7 @@ export function Play({ toasts, ...p }: PlayProps) {
         if (s) p.sfx(s);
       }
       last = t;
-      battle.paint(g, W, H, dpr, t, v, focusGate.current);
+      battle.paint(g, W, H, dpr, t, v, focusGate.current, world.ending ? { kind: world.ending, through: world.death.returnedThrough } : null);
       const pend = pending.current;
       if (pend) {
         const o = outcomeOf(pend, world, t);
@@ -257,6 +257,10 @@ export function Play({ toasts, ...p }: PlayProps) {
     if (terminal) input.current?.focus();
   }, [terminal]);
 
+  // Kiro's mood (D-226): from the meters (the engine's) and the last real outcome; her lips move while she speaks
+  const level = dangerOf(w.heartbeat, w.souls.stolen.length, w.souls.total);
+  const relieved = result !== null && GOOD.has(result.outcome);
+  const mood: Mood = w.ending ? (ENDING_WON.has(w.ending) ? 'relief' : 'alarm') : relieved ? 'relief' : level >= 3 ? 'alarm' : level >= 1 ? 'concern' : 'calm';
   const act = situation.act;
   const needsPick = act?.needs && (!target || target.kind !== act.needs);
   const lastKiro = [...p.kiroLines].reverse().find((l) => l.who === 'kiro');
@@ -447,8 +451,8 @@ export function Play({ toasts, ...p }: PlayProps) {
           </div>
         </section>
 
-        <aside className="pl-kiro">
-          <Portrait />
+        <aside className={`pl-kiro mood-${mood}`}>
+          <Portrait mood={mood} speaking={lastKiro?.id ?? 0} />
           <div className="pl-kiro-name">Kiro</div>
           <p className={`pl-kiro-line${lastKiro?.urgent ? ' is-urgent' : ''}`}>{asking ? '…' : (lastKiro?.text ?? situation.kiro)}</p>
           {lastKiro?.offline && <small className="pl-off">rule-written answer (Kiro offline)</small>}
@@ -543,9 +547,27 @@ function SoundPanel({ volumes, set, muted, setMuted }: { volumes: Volumes; set: 
  * Kiro's face beside the terminal: the portrait in `public/night/kiro.png` when there is one (D-224: a generated
  * still of her), else the briefing's painter.
  */
-function Portrait() {
+type Mood = 'calm' | 'concern' | 'alarm' | 'relief';
+const ENDING_WON: ReadonlySet<string> = new Set(['banished', 'clean-handover']);
+
+/** How Kiro holds her face in each mood: how wide her eyes, where she looks, how much she flickers. */
+const MOOD_POSE: Record<Mood, { eyes: number; look: number; glitch: number }> = {
+  calm: { eyes: 0.7, look: 0.2, glitch: 0 },
+  concern: { eyes: 0.88, look: 0, glitch: 0.02 },
+  alarm: { eyes: 1, look: -0.1, glitch: 0.08 },
+  relief: { eyes: 0.5, look: 0.12, glitch: 0 },
+};
+
+function Portrait({ mood, speaking }: { mood: Mood; speaking: number }) {
   const [img, setImg] = useState(true);
   const ref = useRef<HTMLCanvasElement>(null);
+  const live = useRef({ mood, talkUntil: 0 });
+  useEffect(() => {
+    live.current.mood = mood;
+  }, [mood]);
+  useEffect(() => {
+    if (speaking) live.current.talkUntil = performance.now() + 2600;
+  }, [speaking]);
   useEffect(() => {
     if (img) return;
     const c = ref.current;
@@ -562,7 +584,9 @@ function Portrait() {
       g.setTransform(dpr, 0, 0, dpr, 0, 0);
       g.clearRect(0, 0, W, H);
       const t = (now - t0) / 1000;
-      drawKiro(g, W / 2, H * 2.05, H * 2.25, { t, form: 1, talk: 0, look: Math.sin(t * 0.4) * 0.2, eyes: 0.7, glitch: 0, hand: null }, dpr);
+      const pose = MOOD_POSE[live.current.mood];
+      const talk = now < live.current.talkUntil ? 0.5 + 0.5 * Math.sin(t * 14) : 0;
+      drawKiro(g, W / 2, H * 2.05, H * 2.25, { t, form: 1, talk, look: pose.look + Math.sin(t * 0.4) * 0.08, eyes: pose.eyes, glitch: pose.glitch * (Math.sin(t * 9) > 0.7 ? 1 : 0), hand: null }, dpr);
       raf = requestAnimationFrame(draw);
     };
     raf = requestAnimationFrame(draw);

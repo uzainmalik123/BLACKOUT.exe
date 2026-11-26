@@ -86,12 +86,17 @@ export function NightShift({ difficulty, skipPrologue = false, onMenu, onAgain }
         const base = office.current?.getBoundingClientRect();
         if (!base) return null;
         // the full desk when the tools are open, else the play screen's alert, terminal and Kiro
-        const q = (sel: string) => office.current?.parentElement?.querySelector<HTMLElement>(sel) ?? null;
-        const [l, c, r] = left.current ? [left.current, centre.current, right.current] : [q('.pl-alert'), q('.pl-term'), q('.pl-kiro')];
-        const a = rectOf(l, base);
-        const b = rectOf(c, base);
-        const d = rectOf(r, base);
-        return a && b && d ? { left: a, centre: b, right: d } : null;
+        if (left.current) {
+          const a = rectOf(left.current, base);
+          const b = rectOf(centre.current, base);
+          const d = rectOf(right.current, base);
+          return a && b && d ? { left: a, centre: b, right: d } : null;
+        }
+        // the play screen: the battlefield is the screen he haunts; its thirds stand in for the side monitors
+        const field = rectOf(office.current?.parentElement?.querySelector<HTMLElement>('.pl-field') ?? null, base);
+        if (!field) return null;
+        const third = field.w / 3;
+        return { left: { ...field, w: third }, centre: field, right: { ...field, x: field.x + 2 * third, w: third } };
       },
     };
     const n = new Night(difficulty, skipPrologue, host, {

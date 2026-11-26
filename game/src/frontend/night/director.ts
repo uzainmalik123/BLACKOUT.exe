@@ -13,7 +13,7 @@ import { DURATION, SHAKE, handshake, prompt, startFlow, step, type Flow, type In
 import { paintHaunt, type MonitorName, type Rect } from './haunt';
 import { ENDINGS, STAGE_LINE, danger as dangerOf, reaction, type Beat, type Scene } from './judge';
 import type { KiroLine } from './KiroPanel';
-import { CAMS, lerpCam, paintEyes, paintHands, paintOffice, walkCam, type Cam, type OfficeView } from './office';
+import { CAMS, lerpCam, onScreen, paintEyes, paintHands, paintOffice, walkCam, type Cam, type OfficeView } from './office';
 import type { Run } from './run';
 import { Soundscape, type Bus } from './sound';
 
@@ -625,7 +625,11 @@ export class Night {
     if (f.phase === 'shake') {
       const hs = handshake(f.t);
       if (clipReady) clip.currentTime = Math.min(clip.duration - 0.05, (f.t / (DURATION.shake ?? 3.4)) * clip.duration);
-      else paintHands(g, W, H, this.t, hs.reach, hs.grip, hs.pump, hs.release);
+      else {
+        // her right shoulder, where she stands (stand: x -0.35, z 2.25; her right is our left), as the camera sees it
+        const shoulder = onScreen(cam, W, H, -0.35 - 0.28, 1.3, 2.25) ?? undefined;
+        paintHands(g, W, H, this.t, hs.reach, hs.grip, hs.pump, hs.release, shoulder);
+      }
     }
     // what haunts the monitors
     const rects = seated ? this.host.monitors() : null;

@@ -160,7 +160,8 @@ export function drawKiro(g: G, x: number, y: number, s: number, p: KiroPose, scr
   if (p.form <= 0.01) return;
   const dpr = screenDpr * 0.75;
   if (!kiroBuf) kiroBuf = new Buffer();
-  const bw = s * 1.1;
+  // wide enough for her raised hand's light and the smoke round her: a narrower buffer clipped them into a hard bar
+  const bw = s * 1.5;
   const bh = s * 1.08;
   const b = kiroBuf.size(bw, bh, dpr);
   b.save();
