@@ -6,6 +6,7 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
 import type { Difficulty } from '../../rules/vocabulary';
 import { needsDesktop } from '../screen1-title/curtain';
+import { SAME_AT_EVERY_LEVEL, dialLines } from '../shared/dial';
 import {
   DIFFICULTIES,
   DIFFICULTY_LABEL,
@@ -187,6 +188,16 @@ export function MenuScreen({ title, initialDifficulty = 'medium', onStart, onBac
             {whisper}
           </span>
         </p>
+
+        {/* what the chosen level switches on (UI-02, D-234), generated from the engine's config and the dial, never typed */}
+        <div className="ms-dials" style={{ '--i': 4 } as CSSProperties} aria-label={`What ${DIFFICULTY_LABEL[menu.difficulty]} switches on`}>
+          <p className="ms-same">{SAME_AT_EVERY_LEVEL}</p>
+          <ul key={menu.difficulty} className="ms-dial">
+            {dialLines(menu.difficulty).map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
+        </div>
       </nav>
     </div>
   );

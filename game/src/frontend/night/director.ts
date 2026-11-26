@@ -13,9 +13,12 @@ import { DURATION, SHAKE, handshake, prompt, startFlow, step, type Flow, type In
 import { paintHaunt, type MonitorName, type Rect } from './haunt';
 import { ENDINGS, STAGE_LINE, danger as dangerOf, reaction, type Beat, type Scene } from './judge';
 import type { KiroLine } from './KiroPanel';
-import { CAMS, lerpCam, paintEyes, paintHands, paintOffice, walkCam, type Cam, type OfficeView } from './office';
+import { CAMS, kiroArmRoot, lerpCam, onScreen, paintEyes, paintHands, paintOffice, walkCam, type Cam, type OfficeView } from './office';
+import { talkLevel, type GhostPose, type Mood, type Speech } from '../shared/ghost';
 import type { Run } from './run';
 import { Soundscape, type Bus } from './sound';
+import { markSeen } from '../shared/seen';
+import { LASTS, envStep, lightAt, startEnv, urgencyOf } from './environment';
 
 /** What the director tells the screen. */
 export interface NightUi {
@@ -39,18 +42,18 @@ export interface NightHost {
   office: HTMLCanvasElement;
   haunt: HTMLCanvasElement;
   monitors(): Record<MonitorName, Rect> | null;
-  /** A generated handshake clip (`public/night/handshake.mp4`, D-224), shown in place of the painted hands when it has loaded. */
-  clip(): HTMLVideoElement | null;
+  /** What the haunting must never cover while the shift is live: windows, panels, controls (D-254). */
+  exclude(): Rect[];
 }
 
 /** Kiro's lines in the prologue: phase, seconds into it, the line (the brief's words). */
 export const KIRO_LINES: ReadonlyArray<readonly [Phase, number, string]> = [
-  ['intro', 0.3, "You're late."],
-  ['intro', 1.9, "I'm Kiro. Your guide tonight."],
-  ['shake', 1.2, 'Welcome to the night shift. Try not to die.'],
-  ['after', 0.3, "Come on. Your shift's waiting."],
+  ['intro', 0.15, "You're late."],
+  ['intro', 1.3, "I'm Kiro. Your guide tonight."],
+  ['shake', 0.6, 'Welcome to the night shift. Try not to die.'],
+  ['after', 0.7, "Come on. Your shift's waiting."],
   ['seat', 0.2, "That's your kingdom for tonight."],
-  ['alarm', 1.0, "Well. That didn't last long."],
+  ['alarm', 0.5, "Well. That didn't last long."],
 ];
 
 /** Kiro's three warnings as the run nears its end (D-223's last chance). */
@@ -70,14 +73,20 @@ const ease = (u: number): number => {
 const pick = <T>(xs: readonly T[]): T => xs[Math.floor(Math.random() * xs.length)]!;
 const reducedMotion = (): boolean => typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
+/** Her small arm held out to the player before the handshake (body units from her centre: out to her side, a little toward us). */
+const OFFER = { x: -0.6, y: 0.27 } as const;
+
+/** Where Kiro floats in the room and how she is (D-250): her mood, her gaze, her flipper, her eyes' tint. */
 interface KiroSpot {
   x: number;
   z: number;
   look: number;
-  eyes: number;
-  talk: number;
-  hand: { x: number; y: number } | null;
+  mood: Mood;
   form: number;
+  arm?: GhostPose['arm'];
+  wave?: number;
+  point?: number;
+  lift?: number;
   tint?: string;
 }
 
@@ -86,6 +95,7 @@ export class Night {
   private flow: Flow;
   private run: Run | null = null;
   private starting = false;
+  private alarmed = false;
   private raf = 0;
   private last = 0;
   private lastTick = 0;
@@ -94,11 +104,17 @@ export class Night {
   private reduce = reducedMotion();
   private voices: { kiro: Narrator | null; death: Narrator | null } = { kiro: null, death: null };
   private speakingUntil = 0;
+  /** Kiro's line now: her mouth follows it (the voice's word events when it speaks, else the line's length). */
+  private kiroSpeech: Speech | null = null;
   private subTimer = 0;
   private timers: number[] = [];
   private volume = 0.35;
   private menu = false;
   private paused = false;
+  /** The first shift's tutorial is open: the night's clock waits for the player (D-252). */
+  private held = false;
+  /** How the room answers the fight (D-255). */
+  private env = startEnv();
   private focused: MonitorName | null = null;
   private mouse: { x: number; y: number } | null = null;
   private offs: Array<() => void> = [];
@@ -220,7 +236,15 @@ export class Night {
     this.voicesVolume = v;
   }
 
-  /** Straight to the desk (the menu's skip, a retry). */
+  /**
+   * Hold the night's clock while the first shift's tutorial is open (D-252): nothing of his has begun and no change
+   * can be made (the freeze), so the short calm starts when the player has finished reading.
+   */
+  hold(on: boolean): void {
+    this.held = on;
+  }
+
+  /** Straight to the desk (the menu's skip, the skip button once it has been seen, a retry). */
   skip(): void {
     this.flow = step(this.flow, { kind: 'skip' });
     this.begin();
@@ -242,7 +266,7 @@ export class Night {
     this.starting = true;
     startRun(this.difficulty)
       .then((r) => {
-        this.run = r; // the shift began with the run (run.ts, D-230): the alarm comes with the first threshold alert
+        this.run = r; // the shift begins when the play screen shows (Play.tsx, D-243): the alarm comes with the first alert
         this.events = r.engine.world.events.length;
         this.ui.run(r);
       })
@@ -254,6 +278,8 @@ export class Night {
     const words = text.split(/\s+/).length;
     const secs = Math.max(2.6, words * 0.42 + 1.2) * (who === 'Death' ? 1.35 : 1);
     this.ui.sub({ who, text });
+    // her mouth moves with every line she says, voiced or not; the voice's own events refine it below
+    if (who === 'Kiro') this.kiroSpeech = { from: this.t, until: this.t + Math.min(secs, words * 0.36 + 0.5), word: -1 };
     window.clearTimeout(this.subTimer);
     this.subTimer = window.setTimeout(() => this.ui.sub(null), secs * 1000);
     if (opts.voice === false || !who) return;
@@ -263,7 +289,18 @@ export class Night {
     if (!n) return;
     n.volume = this.voicesVolume;
     this.speakingUntil = this.t + secs;
-    n.say(text);
+    if (who === 'Kiro') {
+      const line: Speech = { from: this.t, until: this.t + secs, word: -1 };
+      this.kiroSpeech = line;
+      n.say(text, {
+        onStart: () => {
+          line.from = this.t;
+          line.until = this.t + secs + 1.5;
+        },
+        onWord: () => (line.word = this.t),
+        onEnd: () => (line.until = this.t),
+      });
+    } else n.say(text);
     if (who === 'Death') {
       this.sound.deathWhisper();
       this.sound.rumble(Math.min(4, secs));
@@ -323,8 +360,10 @@ export class Night {
 
   private onEvent(e: GameEvent): void {
     const r = reaction(e);
+    this.env = envStep(this.env, this.t, [e]);
     if (r.beat) this.beat(r.beat);
-    if (r.cue) this.sound.cue(r.cue);
+    // his return: silence first, then his cue (D-255)
+    if (r.cue && e.kind !== 'return') this.sound.cue(r.cue);
     switch (e.kind) {
       case 'move-started': {
         const line = STAGE_LINE[e.stage];
@@ -339,7 +378,11 @@ export class Night {
         this.taunt(SPECIAL_TAUNTS.tippedOff, true);
         break;
       case 'return':
-        this.taunt(SPECIAL_TAUNTS.return, true);
+        this.sound.hush(LASTS.silence);
+        this.later(LASTS.silence * 1000, () => {
+          this.sound.cue('death');
+          this.taunt(SPECIAL_TAUNTS.return, true);
+        });
         break;
       case 'banished':
         this.taunt(SPECIAL_TAUNTS.banished, true);
@@ -381,6 +424,7 @@ export class Night {
     if (p === 'wake') this.sound.setRain(0.6);
     if (p === 'shake') this.later(1300, () => (this.shadow = this.t));
     if (p === 'login') this.begin();
+    if (p === 'shift') markSeen('prologue'); // the next night offers to skip it (D-252)
     if (p === 'alarm') {
       this.sound.alarm(5);
       this.sound.cue('death');
@@ -427,8 +471,13 @@ export class Night {
     if (this.keys.has('w') && f.phase === 'walk') f = step(f, { kind: 'walk', dt });
     f = step(f, { kind: 'time', dt });
     const r = this.run;
-    // the operator is logged in: the alarm comes when the engine shows him
-    if (f.phase === 'login' && r && r.engine.world.events.some((e) => e.kind === 'move-started' || e.kind === 'alert-opened')) f = step(f, { kind: 'alarm' });
+    // the operator is logged in once the run is ready: the desk shows and the calm begins (SYS-22, D-243)
+    if (f.phase === 'login' && r) f = step(f, { kind: 'ready' });
+    // the alarm sounds once, over the live desk, when the first alert opens
+    if (f.phase === 'shift' && r && !this.alarmed && r.engine.world.alerts.length > 0) {
+      this.alarmed = true;
+      f = step(f, { kind: 'alarm' });
+    }
     this.flow = f;
     if (f.phase !== this.lastPhase) {
       this.lastPhase = f.phase;
@@ -448,12 +497,12 @@ export class Night {
         this.say('Kiro', line, { urgent: true });
       }
     }
-    if (f.phase === 'eyes' && f.t > 1.6 && !this.said.has('death:eyes')) {
+    if (f.phase === 'eyes' && f.t > 0.8 && !this.said.has('death:eyes')) {
       this.said.add('death:eyes');
       this.say('Death', "I've been expecting you.");
     }
     // the engine's clock runs from the login
-    if (r && SEATED.has(f.phase) && !this.ending && !this.paused) {
+    if (r && SEATED.has(f.phase) && !this.ending && !this.paused && !this.held) {
       r.engine.advance(dt * 1000);
       // what happened before the alarm is played out when it sounds
       if (f.phase === 'shift' || f.phase === 'alarm') {
@@ -462,7 +511,8 @@ export class Night {
         this.events = evs.length;
       }
       const w = r.engine.world;
-      this.sound.setHealth(w.heartbeat / 100);
+      // the heartbeat reads the worse of the business and the records left (D-255)
+      this.sound.setHealth(urgencyOf(w.heartbeat, w.souls.stolen.length, w.souls.total));
       if (w.ending && !this.ending) this.startEnding(ENDINGS[w.ending].scene);
     }
     if (now - this.lastTick > 250) {
@@ -579,16 +629,19 @@ export class Night {
       const e = this.t - this.ending.start;
       if (this.ending.scene === 'banished') {
         death = { x: 1.2, z: 10.6, form: clamp(1 - (e - 2) / 4), fragment: clamp((e - 1) / 4), point: 0 };
-        kiro = e > 2.5 ? { x: 0.55, z: 7.6, look: 0.4, eyes: 0.8, talk: e > 4.2 && e < 7 ? 0.7 : 0, hand: null, form: clamp((e - 2.5) / 1.2) } : null;
+        kiro = e > 2.5 ? { x: 0.55, z: 7.6, look: 0.4, mood: 'happy', form: clamp((e - 2.5) / 1.2) } : null;
       } else if (this.ending.scene === 'taken') {
         monitorsOn = clamp(1 - e / 2.5);
-        kiro = e > 2 ? { x: 0.55, z: 7.5, look: 0.5, eyes: 0.25, talk: 0, hand: null, form: clamp((e - 2) / 1.2) } : null;
+        // she sinks at a loss; at his return she is struck still, eyes wide
+        const returned = this.run?.engine.world.ending === 'return';
+        kiro = e > 2 ? { x: 0.55, z: 7.5, look: returned ? -0.6 : 0.5, mood: returned ? 'shock' : 'sad', form: clamp((e - 2) / 1.2) } : null;
         death = e > 3.5 ? { x: -0.3, z: 8.9, form: clamp((e - 3.5) / 1.5), fragment: 0.05, point: clamp((e - 5) / 1.5) } : null;
         hand = clamp((e - 5.5) / 1.6);
         ink = clamp((e - 7) / 2.6);
       } else {
         dawn = clamp(e / 6);
-        kiro = e > 2 ? { x: 0.55, z: 7.6, look: 0.3, eyes: 0.7, talk: e > 3 && e < 6 ? 0.6 : 0, hand: null, form: clamp((e - 2) / 1.2) } : null;
+        const clean = this.run?.engine.world.ending === 'clean-handover';
+        kiro = e > 2 ? { x: 0.55, z: 7.6, look: 0.3, mood: clean ? 'happy' : 'concern', form: clamp((e - 2) / 1.2) } : null;
       }
     }
     const w = this.run?.engine.world;
@@ -597,7 +650,7 @@ export class Night {
       t: this.t,
       cam,
       fade,
-      lights: f.phase === 'alarm' && !this.reduce ? this.lights * (Math.sin(this.t * 23) > 0.2 ? 1 : 0.35) : this.lights,
+      lights: (f.phase === 'alarm' && !this.reduce ? this.lights * (Math.sin(this.t * 12) > 0.2 ? 1 : 0.35) /* under 2 flashes a second (D-255; was 3.7) */ : this.lights) * lightAt(this.env, this.t, this.reduce),
       crimson: this.crimson,
       cold: this.cold,
       rain: this.rain,
@@ -609,7 +662,28 @@ export class Night {
       // the wall clock keeps the engine's time (the scenario starts at 22:00, D-24)
       clockMin: w ? 22 * 60 + Math.floor(w.clock.gameMs / 60000) : 21 * 60 + 58,
       hideDesk: seated && !this.ending,
-      kiro: kiro ? { x: kiro.x, z: kiro.z, pose: { t: this.t, form: kiro.form, talk: kiro.talk, look: kiro.look, eyes: kiro.eyes, glitch: 0, hand: kiro.hand, eyeTint: kiro.tint } } : null,
+      kiro: kiro
+        ? {
+            x: kiro.x,
+            z: kiro.z,
+            pose: {
+              t: this.t,
+              form: kiro.form,
+              mood: kiro.mood,
+              talk: talkLevel(this.kiroSpeech, this.t, this.reduce),
+              look: kiro.look,
+              wander: 0.4,
+              arm: kiro.arm ?? null,
+              wave: kiro.wave ?? 0,
+              point: kiro.point ?? 0,
+              lift: kiro.lift ?? 0,
+              eyeTint: kiro.tint,
+              rim: alarm > 0.5 ? '255, 90, 120' : '150, 210, 235',
+              reduce: this.reduce,
+              glitch: kiro.form < 1 ? 0.25 : 0,
+            },
+          }
+        : null,
       shadow: this.shadow >= 0 && this.t - this.shadow < 6 ? (this.t - this.shadow) / 6 : null,
       death,
     };
@@ -618,14 +692,11 @@ export class Night {
       const open = ease((f.t - 0.4) / 1.4) * (f.t > dur - 1 ? clamp(dur - f.t) : 1);
       paintEyes(g, W, H, this.t, open, this.look);
     } else paintOffice(g, W, H, dpr, view);
-    // the handshake, close: the generated clip when there is one (its time follows the handshake), else painted
-    const clip = this.host.clip();
-    const clipReady = !!clip && clip.readyState >= 2 && clip.duration > 0;
-    if (clip) clip.style.opacity = f.phase === 'shake' && clipReady ? '1' : '0';
-    if (f.phase === 'shake') {
+    // the handshake, close: her small arm from where it leaves her (her right, our left) toward the camera (D-250)
+    if (f.phase === 'shake' && kiro) {
       const hs = handshake(f.t);
-      if (clipReady) clip.currentTime = Math.min(clip.duration - 0.05, (f.t / (DURATION.shake ?? 3.4)) * clip.duration);
-      else paintHands(g, W, H, this.t, hs.reach, hs.grip, hs.pump, hs.release);
+      const root = onScreen(cam, W, H, ...kiroArmRoot(kiro.x, kiro.z)) ?? undefined;
+      paintHands(g, W, H, this.t, hs.reach, hs.grip, hs.pump, hs.release, root);
     }
     // what haunts the monitors
     const rects = seated ? this.host.monitors() : null;
@@ -645,40 +716,57 @@ export class Night {
       recoil: this.recoil >= 0 ? this.t - this.recoil : -1,
       drain: this.drain >= 0 ? this.t - this.drain : -1,
       lastChance: this.lastChance >= 0 && this.t - this.lastChance < 6.5 ? Math.sin(clamp((this.t - this.lastChance) / 6.5) * Math.PI) : 0,
+      kiroTalk: talkLevel(this.kiroSpeech, this.t, this.reduce),
+      reduce: this.reduce,
+      exclude: seated && !this.ending ? this.host.exclude() : [],
       hand,
       ink,
     });
   }
 
-  /** Where Kiro stands in each part of the prologue. */
+  /**
+   * Where Kiro floats in each part of the prologue, and how she is (D-250): she drifts in from the far end glowing and
+   * comes together; says who she is and waves; offers her small arm; at the grip her eyes are not her own for a beat
+   * (D-223), then she bobs with each shake, glancing at the window; she is pleased, leads the player to the desk looking
+   * back, points at the chair, and is alarmed with the alarm.
+   */
   private kiroSpot(f: Flow): KiroSpot | null {
     const stand = { x: -0.35, z: 2.25 };
     switch (f.phase) {
       case 'approach': {
         const u = ease(f.t / (DURATION.approach ?? 4.5));
-        return { x: -5.2 + (stand.x + 5.2) * u, z: 9.8 + (stand.z - 9.8) * u, look: 0.25 * (1 - u), eyes: 0.6, talk: 0, hand: null, form: clamp(0.25 + f.t / 1.5) };
+        return { x: -5.2 + (stand.x + 5.2) * u, z: 9.8 + (stand.z - 9.8) * u, look: 0.5 * (1 - u), mood: 'calm', form: clamp(0.15 + f.t / 1.8) };
       }
-      case 'intro': {
-        return { ...stand, look: 0, eyes: 0.85, talk: [0.3, 1.9].some((a) => f.t > a && f.t < a + 1.5) ? 0.7 : 0, hand: f.t > 3.6 ? { x: 0.2, y: -0.58 } : null, form: 1 };
-      }
+      case 'intro':
+        return { ...stand, look: 0, mood: 'calm', form: 1, wave: f.t > 1.9 && f.t < 3.5 ? 1 : 0, arm: f.t > 3.6 ? OFFER : null };
       case 'offer':
-        return { ...stand, look: 0, eyes: 0.8, talk: 0, hand: { x: 0.2, y: -0.58 }, form: 1 };
-      case 'shake':
-        // she holds the player's eyes, then glances past them at the window; for a moment her eyes are not her own
-        return { ...stand, look: f.t > SHAKE.grip + 0.6 && f.t < SHAKE.pumpEnd ? -0.75 : 0, eyes: 0.95, talk: f.t > 1.2 && f.t < 3 ? 0.6 : 0, hand: null, form: 1, tint: f.t > SHAKE.reach && f.t < SHAKE.grip + 0.25 ? '#ff2a4a' : undefined };
+        return { ...stand, look: 0, mood: 'calm', form: 1, arm: OFFER };
+      case 'shake': {
+        const hs = handshake(f.t);
+        const glance = f.t > SHAKE.grip + 0.6 && f.t < SHAKE.pumpEnd;
+        return {
+          ...stand,
+          look: glance ? -0.75 : 0,
+          mood: f.t > SHAKE.pumpEnd ? 'happy' : 'calm',
+          form: 1,
+          arm: hs.release < 0.9 ? 'out' : null,
+          lift: hs.pump > 0 ? Math.sin(hs.pump * Math.PI * 4) * 0.035 : 0,
+          tint: f.t > SHAKE.reach && f.t < SHAKE.grip + 0.25 ? '#ff2a4a' : undefined,
+        };
+      }
       case 'after':
-        return { ...stand, look: 0.4, eyes: 0.6, talk: f.t > 0.3 && f.t < 1.8 ? 0.6 : 0, hand: null, form: 1 };
+        return { ...stand, look: 0.4, mood: 'happy', form: 1 };
       case 'walk': {
         const u = ease(clamp(f.walked * 1.2 + 0.12));
         const back = Math.sin(this.t * 0.9) > 0.75; // she looks back to see the player is following
-        return { x: stand.x + (0.5 - stand.x) * u, z: stand.z + (6.7 - stand.z) * u, look: back ? -0.6 : 0.2, eyes: 0.7, talk: 0, hand: null, form: 1 };
+        return { x: stand.x + (0.5 - stand.x) * u, z: stand.z + (6.7 - stand.z) * u, look: back ? -0.6 : 0.2, mood: 'calm', form: 1 };
       }
       case 'seat':
-        return { x: 0.5, z: 6.7, look: 0.5, eyes: 0.7, talk: f.t < 2 ? 0.6 : 0, hand: { x: 0.32, y: -0.5 }, form: 1 };
+        return { x: 0.5, z: 6.7, look: 0.5, mood: 'calm', form: 1, point: 1 };
       case 'sitting':
       case 'login':
       case 'alarm':
-        return { x: 0.35, z: 6.95, look: 0.5, eyes: f.phase === 'alarm' ? 0.95 : 0.7, talk: 0, hand: null, form: 1 };
+        return { x: 0.35, z: 6.95, look: 0.5, mood: f.phase === 'alarm' ? 'alarm' : 'calm', form: 1 };
       default:
         return null;
     }

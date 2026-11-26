@@ -140,8 +140,20 @@ describe('every committed recording played alone (D-232)', { timeout: WHOLE_RUN_
     return false;
   }
 
+  // ATK-03.b is one browser login whose quote and comment travel as JSON escapes: its single access line is a normal
+  // successful login, so no access-log detector can tell it from a shopper's (that is what makes it quiet). The loud
+  // attempt the rule cut before it already opened an alert, and what he does as admin next opens its own (D-232 rule 1).
+  const SILENT = new Set(['ATK-03.b']);
+  it('ATK-03.b, the quiet login injection, opens no alert: one normal-looking browser login', () => {
+    const v = real.variantsOf('ATK-03').find((x) => x.variant === 'b')!;
+    const w = lab(initialWorld(1, 'hard'));
+    startReplay(w, v, 'death');
+    for (let i = 0; i < 4000 && w.replays.length > 0 && !w.ending; i++) advance(w, real, 100);
+    expect(w.alerts.filter((a) => a.about === 'ATK-03')).toEqual([]);
+  });
+
   for (const move of MOVES_RECORDED) {
-    for (const v of real.variantsOf(move)) {
+    for (const v of real.variantsOf(move).filter((x) => !SILENT.has(`${move}.${x.variant}`))) {
       it(`${move}.${v.variant} opens one alert after its first lines, with a route it really used, a symptom and a gate, and no spoiler`, () => {
         const w = lab(initialWorld(1, 'hard')); // Hard: every variant may play
         startReplay(w, v, 'death');

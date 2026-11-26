@@ -30,12 +30,18 @@
 .pl-root > * {
   pointer-events: auto;
 }
-.pl-root.is-off {
+/* at the ending the battlefield stays: the controls fade, the fight plays out (D-226) */
+.pl-root.is-off .pl-actions,
+.pl-root.is-off .pl-alert,
+.pl-root.is-off .pl-evidence,
+.pl-root.is-off .pl-term,
+.pl-root.is-off .pl-result,
+.pl-root.is-off .pl-toasts,
+.pl-root.is-off .pl-tools,
+.pl-root.is-off .pl-ask {
   opacity: 0;
   pointer-events: none;
-}
-.pl-root.is-off > * {
-  pointer-events: none;
+  transition: opacity 1s;
 }
 
 /* ---- the top bar */
@@ -235,6 +241,35 @@
   overflow: hidden;
   cursor: text;
 }
+/* Death's reflection in the terminal when one of his attacks lands (D-254): behind every line of text, faint, brief */
+.pl-term.is-haunted::before {
+  content: '';
+  position: absolute;
+  inset: 34px 0 0 0;
+  z-index: -1;
+  background: var(--death) no-repeat right 6% bottom 6% / auto 62%;
+  opacity: 0;
+  pointer-events: none;
+  animation: pl-haunt 2.2s ease-in-out;
+}
+@keyframes pl-haunt {
+  25% {
+    opacity: 0.16;
+  }
+  70% {
+    opacity: 0.11;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pl-term.is-haunted::before {
+    animation: none;
+    opacity: 0.1;
+  }
+}
+/* the stolen admin key: a line in the top bar, not a symbol by him (D-254) */
+.pl-keychip {
+  color: #ff8a8a;
+}
 .pl-term-bar {
   position: relative;
   display: flex;
@@ -362,25 +397,24 @@
   padding: 12px;
   min-height: 0;
   background: rgba(10, 8, 16, 0.88);
-  border: 1px solid rgba(70, 232, 255, 0.25);
+  border: 1px solid rgba(144, 70, 255, 0.35);
   border-radius: 10px;
-  box-shadow: 0 0 40px rgba(70, 232, 255, 0.08);
+  box-shadow: 0 0 40px rgba(144, 70, 255, 0.1);
 }
+/* Kiro, the logo's ghost (D-250), on her own purple dark */
 .pl-portrait {
   width: 100%;
   flex: 1 1 auto;
   min-height: 120px;
   max-height: 46vh;
-  object-fit: cover;
-  object-position: 50% 15%;
   border-radius: 8px;
-  background: radial-gradient(ellipse at 50% 30%, #1a1626, #050408);
+  background: radial-gradient(ellipse at 50% 48%, #24133f 0%, #110a1f 45%, #050309 100%);
 }
 .pl-kiro-name {
   font-family: var(--caps);
   font-size: 18px;
   letter-spacing: 6px;
-  color: var(--cyan);
+  color: #c8a6ff;
 }
 .pl-kiro-line {
   margin: 0;
@@ -489,12 +523,11 @@
 
 .pl-toasts {
   position: absolute;
-  left: 50%;
-  bottom: calc(2.4vh + 90px);
-  transform: translateX(-50%);
+  right: calc(2vw + clamp(220px, 23vw, 340px) + 1.6vw + 16px);
+  bottom: calc(2.4vh + 118px);
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: flex-end;
   gap: 4px;
   pointer-events: none !important;
 }
@@ -517,7 +550,7 @@
   color: var(--amber);
 }
 
-/* the way back from the full toolkit, and the handshake clip */
+/* the way back from the full toolkit */
 .ns-back-simple {
   position: absolute;
   top: 2vh;
@@ -531,16 +564,6 @@
   border-radius: 6px;
   padding: 8px 14px;
   cursor: pointer;
-}
-.ns-clip {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  opacity: 0;
-  pointer-events: none;
-  z-index: 1;
 }
 
 @keyframes pl-blink {
@@ -653,8 +676,8 @@
   left: 14px;
   bottom: 14px;
   z-index: 2;
-  width: min(560px, 62%);
-  max-height: 55%;
+  width: min(470px, 36%);
+  max-height: 42%;
   overflow: auto;
   padding: 10px 14px 12px;
   font-size: 14px;
@@ -723,5 +746,45 @@
 @keyframes pl-fade {
   from {
     opacity: 0;
+  }
+}
+
+/* Kiro's mood on her panel's edge (D-226, D-250): the glow changes slowly, nothing flashes */
+.pl-kiro {
+  transition:
+    border-color 0.8s,
+    box-shadow 0.8s;
+}
+.pl-kiro.mood-concern {
+  border-color: rgba(255, 178, 62, 0.45);
+}
+.pl-kiro.mood-alarm {
+  border-color: rgba(255, 42, 74, 0.6);
+  box-shadow: 0 0 40px rgba(255, 42, 74, 0.2);
+  animation: pl-kiro-alarm 1.4s ease-in-out infinite;
+}
+.pl-kiro.mood-happy {
+  border-color: rgba(190, 150, 255, 0.75);
+  box-shadow: 0 0 44px rgba(160, 100, 255, 0.28);
+}
+.pl-kiro.mood-oops {
+  border-color: rgba(255, 168, 92, 0.6);
+}
+.pl-kiro.mood-sad {
+  border-color: rgba(110, 92, 196, 0.35);
+  box-shadow: none;
+}
+.pl-kiro.mood-shock {
+  border-color: rgba(255, 44, 84, 0.7);
+  box-shadow: 0 0 40px rgba(255, 44, 84, 0.25);
+}
+@media (prefers-reduced-motion: reduce) {
+  .pl-kiro.mood-alarm {
+    animation: none;
+  }
+}
+@keyframes pl-kiro-alarm {
+  50% {
+    box-shadow: 0 0 10px rgba(255, 42, 74, 0.08);
   }
 }

@@ -69,6 +69,7 @@ export interface AlertThresholds {
   probes: { count: number; windowRealS: number }; // probe-looking paths (/wp-, .php, /.env, /.git, phpmyadmin, .bak, /.htaccess) from any address (a crawler wave rotates its addresses; no shopper asks for these)
   failedLogins: { count: number; windowRealS: number }; // 401s on /rest/user/login from one address
   failedLoginsAll: { count: number; windowRealS: number }; // 401s on /rest/user/login from any address (credential stuffing)
+  slowFailedLogins: { count: number; windowRealS: number }; // 401s on /rest/user/login from one address over a long window: a slow password spray (ATK-04.b, one try every 10–12 s)
   searchErrors: { count: number; windowRealS: number }; // 5xx on /rest/products/search from one address (KI-236: customers' quoted searches answer 500 too, a few per address)
   apiPace: { count: number; windowRealS: number }; // requests to one scraped API route (/api/Users, /api/Products, /rest/memories, /support/logs), any address: waves rotate theirs
   feedback: { count: number; windowRealS: number }; // POST /api/Feedbacks, any address
@@ -79,6 +80,7 @@ const ALERTS: AlertThresholds = {
   probes: { count: 10, windowRealS: 30 },
   failedLogins: { count: 5, windowRealS: 30 }, // a fumbling shopper fails three times in 15 s at most
   failedLoginsAll: { count: 20, windowRealS: 30 }, // CUST.a peaks at 4 in 30 s
+  slowFailedLogins: { count: 8, windowRealS: 120 }, // (tune) ATK-04.b crosses it at its 8th try, ~80 s in; a fumbling shopper fails three times at most
   searchErrors: { count: 5, windowRealS: 60 },
   apiPace: { count: 15, windowRealS: 60 },
   feedback: { count: 5, windowRealS: 30 },
@@ -89,12 +91,12 @@ const MEDIUM: EngineConfig = {
   pausable: false,
   tickGameMs: 3_000,
   directorPeriodGameMs: 3 * REAL_S,
-  breatherGameMs: { min: 30 * REAL_S, max: 45 * REAL_S },
+  breatherGameMs: { min: 15 * REAL_S, max: 25 * REAL_S }, // D-258 (approved 2026-11-26): was 30-45 s
   ipResumeGameMs: 10 * REAL_S,
   pacing: { delayAtOpenAlerts: 2, bringForwardAfterQuietGameMs: 60 * REAL_S },
   returnDelayGameMs: 120 * REAL_S,
   patchDurationGameMs: 20 * GAME_MIN,
-  firstMoveDelayRealMs: { min: 20_000, max: 30_000 },
+  firstMoveDelayRealMs: { min: 6_000, max: 9_000 }, // D-252 (approved 2026-11-26): the calm kept, shortened from 20-30 s
   bandage: { breathers: 1 },
   alerts: ALERTS,
   heartbeat: {
@@ -134,8 +136,8 @@ const MEDIUM: EngineConfig = {
 
 export const CONFIG: Readonly<Record<Difficulty, EngineConfig>> = {
   easy: {
-    ...MEDIUM, pausable: true, breatherGameMs: { min: 45 * REAL_S, max: 60 * REAL_S },
-    firstMoveDelayRealMs: { min: 25_000, max: 30_000 }, bandage: { breathers: 2 }, // D-230, D-231: the longest calm, and a rule that holds for two breathers
+    ...MEDIUM, pausable: true, breatherGameMs: { min: 25 * REAL_S, max: 35 * REAL_S }, // D-258: was 45-60 s
+    firstMoveDelayRealMs: { min: 8_000, max: 10_000 }, bandage: { breathers: 2 }, // D-230, D-231, D-252: the longest calm (was 25-30 s), and a rule that holds for two breathers
     minions: { ...MEDIUM.minions, alongsideDeath: false }, customers: { ...MEDIUM.customers, share: 0.2 },
     taps: { ...MEDIUM.taps, everyGameMs: { min: 240 * REAL_S, max: 300 * REAL_S } },
     struggle: { ...MEDIUM.struggle, unlocks: false }, // SYS-13: on Easy Kiro helps anyway (KIRO-03); nothing to unlock
@@ -143,8 +145,8 @@ export const CONFIG: Readonly<Record<Difficulty, EngineConfig>> = {
   },
   medium: MEDIUM,
   hard: {
-    ...MEDIUM, breatherGameMs: { min: 20 * REAL_S, max: 35 * REAL_S }, minions: { ...MEDIUM.minions, successesPerWave: 2 }, customers: { ...MEDIUM.customers, share: 0.8 },
-    firstMoveDelayRealMs: { min: 15_000, max: 25_000 },
+    ...MEDIUM, breatherGameMs: { min: 10 * REAL_S, max: 18 * REAL_S } /* D-258: was 20-35 s */, minions: { ...MEDIUM.minions, successesPerWave: 2 }, customers: { ...MEDIUM.customers, share: 0.8 },
+    firstMoveDelayRealMs: { min: 5_000, max: 8_000 }, // D-252: was 15-25 s
     pinnedVariants: { 'ATK-08': { normal: ['f', 'g'], tippedOff: ['f', 'g'] } },
     shiftGameMs: 13 * 60 * REAL_S, // D-118: idle Hard runs flatline at 11.7–12.8 real min
     taps: { ...MEDIUM.taps, everyGameMs: { min: 120 * REAL_S, max: 180 * REAL_S } },

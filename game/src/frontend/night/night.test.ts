@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { GameEvent } from '../../engine/log';
 import { DURATION, SHAKE, WALK_SECONDS, handshake, prompt, startFlow, step, type Flow, type Input } from './flow';
-import { ENDINGS, STAGE_BEAT, anomalies, danger, kiroVerdict, reaction, whatKiroSees, type Readings } from './judge';
+import { CONFIG } from '../../engine/config';
+import { ENDINGS, STAGE_BEAT, anomalies, danger, kiroMood, kiroVerdict, reaction, whatKiroSees, type Readings } from './judge';
 
 const run = (f: Flow, ...inputs: Input[]) => inputs.reduce(step, f);
 const wait = (f: Flow, s: number) => run(f, { kind: 'time', dt: s });
@@ -17,7 +18,19 @@ describe('the night-shift prologue, kept short (UI-10, D-223, D-224)', () => {
     expect(wait(f, 999).phase).toBe('offer');
     expect(prompt(f)).toBe('[E] Shake hand');
     const story = (['dark', 'eyes', 'wake', 'approach', 'intro'] as const).reduce((a, p) => a + (DURATION[p] ?? 0), 0);
-    expect(story).toBeLessThanOrEqual(18);
+    expect(story).toBeLessThanOrEqual(11.5); // D-252: was up to 18 s
+  });
+
+  it('reaches the desk in under 20 s of play, and the first threat comes within 10 s of the desk on every level (D-252)', () => {
+    const timed = (['dark', 'eyes', 'wake', 'approach', 'intro', 'shake', 'after', 'sitting', 'login'] as const).reduce((a, p) => a + (DURATION[p] ?? 0), 0);
+    expect(timed + WALK_SECONDS).toBeLessThan(20);
+    for (const level of ['easy', 'medium', 'hard'] as const) {
+      const { min, max } = CONFIG[level].firstMoveDelayRealMs;
+      expect(min, level).toBeGreaterThanOrEqual(5000);
+      expect(max, level).toBeLessThanOrEqual(10_000);
+    }
+    expect(CONFIG.easy.firstMoveDelayRealMs.min).toBeGreaterThanOrEqual(CONFIG.medium.firstMoveDelayRealMs.min);
+    expect(CONFIG.medium.firstMoveDelayRealMs.min).toBeGreaterThanOrEqual(CONFIG.hard.firstMoveDelayRealMs.min);
   });
 
   it('E plays the handshake: the hands reach, close, pump twice and let go, then she leads on', () => {
@@ -32,7 +45,7 @@ describe('the night-shift prologue, kept short (UI-10, D-223, D-224)', () => {
     expect(f.phase).toBe('after');
   });
 
-  it('the player follows her with W and sits with E; the login waits for the engine to show him', () => {
+  it('the player follows her with W and sits with E; the login waits for the run, the alarm for the first alert (D-243)', () => {
     let f = wait({ ...startFlow(), phase: 'after' }, (DURATION.after ?? 0) + 0.01);
     expect(f.phase).toBe('walk');
     f = run(f, { kind: 'walk', dt: WALK_SECONDS / 2 });
@@ -44,9 +57,13 @@ describe('the night-shift prologue, kept short (UI-10, D-223, D-224)', () => {
     expect(f.phase).toBe('sitting');
     f = wait(f, (DURATION.sitting ?? 0) + 0.01);
     expect(f.phase).toBe('login');
+    expect(run(f, { kind: 'ready' }).phase).toBe('login');
     expect(run(f, { kind: 'alarm' }).phase).toBe('login');
     f = wait(f, 99);
     expect(f.phase).toBe('login');
+    f = run(f, { kind: 'ready' });
+    expect(f.phase).toBe('shift');
+    expect(wait(f, 99).phase).toBe('shift');
     f = run(f, { kind: 'alarm' });
     expect(f.phase).toBe('alarm');
     expect(wait(f, (DURATION.alarm ?? 0) + 0.01).phase).toBe('shift');
@@ -97,6 +114,42 @@ describe('the room reacts to the engine, and the endings are the engine\'s', () 
     expect(ENDINGS.banished).toMatchObject({ won: true, title: 'Death banished', line: 'The system survived. Did you?' });
     for (const e of ['souls-lost', 'flatline', 'return'] as const) expect(ENDINGS[e].scene).toBe('taken');
     expect(kiroVerdict({ detect: 'A', contain: 'B', eradicate: 'B', recover: 'D' })).toMatch(/followed the evidence/);
-    expect(kiroVerdict({ detect: 'C', contain: 'F', eradicate: 'B', recover: 'D' })).toMatch(/panicked/);
+    expect(kiroVerdict({ detect: 'C', contain: 'F', eradicate: 'B', recover: 'D' }, 'flatline')).toMatch(/panicked/);
+    // D-256: she never praises a lost night, and never scolds a won one as a panic
+    expect(kiroVerdict({ detect: 'A', contain: 'F', eradicate: 'A', recover: 'A' }, 'return')).toMatch(/one way in you missed/);
+    expect(kiroVerdict({ detect: 'A', contain: 'F', eradicate: 'A', recover: 'A' }, 'return')).not.toMatch(/still here/);
+    expect(kiroVerdict({ detect: 'A', contain: 'F', eradicate: 'A', recover: 'A' }, 'souls-lost')).toMatch(/faster with the records/);
+    expect(kiroVerdict({ detect: 'A', contain: 'F', eradicate: 'A', recover: 'A' }, 'flatline')).toMatch(/could not survive/);
+    expect(kiroVerdict({ detect: 'C', contain: 'F', eradicate: 'B', recover: 'D' }, 'clean-handover')).toMatch(/follow the evidence sooner/);
+  });
+});
+
+describe("Kiro's mood comes from the engine and the last result (D-250)", () => {
+  const calm = { outcome: null, danger: 0, alertAge: null } as const;
+
+  it('at the end: happy when won, shocked at his return, sad at any other loss', () => {
+    expect(kiroMood({ ...calm, ending: 'banished' })).toBe('happy');
+    expect(kiroMood({ ...calm, ending: 'clean-handover' })).toBe('happy');
+    expect(kiroMood({ ...calm, ending: 'return' })).toBe('shock');
+    for (const e of ['souls-lost', 'flatline', 'rough-handover', 'walked-away'] as const) expect(kiroMood({ ...calm, ending: e }), e).toBe('sad');
+    // the ending outweighs everything else
+    expect(kiroMood({ ending: 'flatline', outcome: 'contained', danger: 0, alertAge: 1 })).toBe('sad');
+  });
+
+  it('happy after a defence that worked, a wince after a mistake, worried while he is still in', () => {
+    for (const o of ['contained', 'evidence', 'restored', 'deploying'] as const) expect(kiroMood({ ...calm, outcome: o }), o).toBe('happy');
+    for (const o of ['failed', 'shutdown', 'disrupted'] as const) expect(kiroMood({ ...calm, outcome: o }), o).toBe('oops');
+    expect(kiroMood({ ...calm, outcome: 'still-active' })).toBe('concern');
+    // a result still outweighs the danger behind it
+    expect(kiroMood({ outcome: 'contained', danger: 3, alertAge: 1, ending: undefined })).toBe('happy');
+  });
+
+  it('alarmed by a fresh alert or real danger, worried while an alert stays open, calm otherwise', () => {
+    expect(kiroMood({ ...calm, alertAge: 2 })).toBe('alarm');
+    expect(kiroMood({ ...calm, alertAge: 30 })).toBe('concern');
+    expect(kiroMood({ ...calm, danger: 2 })).toBe('alarm');
+    expect(kiroMood({ ...calm, danger: 1 })).toBe('concern');
+    expect(kiroMood(calm)).toBe('calm');
+    expect(kiroMood({ ...calm, outcome: 'applied' })).toBe('calm');
   });
 });

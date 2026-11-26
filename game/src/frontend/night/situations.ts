@@ -3,9 +3,11 @@
 // shell command, typed into the terminal so the player sees it; acting is a real shell command or console action,
 // and when it needs a target (an address, an account, a file) the player has to pick it out of the evidence first.
 // The engine still decides what every step does: a suggestion can be the wrong tool, and the meters will say so.
+// The alert is its `symptom` (D-232); the steps are picked from its `gate`, the route family, never from who raised it
+// (`about` is a spoiler and never read here, D-241).
 
 import type { World } from '../../engine/state';
-import type { Actor, PlayerAction, Stage } from '../../rules/vocabulary';
+import type { PlayerAction, Stage } from '../../rules/vocabulary';
 
 export type TargetKind = 'ip' | 'email' | 'file';
 
@@ -23,9 +25,11 @@ export interface Step {
 
 export interface Situation {
   key: string;
-  /** What raised the alert (a move, minion or tap id: never shown, it picks the gate). */
-  actor?: string;
-  stage: Stage | null;
+  /** The alert's gate (the engine's `alert.gate`): shown on Easy only (D-235). */
+  gate?: string;
+  /** The alert's route (the path family), shown on every level. */
+  route?: string;
+  /** The alert's symptom, as the engine words it (D-232). */
   alert: string;
   kiro: string;
   look: Step;
@@ -44,58 +48,48 @@ const ADMINS: Step = { label: 'List the admins', what: 'Shows every account with
 const grepLog = (label: string, what: string, pattern: string, n = 6): Step => ({ label, what, cmd: `grep "${pattern}" ${ACCESS} | tail -n ${n}` });
 const LOCK: Step = { label: 'Lock an account', what: "That account can't log in again", needs: 'email', action: (email) => ({ type: 'DEF-08', email }) };
 const SHIELD: Step = { label: 'Turn on the injection shield', what: 'Blocks code hidden in what people type', action: () => ({ type: 'DEF-12', rule: { kind: 'sqli' } }) };
-const REVOKE: Step = { label: 'Cancel every login', what: 'Logs everyone out, customers too', action: () => ({ type: 'DEF-09' }) };
 const RESTORE: Step = { label: 'Restore the last backup', what: 'Puts the shop back as it was at the last backup', action: (_t, w) => ({ type: 'DEF-17', backupId: w.backups[w.backups.length - 1]?.id ?? 0 }) };
+const LOGINS = grepLog('Check the logins', 'Shows the latest login attempts', '/rest/user/login', 8);
+const SLOW_LOGINS: Step = { label: 'Slow down logins', what: 'Limits how often anyone can try a password', action: () => ({ type: 'DEF-07' }) };
+const TAIL: Step = { label: 'Check the latest traffic', what: 'Shows the last requests to the shop', cmd: `tail -n 10 ${ACCESS}` };
 
-/** One row per thing that can raise an alert. */
-const BY_ACTOR: Record<string, Omit<Situation, 'key'>> = {
-  'ATK-01': { stage: 1, alert: 'Someone is knocking on every door of the shop.', kiro: "Thousands of requests from one visitor. That's not a shopper.", look: WHO, act: BLOCK },
-  'ATK-02': { stage: 1, alert: "Someone is reading the files in the shop's /ftp folder.", kiro: 'Those files were never meant to be public.', look: grepLog('Check /ftp visits', 'Shows who opened the /ftp folder', '/ftp'), act: { label: 'Close the /ftp folder', what: 'Hides it from everyone, customers too', action: () => ({ type: 'DEF-10', feature: 'ftp', enabled: false }) } },
-  'ATK-03': { stage: 2, alert: 'Someone is typing code into the login box.', kiro: "That isn't a password. It's a trick to skip the password.", look: grepLog('Check the logins', 'Shows the latest login attempts', '/rest/user/login', 8), act: SHIELD },
-  'ATK-04': { stage: 2, alert: "Someone is guessing the admin's password. Fast.", kiro: 'Hundreds of wrong passwords. Nobody types that fast.', look: grepLog('Check the logins', 'Shows the latest login attempts', '/rest/user/login', 8), act: { label: 'Slow down logins', what: 'Limits how often anyone can try a password', action: () => ({ type: 'DEF-07' }) } },
-  'ATK-05': { stage: 2, alert: "Someone is resetting a customer's password.", kiro: "They're answering a security question that isn't theirs.", look: grepLog('Check password resets', 'Shows the latest password resets', 'reset-password'), act: { label: 'Turn off password reset', what: 'Nobody can reset a password while it is off', action: () => ({ type: 'DEF-10', feature: 'password-reset', enabled: false }) } },
-  'ATK-06': { stage: 3, alert: 'A new admin account just appeared.', kiro: 'Someone just gave our guest a key.', look: ADMINS, act: LOCK },
-  'ATK-07': { stage: 3, alert: "Someone is using an admin's login without the password.", kiro: "They stole a pass that still works. Passes can be cancelled.", look: grepLog('Check admin activity', 'Shows the latest admin requests', '/api/', 8), act: REVOKE },
-  'ATK-08': { stage: 4, alert: 'Someone is sending strange commands through the search box.', kiro: "That isn't a normal customer. Let's find out what they're trying.", look: grepLog('Check the searches', 'Shows the latest searches', '/rest/products/search'), act: SHIELD },
-  'ATK-09': { stage: 4, alert: 'Someone is copying the customer list.', kiro: "Every customer, page by page. That's our people walking out the door.", look: grepLog('Check the user list', 'Shows who asked for the customer list', '/api/Users'), act: BLOCK },
-  'ATK-10': { stage: 4, alert: "Someone is opening other customers' baskets.", kiro: 'Those baskets belong to real people.', look: grepLog('Check the baskets', 'Shows who opened which basket', '/rest/basket'), act: BLOCK },
-  'ATK-11': { stage: 5, alert: 'Things have gone quiet. Too quiet.', kiro: "Don't trust silence. That's when he hides.", look: ADMINS, act: { label: 'Delete an account', what: 'Removes it for good', needs: 'email', action: (email) => ({ type: 'DEF-14', email }) } },
-  'ATK-12': { stage: 5, alert: "A customer's account is acting strangely.", kiro: "Someone else is wearing that customer's face.", look: { label: 'Check recent changes', what: 'Shows the accounts changed last', cmd: `sqlite3 ${DB} "SELECT id, email, role, updatedAt FROM Users ORDER BY updatedAt DESC LIMIT 5;"` }, act: { label: 'Force a password reset', what: 'Whoever has that password loses it', needs: 'email', action: (email) => ({ type: 'DEF-16', email }) } },
-  'ATK-13': { stage: 5, alert: "A new file appeared in the shop's uploads.", kiro: 'Nobody uploads files at this hour.', look: { label: 'List the uploads', what: 'Shows every uploaded file', cmd: `ls -la ${UPLOADS}` }, act: { label: 'Delete a file', what: 'Removes it from the server', needs: 'file', cmd: `rm ${UPLOADS}/{target}` } },
-  'ATK-14': { stage: 5, alert: 'Someone made their own admin pass.', kiro: 'If he can forge passes, change the lock.', look: grepLog('Check admin activity', 'Shows the latest admin requests', '/api/', 8), act: REVOKE },
-  'ATK-15': { stage: 6, alert: 'Product pages are being changed.', kiro: 'He wants the customers to see him.', look: grepLog('Check product changes', 'Shows who changed the products', '/api/Products', 8), act: RESTORE },
-  'ATK-16': { stage: 6, alert: 'A product page now hides a trap for customers.', kiro: 'Anyone who opens that page is in danger.', look: grepLog('Check product changes', 'Shows who changed the products', '/api/Products', 8), act: RESTORE },
-  'ATK-17': { stage: 6, alert: 'A ransom note just went up.', kiro: "This is it. Whatever you're going to do, do it now.", look: { label: 'Check the latest traffic', what: 'Shows the last requests to the shop', cmd: `tail -n 8 ${ACCESS}` }, act: RESTORE },
-  'MIN-01': { stage: null, alert: 'A swarm of bots is poking at the shop.', kiro: "Cheap tools, looking for doors we don't even have.", look: WHO, act: BLOCK },
-  'MIN-02': { stage: null, alert: 'Bots are trying stolen passwords on the login.', kiro: 'Many addresses, one goal: get in.', look: grepLog('Check the logins', 'Shows the latest login attempts', '/rest/user/login', 8), act: { label: 'Slow down logins', what: 'Limits how often anyone can try a password', action: () => ({ type: 'DEF-07' }) } },
-  'MIN-03': { stage: null, alert: 'Something is copying the whole product list.', kiro: "Greedy. It wants everything we sell.", look: grepLog('Check product requests', 'Shows the latest product requests', '/api/Products', 8), act: BLOCK },
-  'MIN-04': { stage: null, alert: 'A bot is spamming the feedback form.', kiro: 'Noise, to hide something else.', look: grepLog('Check the feedback', 'Shows the latest feedback posts', '/api/Feedbacks', 8), act: { label: 'Turn on the feedback CAPTCHA', what: 'Only humans can post feedback', action: () => ({ type: 'DEF-10', feature: 'feedback-captcha', enabled: true }) } },
-  'TAP-01': { stage: null, alert: 'Customer records are leaking from somewhere.', kiro: 'Something we left open is talking too much.', look: { label: 'Check the latest traffic', what: 'Shows the last requests to the shop', cmd: `tail -n 10 ${ACCESS}` }, act: null },
+type Row = Omit<Situation, 'key' | 'gate' | 'route' | 'alert'>;
+
+/** One row per gate an alert can name (the engine's `alert.gate`, D-232): what to look at, what to try, Kiro's clue. */
+const BY_GATE: Record<string, Row> = {
+  'front door': { kiro: 'That many requests is not a shopper. Find out who is knocking.', look: WHO, act: BLOCK },
+  login: { kiro: 'A login from something that is not a browser. Look at how it got in.', look: LOGINS, act: SHIELD },
+  passwords: { kiro: 'Wrong password after wrong password. Nobody types that fast.', look: LOGINS, act: SLOW_LOGINS },
+  search: { kiro: 'Search should never throw server errors. Someone is feeding it something strange.', look: grepLog('Check the searches', 'Shows the latest searches', '/rest/products/search'), act: SHIELD },
+  'sign-up': { kiro: 'An admin nobody hired. Who made it?', look: ADMINS, act: LOCK },
+  'admin API': { kiro: 'Someone is reading the customer list, page by page.', look: grepLog('Check the user list', 'Shows who asked for the customer list', '/api/Users'), act: BLOCK },
+  products: { kiro: 'Product pages are being touched. Customers will see it.', look: grepLog('Check product changes', 'Shows who changed the products', '/api/Products', 8), act: RESTORE },
+  uploads: { kiro: 'Nobody uploads files at this hour.', look: { label: 'List the uploads', what: 'Shows every uploaded file', cmd: `ls -la ${UPLOADS}` }, act: { label: 'Delete a file', what: 'Removes it from the server', needs: 'file', cmd: `rm ${UPLOADS}/{target}` } },
+  feedback: { kiro: 'The feedback form is filling up with noise.', look: grepLog('Check the feedback', 'Shows the latest feedback posts', '/api/Feedbacks', 8), act: { label: 'Turn on the feedback CAPTCHA', what: 'Only humans can post feedback', action: () => ({ type: 'DEF-10', feature: 'feedback-captcha', enabled: true }) } },
 };
-BY_ACTOR['TAP-02'] = BY_ACTOR['TAP-01']!;
-BY_ACTOR['TAP-03'] = BY_ACTOR['TAP-01']!;
+/** A leaky tap's gate (its own name): something left open, talking too much. */
+const LEAK: Row = { kiro: 'Something we left open is talking too much.', look: TAIL, act: null };
 
 const QUIET: Omit<Situation, 'key'> = {
-  stage: null,
   alert: 'All quiet. For now.',
   kiro: "Watch the traffic. He'll come.",
   look: WHO,
   act: { label: 'Watch the log', what: 'Shows the last requests to the shop', cmd: `tail -n 8 ${ACCESS}` },
 };
 
-/** The problem to show now: the newest open alert, worded for its source; or the quiet. */
+/** The problem to show now: the newest open alert, its symptom and its gate's steps; or the quiet. */
 export function situationOf(world: World): Situation {
   const open = world.alerts.filter((a) => a.closedAt === undefined);
   const alert = open[open.length - 1];
   if (!alert) return { key: 'quiet', ...QUIET };
-  const row = BY_ACTOR[alert.about as Actor] ?? { ...QUIET, alert: 'Something unusual is happening.' };
-  return { key: `alert-${alert.id}`, actor: alert.about, ...row };
+  const row = BY_GATE[alert.gate] ?? LEAK;
+  return { key: `alert-${alert.id}`, gate: alert.gate, route: alert.route, alert: alert.symptom, ...row };
 }
 
-/** On Hard the screen names no stage and suggests no action: the player reads and decides alone (D-224). */
+/** On Hard the screen suggests no action and Kiro gives no clue: the player reads and decides alone (D-224). */
 export function forLevel(s: Situation, difficulty: World['difficulty']): Situation {
   if (difficulty !== 'hard' || s.key === 'quiet') return s;
-  return { ...s, stage: null, alert: 'Suspicious activity detected.', kiro: 'Something is wrong. Find it.', act: null };
+  return { ...s, kiro: 'Something is wrong. Find it.', act: null };
 }
 
 /** A step's shell command with its target filled in. */

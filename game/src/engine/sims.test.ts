@@ -150,10 +150,14 @@ describe('the playthrough sims (PRD §10, SYS-16)', { timeout: WHOLE_RUN_TIMEOUT
     expect(planted.length).toBeGreaterThanOrEqual(2);
     for (const r of planted) {
       expect(kinds(r), `seed ${r.world.seed}`).toContain('banished');
-      expect(ending(r), `seed ${r.world.seed}`).toBe('return');
-      // ATK-11's admin brings him back unless a restore (the recover step) happened to wipe it with the defacement
-      if (r.world.accounts.some((a) => a.createdBy === 'ATK-11')) expect(eventsOfKind(r.world, 'return'), `seed ${r.world.seed}`).toMatchObject([{ through: 'hidden-admin' }]);
+      // ATK-11's admin brings him back, unless a restore (the recover step) happened to wipe it with the defacement:
+      // then nothing of his is left and the banishment stands (D-258: with his shorter rests, seed 3 does that)
+      if (r.world.accounts.some((a) => a.createdBy === 'ATK-11')) {
+        expect(ending(r), `seed ${r.world.seed}`).toBe('return');
+        expect(eventsOfKind(r.world, 'return'), `seed ${r.world.seed}`).toMatchObject([{ through: 'hidden-admin' }]);
+      }
     }
+    expect(planted.filter((r) => ending(r) === 'return').length).toBeGreaterThanOrEqual(2);
     expect(planted.filter((r) => eventsOfKind(r.world, 'return')[0]?.through === 'hidden-admin').length).toBeGreaterThanOrEqual(1);
   });
 
@@ -195,18 +199,29 @@ describe('the playthrough sims (PRD §10, SYS-16)', { timeout: WHOLE_RUN_TIMEOUT
   });
 
   it('SIM-7: rotating the signing key but never patching token verification returns through the forged token', () => {
-    const r = sim(reactor((e, w, act) => {
-      if (e.kind === 'move-started') contain(e.move, e.ip, w, act, { skipPatch: 'token-verify' });
-      if (e.kind === 'wave-started') closeMinion(e.minion, act);
-      if (e.kind === 'move-landed') {
-        if (e.move === 'ATK-14') act({ type: 'DEF-09' });
-        else eradicate(e.move, w, act);
-      }
-      bringBack(e, act);
-    }));
-    expect(eventsOfKind(r.world, 'move-landed').map((e) => e.move)).toContain('ATK-14');
-    expect(eventsOfKind(r.world, 'return')).toMatchObject([{ through: 'forged-token' }]);
-    expect(ending(r)).toBe('return');
+    // the seed decides whether he reaches the forged token (ATK-14) before the player's containment leaves him nothing
+    // (D-258: with his shorter rests, seed 1 no longer does); every seed where it lands must bring him back through it
+    const runs = [1, 2, 3, 4, 5, 6].map((seed) =>
+      sim(
+        reactor((e, w, act) => {
+          if (e.kind === 'move-started') contain(e.move, e.ip, w, act, { skipPatch: 'token-verify' });
+          if (e.kind === 'wave-started') closeMinion(e.minion, act);
+          if (e.kind === 'move-landed') {
+            if (e.move === 'ATK-14') act({ type: 'DEF-09' });
+            else eradicate(e.move, w, act);
+          }
+          bringBack(e, act);
+        }),
+        20 * REAL_MIN,
+        seed,
+      ),
+    );
+    const forged = runs.filter((r) => eventsOfKind(r.world, 'move-landed').some((e) => e.move === 'ATK-14'));
+    expect(forged.length).toBeGreaterThanOrEqual(2);
+    for (const r of forged) {
+      expect(eventsOfKind(r.world, 'return'), `seed ${r.world.seed}`).toMatchObject([{ through: 'forged-token' }]);
+      expect(ending(r), `seed ${r.world.seed}`).toBe('return');
+    }
   });
 });
 

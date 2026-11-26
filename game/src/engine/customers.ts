@@ -1,5 +1,5 @@
-// Customer traffic (SYS-19, D-60, D-65): REC-06's shoppers play underneath everything, looping (CUST.a, then CUST.b, in
-// turn: D-131), from the shared
+// Customer traffic (SYS-19, D-60, D-65): REC-06's shoppers play underneath everything, looping (CUST.a, CUST.b, then CUST.c,
+// in turn: D-131, D-237), from the shared
 // address pool, and the world answers them as a real shop would: 503 from a disabled feature, 429 from a rate
 // limit, 403 from a WAF rule that matches them, nothing at all behind a blocked address or a pulled plug. Each
 // request the player's actions fail costs heartbeat by what the customer was doing (the backlash), the customer
@@ -186,7 +186,7 @@ function startLoop(world: World, library: RecordingLibrary, shoppers: Shoppers, 
 export function stepCustomers(world: World, library: RecordingLibrary): void {
   const traffic = library.variantsOf('CUST').filter((v) => v.recording.durationMs > 0);
   if (traffic.length === 0) return;
-  const recordingOf = (loop: number) => traffic[(loop - 1) % traffic.length]!.recording; // CUST.a, CUST.b, CUST.a, … (D-131)
+  const recordingOf = (loop: number) => traffic[(loop - 1) % traffic.length]!.recording; // CUST.a, CUST.b, CUST.c, CUST.a, … (D-131, D-237)
   const ratio = CONFIG[world.difficulty].gameMsPerRealMs;
   const c = world.customers;
   const now = world.clock.gameMs;
