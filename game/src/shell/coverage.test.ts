@@ -154,7 +154,7 @@ describe('R16.1: each command rejects an unsupported flag', () => {
     const f = fixture();
     const act = vi.spyOn(f.engine, 'act');
     act.mockClear();
-    expect(COMMAND_LIST).toHaveLength(31);
+    expect(COMMAND_LIST).toHaveLength(32);
     for (const command of COMMAND_LIST) {
       const r = await f.shell.run(`${command} ${BAD_FLAG}`);
       expect(r, command).toEqual({
@@ -284,6 +284,15 @@ const ACTION_ROWS: ActionRow[] = [
     },
   },
   {
+    name: 'flag (DEF-21)',
+    line: `flag ${IP} the scanner`,
+    acts: [{ type: 'DEF-21', ip: IP, note: 'the scanner' }],
+    check: (f, r) => {
+      expect(r).toEqual({ output: `${IP} flagged: a suspicion until it acts again`, exitCode: 0 });
+      expect(f.world.flags).toMatchObject([{ ip: IP, note: 'the scanner' }]);
+    },
+  },
+  {
     name: 'whois (DEF-04 passive)',
     line: `whois ${IP}`,
     acts: [{ type: 'DEF-04', ip: IP, mode: 'passive' }],
@@ -309,9 +318,9 @@ const ACTION_ROWS: ActionRow[] = [
   },
 ];
 
-describe('R16.2: the 15 command-to-action rows', () => {
-  it('has 15 rows', () => {
-    expect(ACTION_ROWS).toHaveLength(15);
+describe('R16.2: the 16 command-to-action rows (15 of R16.2, the flag of D-233)', () => {
+  it('has 16 rows', () => {
+    expect(ACTION_ROWS).toHaveLength(16);
   });
 
   for (const row of ACTION_ROWS) {

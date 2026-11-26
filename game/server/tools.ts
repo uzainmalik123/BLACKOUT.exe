@@ -50,7 +50,7 @@ export function runTool(name: string, args: Record<string, unknown>, s: KiroSnap
       if (s.alerts.length === 0) return { text: 'No alerts yet.' };
       const open = s.alerts.filter((a) => a.closedAt === undefined);
       const closed = s.alerts.filter((a) => a.closedAt !== undefined);
-      const line = (a: KiroSnapshot['alerts'][number]) => `- #${a.id} ${a.kind}: opened at ${a.openedAt}${a.closedAt ? `, closed at ${a.closedAt}` : ' (open)'}`;
+      const line = (a: KiroSnapshot['alerts'][number]) => `- #${a.id} ${a.kind}: opened at ${a.openedAt}${a.closedAt ? `, closed at ${a.closedAt}` : ' (open)'}${a.symptom ? `: ${a.symptom}` : ''}`;
       return { text: [`Open alerts (${open.length}):`, ...open.map(line), `Closed alerts (${closed.length}):`, ...closed.map(line)].join('\n') };
     }
     case 'meters':

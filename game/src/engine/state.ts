@@ -4,6 +4,7 @@ import type { Row } from '../recordings/format';
 import { initialAssess, type AssessState } from './assess';
 import type { GameEvent } from './log';
 import type { Actor, Difficulty, Ending, Feature, Foothold, MinionId, MoveId, Patch, RequestClass, TapId, WafRule } from '../rules/vocabulary';
+import { shiftSeed } from './shift-seed';
 import { FEATURE_DEFAULTS } from '../rules/vocabulary';
 import { CONFIG } from './config';
 import { SEED_ACCOUNTS } from './seed';
@@ -96,12 +97,38 @@ export interface Wave {
   successesDone: number;
 }
 
+/**
+ * An alert (D-232): opened by a per-route detector, never at move start. `route`, `symptom` and `gate` are what the
+ * screens show (`gate` on Easy only); `about` (the actor whose line crossed the threshold) stays internal: a spoiler.
+ */
 export interface Alert {
   id: number;
   about: Actor;
   openedAt: number;
   closedAt?: number;
+  route: string; // the path family: '/', '/rest/user/login', '/rest/products/search', '/api/Users', ...
+  symptom: string; // one plain sentence built from what the detector counted; never a move id, never who
+  gate: string; // the player-facing gate name derived from the route (front door, login, passwords, sign-up, search, admin API, products, uploads, feedback, a tap's name)
 }
+
+/** A flagged address (DEF-21, D-233): a suspicion until a hostile request from it, after the flag, confirms it. Carries no verdict on purpose. */
+export interface Flag {
+  ip: string;
+  at: number;
+  note?: string;
+  confirmedAt?: number;
+}
+
+/** A WAF rule (or the login rate limit) that cut one of Death's moves (SYS-23, D-231): evaded by that move's quiet variants from `evadesAt`. */
+export interface Bandage {
+  move: MoveId;
+  rule: WafRule;
+  at: number;
+  evadesAt: number;
+  announced?: boolean; // the `rule-evaded` event has been logged
+}
+
+export type PlaybookPhase = 'watch' | 'identify' | 'contain' | 'eradicate' | 'recover';
 
 /** An open leaky tap (D-42, PRD §4.1). */
 export interface OpenTap {
@@ -210,6 +237,12 @@ export interface World {
   logs: { access: AccessLine[]; app: AppLine[]; dbChanges: DbChange[] };
   events: GameEvent[]; // SYS-10
   ending?: Ending;
+  shift: { beganAt?: number; firstMoveAt?: number; rng: number }; // SYS-22 (D-230): engine.beginShift() sets beganAt; Death's first move sets firstMoveAt (minions and taps count from it); rng is the shift's own seeded stream (the first-move delay)
+  incident: { declaredAt?: number; by?: 'alert' | 'escalation' | 'flag' }; // SYS-22 (D-230): the change freeze holds from beganAt until declaredAt
+  flags: Flag[]; // DEF-21 (D-233)
+  bandages: Bandage[]; // SYS-23 (D-231)
+  playbook: { phase: PlaybookPhase; since: number; lastDeathActiveAt?: number }; // D-233: the "Now:" strip's phase, from the player's acts and visible events, never from the assessor
+  detect: { logCursor: number; dbCursor: number; flagCursor: number; files: string[]; windows: Record<string, number[]> }; // D-232: the detectors' cursors and sliding windows (game ms per key)
 }
 
 /** D-42: the taps' own PRNG state, derived from the run's seed. */
@@ -235,6 +268,7 @@ export function initialWorld(seed: number, difficulty: Difficulty): World {
   const config = CONFIG[difficulty];
   const accounts = SEED_ACCOUNTS.map((a) => ({ ...a }));
   const firstTap = mulberry(tapSeed(seed)); // D-42: the first tap opens one seeded interval in
+  void shiftSeed; // (the shift's stream is drawn in shift.ts)
   return {
     seed,
     rng: seed >>> 0,
@@ -270,5 +304,11 @@ export function initialWorld(seed: number, difficulty: Difficulty): World {
     quietAlertsSince: 0,
     logs: { access: [], app: [], dbChanges: [] },
     events: [],
+    shift: { rng: shiftSeed(seed) },
+    incident: {},
+    flags: [],
+    bandages: [],
+    playbook: { phase: 'watch', since: 0 },
+    detect: { logCursor: 0, dbCursor: 0, flagCursor: 0, files: [], windows: {} },
   };
 }

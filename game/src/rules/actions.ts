@@ -41,6 +41,7 @@ export const ACTIONS: readonly ActionRow[] = [
   row('DEF-18', 'recover', 'Bring things back', 'terminal', 'M'),
   row('DEF-19', 'communicate', 'Escalate to the incident lead', 'console', 'S'),
   row('DEF-20', 'communicate', 'Notify (legal / customers)', 'console', 'S'),
+  row('DEF-21', 'investigate', 'Flag an address', 'both', 'M'), // D-233
 ];
 
 export const ACTION_BY_ID: Readonly<Record<ActionId, ActionRow>> = Object.fromEntries(ACTIONS.map((a) => [a.id, a])) as Record<ActionId, ActionRow>;

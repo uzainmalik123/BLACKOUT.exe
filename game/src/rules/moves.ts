@@ -28,7 +28,7 @@ export const MOVES: readonly Move[] = [
     stoppedBy: [{ action: 'DEF-10', feature: 'ftp' }], pri: 'S' },
   { id: 'ATK-03', stage: 2, name: 'SQL injection on login', attack: 'T1190', needs: [MAP], gains: ['admin-session'],
     stoppedBy: [SQLI, { action: 'DEF-13', patch: 'login' }], pri: 'M' },
-  { id: 'ATK-04', stage: 2, name: 'Guess the admin password', attack: 'T1110.001', needs: [MAP, { loginNotRateLimited: true }], gains: ['admin-session', 'admin-password'],
+  { id: 'ATK-04', stage: 2, name: 'Guess the admin password', attack: 'T1110.001', needs: [MAP], gains: ['admin-session', 'admin-password'], // D-231: the rate limit is a bandage (a stopper he attempts), not a Need
     stoppedBy: [{ action: 'DEF-07' }, { action: 'DEF-16', account: 'admin' }], pri: 'M' },
   { id: 'ATK-05', stage: 2, name: "Reset a user's password via the security question", attack: 'T1110', needs: [MAP, { featureOn: 'password-reset' }], gains: ['user-session'],
     stoppedBy: [{ action: 'DEF-10', feature: 'password-reset' }, { action: 'DEF-08', account: 'target' }], pri: 'S' },

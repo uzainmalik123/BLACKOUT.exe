@@ -10,7 +10,7 @@ import type { CommandName } from './types';
 const EXPECTED_31 = [
   'ls', 'cd', 'pwd', 'cat', 'head', 'tail', 'grep', 'awk', 'sort', 'uniq', 'wc', 'cut',
   'file', 'sha256sum', 'tar', 'cp', 'rm', 'mkdir', 'sqlite3', 'iptables', 'systemctl',
-  'ss', 'whois', 'ping', 'nmap', 'curl', 'date', 'history', 'clear', 'help', 'man',
+  'ss', 'whois', 'ping', 'nmap', 'curl', 'flag', 'date', 'history', 'clear', 'help', 'man',
 ];
 
 // game/src/shell -> repo root is three levels up.
@@ -26,9 +26,9 @@ function steeringCommands(): string[] {
 const names = COMMAND_NAMES as readonly CommandName[];
 
 describe('COMMAND_LIST (R2.1)', () => {
-  it('is the literal 31 names in the steering order', () => {
+  it('is the literal 32 names in the steering order (flag since D-233)', () => {
     expect([...COMMAND_LIST]).toEqual(EXPECTED_31);
-    expect(COMMAND_LIST).toHaveLength(31);
+    expect(COMMAND_LIST).toHaveLength(32);
   });
 
   it('has no duplicates', () => {

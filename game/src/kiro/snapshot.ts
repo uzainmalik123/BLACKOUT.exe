@@ -21,6 +21,9 @@ export interface SnapshotAlert {
   kind: AlertKind;
   openedAt: string; // game clock, as shown ("1 h 05 min")
   closedAt?: string;
+  route: string; // D-232: the path family the detector watched
+  symptom: string; // D-232: what it counted, in one plain sentence
+  gate: string; // D-232, D-235: the gate's name (the screens show it on Easy only)
 }
 
 export interface SnapshotAction {
@@ -86,6 +89,7 @@ export function describeAction(a: PlayerAction): string {
     case 'DEF-18': return `bring back ${a.what}`;
     case 'DEF-19': return 'escalate to the incident lead';
     case 'DEF-20': return `notify ${a.to}`;
+    case 'DEF-21': return `flag ${a.ip}${a.note ? ` (${a.note})` : ''}`;
   }
 }
 
@@ -123,7 +127,7 @@ export function buildSnapshot(engine: Pick<Engine, 'world' | 'accessLog' | 'appL
     alerts: w.alerts
       .slice()
       .sort((a, b) => b.openedAt - a.openedAt)
-      .map((a) => ({ id: a.id, kind: alertKind(a.about), openedAt: at(a.openedAt), ...(a.closedAt !== undefined && { closedAt: at(a.closedAt) }) })),
+      .map((a) => ({ id: a.id, kind: alertKind(a.about), openedAt: at(a.openedAt), ...(a.closedAt !== undefined && { closedAt: at(a.closedAt) }), route: a.route, symptom: a.symptom, gate: a.gate })),
     accounts: w.accounts.map((a) => ({ email: a.email, role: a.role, locked: a.lockedAt !== undefined })),
     sessions: { total: w.sessions.length, admin: w.sessions.filter((s) => s.kind === 'admin').length },
     uploads: w.files.map((f) => ({ path: f.path, size: f.size, sha256: f.sha256 })),

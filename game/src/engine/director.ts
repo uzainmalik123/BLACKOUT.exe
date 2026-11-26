@@ -4,7 +4,7 @@ import { MOVES, type Move } from '../rules/moves';
 import { FOOTHOLDS, RETURN_GRANTS, STAGES, type Foothold, type Gain, type MoveId, type Stage } from '../rules/vocabulary';
 import { CONFIG } from './config';
 import { doorHalves, doorOpenForWin, isDoor, landed, soulKeys, unstolen } from './doors';
-import { anyStopperHolds, footholds, needsHold } from './facts';
+import { blocksPick, footholds, needsHold } from './facts';
 import type { RecordingLibrary, Variant } from './library';
 import { emit, endRun } from './log';
 import { bump, customerAddresses } from './pool';
@@ -28,7 +28,7 @@ export function playableVariants(world: World, library: RecordingLibrary, move: 
   const his = isHisDoor(world, move);
   if (landed(world, move.id) && !his) return [];
   return doorHalves(world, library, move)
-    .filter((v) => !anyStopperHolds(world, move, { ...v.info, ip: 'fresh' }))
+    .filter((v) => !blocksPick(world, move, { ...v.info, ip: 'fresh' })) // D-231: an untried WAF rule is attempted, not avoided
     .filter((v) => !his || unstolen(world, v) > 0);
 }
 
@@ -190,6 +190,7 @@ function doorToVisit(world: World, library: RecordingLibrary, doors: Move[]): Mo
 }
 
 export function directorTick(world: World, library: RecordingLibrary): void {
+  if (world.shift.beganAt === undefined) return; // SYS-22 (D-230): nothing of his before engine.beginShift()
   if (world.ending || world.nginx === 'stopped' || activeDeathReplay(world)) return; // nothing reaches a stopped server
   pace(world);
   const candidates = candidateMoves(world, library);

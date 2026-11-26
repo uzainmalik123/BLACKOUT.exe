@@ -364,32 +364,35 @@ describe('the committed customers (REC-06) in whole runs', { timeout: WHOLE_RUN_
   });
 
   it('with search off every customer search answers 503 (the product list does not); with the plug pulled no customer line appears', () => {
-    const off = runSim({ seed: 1, difficulty: 'medium', library: real, maxRealMs: 3 * REAL_MIN, player: (_w, ms) => (ms === 0 ? [{ type: 'DEF-10', feature: 'search', enabled: false }] : []) });
+    const off = runSim({ lab: true, seed: 1, difficulty: 'medium', library: real, maxRealMs: 3 * REAL_MIN, player: (_w, ms) => (ms === 0 ? [{ type: 'DEF-10', feature: 'search', enabled: false }] : []) }); // the lab: no change freeze (D-230)
     const searches = off.world.logs.access.filter((l) => l.by === 'CUST' && /search\?q=.+/.test(l.target));
     expect(searches.length).toBeGreaterThan(5); // fewer than usual: a shopper whose second search fails gives up
     expect(new Set(searches.map((l) => l.status))).toEqual(new Set([503]));
     expect(new Set(off.world.logs.access.filter((l) => l.by === 'CUST' && l.target === '/rest/products/search?q=').map((l) => l.status))).toEqual(new Set([200]));
     expect(off.world.tickets.length).toBeGreaterThan(0);
-    const plug = runSim({ seed: 1, difficulty: 'medium', library: real, maxRealMs: 3 * REAL_MIN, player: (_w, ms) => (ms === 0 ? [{ type: 'DEF-11' }] : []) });
+    const plug = runSim({ lab: true, seed: 1, difficulty: 'medium', library: real, maxRealMs: 3 * REAL_MIN, player: (_w, ms) => (ms === 0 ? [{ type: 'DEF-11' }] : []) });
     expect(plug.world.logs.access.filter((l) => l.by === 'CUST')).toEqual([]);
     expect(plug.world.customers.failed).toBe(0);
   });
 
-  it('both recordings take turns: CUST.a then CUST.b, and every CUST.b loop has its password resets and /ftp readers (KI-82, D-131)', () => {
-    expect(real.variantsOf('CUST').map((v) => v.variant)).toEqual(['a', 'b']);
+  it('the recordings take turns: CUST.a, CUST.b, CUST.c; every CUST.b loop has its password resets and /ftp readers, every CUST.c loop its quoted searches (KI-82, D-131, D-237)', () => {
+    expect(real.variantsOf('CUST').map((v) => v.variant)).toEqual(['a', 'b', 'c']);
     const only = libraryFrom(real.variantsOf('CUST').map((v) => v.recording));
-    const [a, b] = real.variantsOf('CUST').map((v) => v.recording.durationMs * CONFIG.medium.gameMsPerRealMs) as [number, number];
+    const lengths = real.variantsOf('CUST').map((v) => v.recording.durationMs * CONFIG.medium.gameMsPerRealMs);
     const w = initialWorld(1, 'medium');
     for (let realMs = 0; realMs < 45 * REAL_MIN; realMs += 100) { w.clock.gameMs += 3000; stepCustomers(w, only); }
     const lines = custLines(w);
-    for (let start = 0, loop = 1; start + (loop % 2 ? a : b) <= w.clock.gameMs; start += loop % 2 ? a : b, loop++) {
-      const inLoop = lines.filter((l) => l.t >= start && l.t < start + (loop % 2 ? a : b));
+    for (let start = 0, loop = 1; start + lengths[(loop - 1) % 3]! <= w.clock.gameMs; start += lengths[(loop - 1) % 3]!, loop++) {
+      const which = 'abc'[(loop - 1) % 3]!;
+      const inLoop = lines.filter((l) => l.t >= start && l.t < start + lengths[(loop - 1) % 3]!);
       const of = (cls: string) => inLoop.filter((l) => classify(l.method, l.target) === cls).length;
-      if (loop % 2) expect(of('password-reset') + of('ftp'), `loop ${loop} (CUST.a)`).toBe(0);
-      else {
+      const quoted = inLoop.filter((l) => l.target.startsWith('/rest/products/search?q=') && l.target.includes('%27')).length;
+      if (which === 'b') {
         expect(of('password-reset'), `loop ${loop} (CUST.b)`).toBeGreaterThanOrEqual(2);
         expect(of('ftp'), `loop ${loop} (CUST.b)`).toBeGreaterThanOrEqual(1);
-      }
+      } else expect(of('password-reset') + of('ftp'), `loop ${loop} (CUST.${which})`).toBe(0);
+      if (which === 'c') expect(quoted, `loop ${loop} (CUST.c)`).toBeGreaterThanOrEqual(1);
+      else expect(quoted, `loop ${loop} (CUST.${which})`).toBe(0);
     }
     expect(w.customers.loop).toBeGreaterThanOrEqual(6);
   });

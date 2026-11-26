@@ -1,6 +1,6 @@
 // The event log (SYS-10): every Death move, minion wave, player action and Kiro call, in game time.
 // The report (SYS-11) and the sims (SYS-16) read only from world.events.
-import type { ActionId, Actor, Ending, Foothold, MinionId, MoveId, Patch, PlayerAction, RequestClass, Stage, TapId } from '../rules/vocabulary';
+import type { ActionId, Actor, Ending, Foothold, MinionId, MoveId, Patch, PlayerAction, RequestClass, Stage, TapId, WafRule } from '../rules/vocabulary';
 import type { GapType } from './assess';
 import type { World } from './state';
 
@@ -16,8 +16,12 @@ export type GameEventBody =
   | { kind: 'kiro'; call: KiroCall; credits?: number } // D-191 (KI-190): logged by the Kiro client through engine.noteKiro, credits as the server reported them
   | { kind: 'souls-stolen'; by: Actor; count: number; stolen: number; total: number }
   | { kind: 'tip-off'; by: ActionId }
-  | { kind: 'alert-opened'; alert: number; about: Actor }
+  | { kind: 'alert-opened'; alert: number; about: Actor; route: string; symptom: string } // D-232: opened by a per-route detector; `about` is the spoiler, `route` and `symptom` are what to show
   | { kind: 'alert-closed'; alert: number; about: Actor }
+  | { kind: 'shift-begun' } // D-230: engine.beginShift(): the desk is in view; Death's first move waits its seeded delay from here
+  | { kind: 'incident-declared'; by: 'alert' | 'escalation' | 'flag' } // D-230: the change freeze lifts
+  | { kind: 'flag-confirmed'; ip: string; about: Actor } // D-233: a hostile request from a flagged address, after the flag (`about` is the spoiler: don't show it)
+  | { kind: 'rule-evaded'; move: MoveId; rule: WafRule } // D-231: the bandage failed: that move's quiet variants slip the rule from now on
   | { kind: 'tap-opened'; tap: TapId }
   | { kind: 'tap-closed'; tap: TapId; by?: ActionId } // no `by`: it ran dry
   | { kind: 'door-shut'; move: MoveId; by: ActionId } // D-44: one of its own stoppers holds for every half he may play

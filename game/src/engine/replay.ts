@@ -6,6 +6,8 @@ import type { DbEvent, FileEvent, RecEvent } from '../recordings/format';
 import { MINION_BY_ID } from '../rules/minions';
 import { MOVE_BY_ID, SOUL_DOORS } from '../rules/moves';
 import type { ActionId, Actor, MinionId, MoveId, Stopper } from '../rules/vocabulary';
+import { closeAlert } from './alerts';
+import { bandage, ruleOf } from './bandages';
 import { gameTimeIso } from './clock';
 import { CONFIG } from './config';
 import { doorHalves, landed, soulKeys } from './doors';
@@ -15,6 +17,7 @@ import { emit } from './log';
 import { bump, customerAddresses } from './pool';
 import { nextRandom } from './rng';
 import { SEED_ACCOUNTS } from './seed';
+import { noteFirstMove } from './shift';
 import { breakInto, soulsLeft, steal } from './souls';
 import type { Account, AccessLine, Replay, World } from './state';
 
@@ -25,21 +28,7 @@ function nextId(world: World): number {
   return world.death.nextId++;
 }
 
-/** One alert per Death move and per minion wave (D-24). Opening or closing one restarts the Director's "quiet" clock. */
-export function openAlert(world: World, about: Actor): void {
-  const id = nextId(world);
-  world.alerts.push({ id, about, openedAt: world.clock.gameMs });
-  world.quietAlertsSince = world.clock.gameMs;
-  emit(world, { kind: 'alert-opened', alert: id, about });
-}
-
-export function closeAlert(world: World, about: Actor): void {
-  const alert = world.alerts.find((a) => a.about === about && a.closedAt === undefined);
-  if (!alert) return;
-  alert.closedAt = world.clock.gameMs;
-  world.quietAlertsSince = world.clock.gameMs;
-  emit(world, { kind: 'alert-closed', alert: alert.id, about });
-}
+export { closeAlert } from './alerts'; // alerts open on a threshold (D-232, alerts.ts); a move's alert closes when it lands or is cut
 
 /** D-41: the seeded wait after one of Death's moves lands or is stopped. */
 export function breather(world: World): number {
@@ -78,8 +67,8 @@ export function startReplay(world: World, v: Variant, owner: 'death' | MinionId,
   if (owner === 'death' && isMove(v.move)) {
     if (world.death.noRepeat !== v.move) delete world.death.noRepeat; // D-41: he has started a different move
     world.death.pacingDelayed = false; // D-43: the next pick may be delayed again
-    openAlert(world, v.move);
     emit(world, { kind: 'move-started', move: v.move, variant: v.variant, stage: MOVE_BY_ID[v.move].stage, ip: v.info.ip });
+    noteFirstMove(world); // D-230: the minions and the taps count from his first move
   }
   return replay;
 }
@@ -99,9 +88,11 @@ function variantOf(library: RecordingLibrary, replay: Replay): Variant | undefin
  * is open again (D-42, D-44, D-45). Any other cut ends the move: a breather, and he won't pick the same move again
  * until he has started a different one (D-41).
  */
-export function cutReplay(world: World, replay: Replay, by: ActionId): void {
+export function cutReplay(world: World, replay: Replay, by: ActionId, stopper?: Stopper): void {
   world.replays = world.replays.filter((r) => r !== replay);
   if (replay.owner !== 'death' || !isMove(replay.move)) return;
+  const rule = stopper && ruleOf(stopper);
+  if (rule) bandage(world, replay.move, rule); // D-231: the rule stopped him now; his quiet way past it comes after the breathers
   const visit = isDoor(replay.move) && landed(world, replay.move); // his door: a visit, not a first entry
   world.death.played.push({ move: replay.move, variant: replay.variant, outcome: 'cut' });
   countIpCut(world, by);
@@ -156,11 +147,13 @@ export function grantMinionSession(world: World, by: MinionId, victim: Account |
   }
 }
 
-function whatStops(world: World, replay: Replay, info: VariantInfo): ActionId | undefined {
-  if (world.nginx === 'stopped') return 'DEF-11';
-  if ((replay.ips ?? [replay.ip]).every((ip) => world.firewall.blocked.includes(ip))) return 'DEF-06';
+const PLUG: Stopper = { action: 'DEF-11' } as unknown as Stopper; // the plug: not a row of the table, but it stops everything
+
+function whatStops(world: World, replay: Replay, info: VariantInfo): Stopper | undefined {
+  if (world.nginx === 'stopped') return PLUG;
+  if ((replay.ips ?? [replay.ip]).every((ip) => world.firewall.blocked.includes(ip))) return { action: 'DEF-06' };
   const stoppers: Stopper[] = isMove(replay.move) ? MOVE_BY_ID[replay.move].stoppedBy : MINION_BY_ID[replay.move].closedBy;
-  return stoppers.find((s) => stopperHolds(world, s, info))?.action;
+  return stoppers.find((s) => stopperHolds(world, s, info));
 }
 
 /**
@@ -293,12 +286,14 @@ export function stepReplays(world: World, library: RecordingLibrary): void {
     const info: VariantInfo = { ...v.info, ip: replay.ip };
     const events = v.recording.events;
     const end = replay.endCursor ?? events.length;
-    let by = whatStops(world, replay, info);
+    let stopper = whatStops(world, replay, info);
+    let by = stopper?.action;
     if (by === 'DEF-06' && replay.owner === 'death' && world.death.proxies && replay.cursor < end) {
       // D-46 (KI-78): on rotating proxies a pool blocked to the last address just hands him fresh exits: no cut
       replay.ips = proxyPool(world);
       replay.ip = replay.ips[0]!;
-      by = whatStops(world, replay, { ...info, ip: replay.ip });
+      stopper = whatStops(world, replay, { ...info, ip: replay.ip });
+      by = stopper?.action;
     }
     if (by === 'DEF-06' && replay.cursor >= end) {
       land(world, library, replay, info); // the tool had already finished; blocking the address changes nothing
@@ -310,11 +305,11 @@ export function stepReplays(world: World, library: RecordingLibrary): void {
       // way is open again, so a fix protects for exactly as long as it holds. Held past the grace, the move is cut: a
       // visit to his door is saved and resumes once the door reopens; any other move ends (D-41).
       replay.frozenSince ??= now;
-      if (now - replay.frozenSince >= CONFIG[world.difficulty].doors.pauseGraceGameMs) cutReplay(world, replay, by);
+      if (now - replay.frozenSince >= CONFIG[world.difficulty].doors.pauseGraceGameMs) cutReplay(world, replay, by, stopper);
       continue;
     }
     if (by) {
-      cutReplay(world, replay, by);
+      cutReplay(world, replay, by, stopper);
       continue;
     }
     if (replay.frozenSince !== undefined) {

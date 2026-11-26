@@ -242,7 +242,7 @@ export class Night {
     this.starting = true;
     startRun(this.difficulty)
       .then((r) => {
-        this.run = r;
+        this.run = r; // the shift began with the run (run.ts, D-230): the alarm comes with the first threshold alert
         this.events = r.engine.world.events.length;
         this.ui.run(r);
       })

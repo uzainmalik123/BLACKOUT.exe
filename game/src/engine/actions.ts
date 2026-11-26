@@ -8,6 +8,7 @@ import { summariseShown } from './assess';
 import { emit } from './log';
 import { confirmBreach } from './notification';
 import { deathAddresses } from './pool';
+import { changeFrozen, declareIncident } from './shift';
 import type { Backup, World } from './state';
 
 export type { PlayerAction } from '../rules/vocabulary';
@@ -20,6 +21,11 @@ export interface ActionResult {
 const ok = (message: string): ActionResult => ({ ok: true, message });
 const no = (message: string): ActionResult => ({ ok: false, message });
 const IPV4 = /^(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}$/;
+
+/** SYS-22 (D-230): what a change action answers while no incident is declared. The shell prints it as it is. */
+export const FREEZE_MESSAGE = 'No incident declared. Change control forbids production changes outside an incident.';
+/** The actions the freeze refuses: every change (DEF-05..DEF-20) but the escalation, which declares the incident itself. */
+const FROZEN: ReadonlySet<ActionId> = new Set<ActionId>(['DEF-05', 'DEF-06', 'DEF-07', 'DEF-08', 'DEF-09', 'DEF-10', 'DEF-11', 'DEF-12', 'DEF-13', 'DEF-14', 'DEF-15', 'DEF-16', 'DEF-17', 'DEF-18', 'DEF-20']);
 
 function sameRule(a: WafRule, b: WafRule): boolean {
   return JSON.stringify(a) === JSON.stringify(b);
@@ -148,12 +154,21 @@ function run(world: World, action: PlayerAction): ActionResult {
     case 'DEF-19':
       if (world.comms.escalatedAt !== undefined) return no('The incident lead already knows');
       world.comms.escalatedAt = now;
+      declareIncident(world, 'escalation'); // SYS-22, D-230: an escalation declares the incident and lifts the freeze
       confirmBreach(world, 'DEF-19'); // SYS-14, D-116: escalating confirms the breach once souls are gone
       return ok('The incident lead acknowledges');
     case 'DEF-20':
       if (world.comms.notifiedAt[action.to] !== undefined) return no(`${action.to} already notified`);
       world.comms.notifiedAt[action.to] = now;
       return ok(`${action.to} notified`);
+    case 'DEF-21': {
+      // D-233: a suspicion, confirmed by the next hostile request from that address (flags.ts); never judged here
+      if (!IPV4.test(action.ip)) return no(`${action.ip} is not an IPv4 address`);
+      if (world.flags.some((f) => f.ip === action.ip)) return no(`${action.ip} is already flagged`);
+      const note = action.note?.trim();
+      world.flags.push({ ip: action.ip, at: now, ...(note && { note }) });
+      return ok(`${action.ip} flagged: a suspicion until it acts again`);
+    }
   }
 }
 
@@ -166,7 +181,7 @@ function restore(world: World, b: Backup): void {
 
 /** Applies one player action and logs it (SYS-10). After an ending every action is refused. */
 export function applyAction(world: World, action: PlayerAction): ActionResult {
-  const result = world.ending ? no(`The incident is over: ${world.ending}`) : run(world, action);
+  const result = world.ending ? no(`The incident is over: ${world.ending}`) : changeFrozen(world) && FROZEN.has(action.type) ? no(FREEZE_MESSAGE) : run(world, action);
   if ('shown' in action && action.shown !== undefined) {
     // D-115, D-122: at most 200 lines are judged, and the log keeps only what the judge needs of them, never the text
     const { shown, ...rest } = action;

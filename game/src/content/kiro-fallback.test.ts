@@ -4,7 +4,10 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { MOVES } from '../rules/moves';
 import { MINION_IDS, TAP_IDS, type Difficulty } from '../rules/vocabulary';
-import { ALERT_HINTS, DRAFTS, HINT_POLICY, MOVE_HINTS, OFFLINE_ANSWER, debriefTemplate, hintsFor, type DebriefInput } from './kiro-fallback';
+import {
+  ALERT_HINTS, DRAFTS, DRILL_COMPLETE, HINT_POLICY, MOVE_HINTS, OFFLINE_ANSWER, OPENING_TUTORIAL, TRAINING_STEPS, debriefTemplate, hintsFor,
+  type DebriefInput, type TutorialPanel,
+} from './kiro-fallback';
 
 const LEVELS: readonly Difficulty[] = ['easy', 'medium', 'hard'];
 
@@ -143,5 +146,79 @@ describe("Kiro's offline debrief (CON-03, KIRO-06)", () => {
     expect(text).toContain('No mistakes were recorded.');
     expect(text).toContain('Nothing the attacker left behind was missed.');
     expect(text).not.toMatch(INTERNAL_ID);
+  });
+});
+
+describe("Kiro's tutorial texts (CON-03 extended, D-238)", () => {
+  /** Words that would give away Death, his techniques or how the real shift is won (playtest round 1 design, anti-goals). */
+  const SPOILER =
+    /\b(death|reaper|minions?|footholds?|backdoors?|taps?|quiet\w*|proxy|proxies|tamper\w*|return\w*|gates?|harvest\w*|soul doors?|banish\w*|sqlmap|hydra|ffuf|union|select|admin\w*)\b/i;
+  /** The word each panel goes by in the text, so a step that points at a panel also names it. */
+  const PANEL_WORD: Readonly<Record<TutorialPanel, RegExp>> = {
+    logs: /\blog\b/i, alerts: /\balerts?\b/i, meters: /\bmeters\b/i, terminal: /\bterminal\b/i, dock: /\bdock\b/i,
+    'top-talkers': /\btop talkers\b/i, 'cheat-sheet': /\bcheat sheet\b/i, waf: /\bWAF console\b/, 'feature-flags': /\bfeature flags console\b/i,
+    deploy: /\bdeploy console\b/i, backups: /\bbackups and evidence console\b/i, kiro: /\bKiro\b/,
+  };
+  /** The shell's commands plus DEF-21's `flag` (SYS-22's stream adds it to the steering list; until then it is named here). */
+  const TUTORIAL_COMMANDS = new Set([...COMMANDS, 'flag']);
+  const READ_ONLY = new Set(['ls', 'cat', 'head', 'tail', 'grep', 'awk', 'sort', 'uniq', 'wc', 'cut', 'file', 'sha256sum', 'whois', 'help', 'man']);
+  const commandsIn = (text: string) => [...text.matchAll(/`([^`]+)`/g)].map((m) => m[1]!);
+
+  const texts: Array<[string, string]> = [
+    ...LEVELS.flatMap((level) =>
+      OPENING_TUTORIAL[level].flatMap((s) => s.lines.map((l, i): [string, string] => [`opening ${level} ${s.id} ${i + 1}`, l]))),
+    ...TRAINING_STEPS.flatMap((s) => [
+      ...s.lines.map((l, i): [string, string] => [`training ${s.id} ${i + 1}`, l]),
+      [`training ${s.id} done`, s.done] as [string, string],
+    ]),
+    ['drill complete title', DRILL_COMPLETE.title],
+    ...DRILL_COMPLETE.learned.map((l, i): [string, string] => [`drill complete ${i + 1}`, l]),
+    ['drill complete next', DRILL_COMPLETE.next],
+  ];
+
+  it.each(texts)('%s: no spoiler, no internal id, only real commands', (_name, text) => {
+    expect(text.length).toBeGreaterThan(0);
+    expect(text).not.toMatch(SPOILER);
+    expect(text).not.toMatch(INTERNAL_ID);
+    for (const cmd of commandsIn(text)) {
+      expect(cmd, cmd).not.toMatch(/&&|;|\$\(|\bsudo\b|\|\|/);
+      for (const seg of segments(cmd)) expect(TUTORIAL_COMMANDS.has(seg.split(/\s+/)[0]!), `${seg} in ${text}`).toBe(true);
+    }
+  });
+
+  it('the opening: Easy walks log, alerts, meters, terminal, dock; Medium three lines; Hard the one line', () => {
+    expect(OPENING_TUTORIAL.easy.map((s) => s.panels[0])).toEqual(['logs', 'alerts', 'meters', 'terminal', 'dock']);
+    expect(OPENING_TUTORIAL.medium.flatMap((s) => s.lines)).toHaveLength(3);
+    expect(OPENING_TUTORIAL.hard.flatMap((s) => s.lines)).toEqual(['Change freeze is on until an incident is declared. Look around.']);
+    for (const s of OPENING_TUTORIAL.medium) for (const l of s.lines) expect(l.length).toBeLessThanOrEqual(160);
+  });
+
+  it("the opening's terminal step offers exactly one safe, read-only command", () => {
+    const cmds = OPENING_TUTORIAL.easy.find((s) => s.id === 'terminal')!.lines.flatMap(commandsIn);
+    expect(cmds).toHaveLength(1);
+    for (const seg of segments(cmds[0]!)) expect(READ_ONLY.has(seg.split(/\s+/)[0]!), seg).toBe(true);
+  });
+
+  it('every step names each panel it points at, so the highlight and the words agree', () => {
+    const steps = [...LEVELS.flatMap((l) => OPENING_TUTORIAL[l]), ...TRAINING_STEPS];
+    for (const s of steps) {
+      const text = [...s.lines, ...('done' in s ? [s.done] : [])].join(' ');
+      for (const p of s.panels) expect(text, `${s.id} names ${p}`).toMatch(PANEL_WORD[p]);
+    }
+  });
+
+  it('the training shift runs the six steps in order and calls itself a drill', () => {
+    expect(TRAINING_STEPS.map((s) => s.step)).toEqual([1, 2, 3, 4, 5, 5, 6]);
+    expect(new Set(TRAINING_STEPS.map((s) => s.id)).size).toBe(TRAINING_STEPS.length);
+    expect(TRAINING_STEPS[0]!.lines[0]).toMatch(/^This is a drill\./);
+    expect(DRILL_COMPLETE.title).toBe('Drill complete');
+  });
+
+  it('each training step names the tool that does its action', () => {
+    const tool: Readonly<Record<string, RegExp>> = {
+      flag: /flag on its row|`flag <ip>`/, block: /block on its row|`iptables -A INPUT -s <ip> -j DROP`/, 'rate-limit': /WAF console.*rate limit/,
+      'search-off': /feature flags console.*search off/, patch: /deploy console.*deploy it/, evidence: /backups and evidence console|`tar czf \/evidence\//,
+    };
+    for (const [id, re] of Object.entries(tool)) expect(TRAINING_STEPS.find((s) => s.id === id)!.lines.join(' '), id).toMatch(re);
   });
 });

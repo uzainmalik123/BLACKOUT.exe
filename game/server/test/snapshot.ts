@@ -7,7 +7,7 @@ export const SNAPSHOT: KiroSnapshot = {
   souls: { total: 325, stolen: 0 },
   heartbeat: { now: 98, max: 100 },
   nginx: 'running',
-  alerts: [{ id: 2, kind: 'noise', openedAt: '12 min' }, { id: 1, kind: 'attack', openedAt: '4 min', closedAt: '9 min' }],
+  alerts: [{ id: 2, kind: 'noise', openedAt: '12 min', route: '/', symptom: 'unusual activity on the site: 12 requests for PHP, WordPress or config paths in 30 s from one address', gate: 'front door' }, { id: 1, kind: 'attack', openedAt: '4 min', closedAt: '9 min', route: '/', symptom: 'unusual activity on the site: 50 requests in 10 s from one address', gate: 'front door' }],
   accounts: [{ email: 'admin@juice-sh.op', role: 'admin', locked: false }, { email: 'jim@juice-sh.op', role: 'customer', locked: false }, { email: 'reaper@example.org', role: 'admin', locked: true }],
   sessions: { total: 3, admin: 1 },
   uploads: [{ path: 'complaints/evil.zip', size: 1234, sha256: 'ab'.repeat(32) }],

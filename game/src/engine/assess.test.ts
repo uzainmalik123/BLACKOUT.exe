@@ -9,6 +9,7 @@ import { CONFIG } from './config';
 import { emit, eventsOfKind, type GameEventBody } from './log';
 import { runSim } from './sim';
 import { initialWorld, type World } from './state';
+import { lab } from './test-fixtures/lab';
 import { FIXTURE_LIBRARY } from './test-fixtures/recordings';
 import { WHOLE_RUN_TIMEOUT_MS } from './test-fixtures/timeouts';
 
@@ -603,7 +604,7 @@ describe('the gaps: every type has a test, the biggest stands first with how lon
 
 describe('the assessor inside advance() (SYS-21)', () => {
   it('judges an action on the next tick, refreshes the snapshot once a real second and at the ending, and the state stays JSON-plain', () => {
-    const w = initialWorld(1, 'medium');
+    const w = lab(initialWorld(1, 'medium'));
     advance(w, FIXTURE_LIBRARY, 100);
     expect(w.assess.assessedAt).toBe(CONFIG.medium.tickGameMs);
     advance(w, FIXTURE_LIBRARY, 500);
@@ -627,7 +628,7 @@ describe('the assessor inside advance() (SYS-21)', () => {
   });
 
   it('the snapshot tracks the live run: the scan opens stage-unseen, a focused look closes it; the gap stands from the move start', () => {
-    const w = initialWorld(1, 'medium');
+    const w = lab(initialWorld(1, 'medium'));
     advance(w, FIXTURE_LIBRARY, 10_000);
     const start = w.events.find((e) => e.kind === 'move-started')!;
     expect(w.assess.gap).toMatchObject({ type: 'stage-unseen', since: start.t });
@@ -650,5 +651,31 @@ describe('a player who only spams ls and pwd (D-114)', { timeout: WHOLE_RUN_TIME
     expect(g.phases.detect.status).toBe('behind');
     expect(['D', 'F']).toContain(g.grades.detect);
     expect(r.world.assess.grades.detect).toBe(g.grades.detect); // the live snapshot agrees
+  });
+});
+
+describe('flags in the judge (D-233)', () => {
+  it("a confirmed flag is the discovery: time to notice is the confirmation's time; an unconfirmed flag is not", () => {
+    const r = run().at(0).start('ATK-01', 1).at(20 * REAL_S).act({ type: 'DEF-21', ip: HIS_IP }).act({ type: 'DEF-21', ip: '192.0.2.9' })
+      .at(35 * REAL_S).e({ kind: 'flag-confirmed', ip: HIS_IP, about: 'ATK-01' });
+    const g = grade(r);
+    expect(fact(g, 'Time to notice stage 1')).toBe(fmtGameMs(35 * REAL_S));
+    const flagEvent = eventsOfKind(r.w, 'action').find((e) => e.action.type === 'DEF-21' && e.action.ip === HIS_IP)!;
+    expect(g.relevant).toEqual([flagEvent.id]);
+    const unconfirmed = grade(run().at(0).start('ATK-01', 1).at(20 * REAL_S).act({ type: 'DEF-21', ip: HIS_IP }));
+    expect(fact(unconfirmed, 'Time to notice stage 1')).toBe('never');
+  });
+
+  it('two or more false leads become a detect mistake and cost a letter; one does not', () => {
+    const one = openRun();
+    one.w.flags.push({ ip: '192.0.2.9', at: 0 });
+    expect(fact(grade(one), 'False leads chased')).toBe('1');
+    expect(titles(grade(one), 'detect')).toEqual([]);
+    const two = openRun();
+    two.w.flags.push({ ip: '192.0.2.10', at: 0 }, { ip: '192.0.2.11', at: 0 });
+    const g = grade(two);
+    expect(fact(g, 'False leads chased')).toBe('2');
+    expect(titles(g, 'detect')).toEqual(['Chased 2 false leads']);
+    expect(g.grades.detect).toBe('B');
   });
 });

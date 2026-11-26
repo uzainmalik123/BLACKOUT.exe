@@ -26,7 +26,7 @@ async function baseline() {
 
 describe('every committed recording', () => {
   it('exists', () => {
-    const moves = ['ATK-01', 'ATK-03', 'ATK-04', 'ATK-06', 'ATK-08', 'ATK-08.b', 'ATK-08.c', 'ATK-08.d', 'ATK-08.e', 'ATK-08.f', 'ATK-08.g', 'ATK-09.b', 'ATK-09.c', 'ATK-11', 'ATK-13', 'ATK-15', 'ATK-17', 'MIN-01', 'MIN-02', 'MIN-03', 'MIN-04'];
+    const moves = ['ATK-01', 'ATK-03', 'ATK-03.b', 'ATK-04', 'ATK-04.b', 'ATK-06', 'ATK-08', 'ATK-08.b', 'ATK-08.c', 'ATK-08.d', 'ATK-08.e', 'ATK-08.f', 'ATK-08.g', 'ATK-09.b', 'ATK-09.c', 'ATK-11', 'ATK-13', 'ATK-15', 'ATK-17', 'MIN-01', 'MIN-02', 'MIN-03', 'MIN-04'];
     expect(jsonFiles).toEqual(expect.arrayContaining(moves.map((m) => (m.includes('.') ? `${m}.json` : `${m}.a.json`))));
   });
 
@@ -338,6 +338,65 @@ describe('CUST.b: shoppers who reset a password and open /ftp (KI-82, D-131)', (
     expect(access.filter((e) => e.status >= 500)).toEqual([]);
     expect(access.filter((e) => /union|select|%27|'|<script|\.\.\/|\.php/i.test(e.target))).toEqual([]);
     expect(access.filter((e) => /^\/ftp\/./.test(e.target) && e.target !== '/ftp/legal.md')).toEqual([]); // no confidential file opened
+  });
+});
+
+describe('the quiet login variants, a WAF rule does not match them (SYS-23, D-237)', () => {
+  const browser = (e: AccessEvent) => e.userAgent.startsWith('Mozilla/5.0') && !/hydra|curl|sqlmap/i.test(e.userAgent);
+
+  it('ATK-03.b: one login from a browser, no quote or comment in the line, and it lands (200)', () => {
+    const r = load('ATK-03.b.json');
+    expect(r.label.startsWith('quiet')).toBe(true);
+    expect(r.attackerIp).toBe('203.0.113.26');
+    const access = accessOf(r);
+    expect(access.map((e) => [e.method, e.target, e.status])).toEqual([['POST', '/rest/user/login', 200]]);
+    expect(access.every(browser)).toBe(true);
+  });
+
+  it('ATK-04.b: POSTs only, 10 s or more apart (never three logins in 15 s, the rate limit), 401s then one 200', () => {
+    const r = load('ATK-04.b.json');
+    expect(r.label.startsWith('quiet')).toBe(true);
+    expect(r.attackerIp).toBe('203.0.113.45');
+    const access = accessOf(r);
+    expect(access.every((e) => e.method === 'POST' && e.target === '/rest/user/login' && browser(e))).toBe(true);
+    expect(access.map((e) => e.status)).toEqual([...Array<number>(access.length - 1).fill(401), 200]);
+    expect(access.length).toBe(18);
+    for (let i = 1; i < access.length; i++) expect(access[i]!.t - access[i - 1]!.t).toBeGreaterThanOrEqual(10_000);
+    for (let i = 2; i < access.length; i++) expect(access[i]!.t - access[i - 2]!.t).toBeGreaterThanOrEqual(15_000);
+  });
+});
+
+describe('CUST.c: shoppers whose searches and feedback hold quotes, the false positives of a SQLi rule (SYS-23, D-237)', () => {
+  const r = load('traffic/CUST.c.json');
+  const access = accessOf(r);
+  const quoted = access.filter((e) => /^\/rest\/products\/search\?q=.*%27/.test(e.target));
+
+  it('is about two minutes from 12 addresses, none a Death or minion address, all with browser user agents', () => {
+    expect(r.durationMs).toBeGreaterThan(90_000);
+    expect(r.durationMs).toBeLessThan(150_000);
+    const ips = new Set(access.map((e) => e.ip));
+    expect(ips.size).toBe(12);
+    const attackers = new Set(readdirSync(dir).filter((f) => f.endsWith('.json')).flatMap((f) => accessOf(load(f)).map((e) => e.ip)));
+    expect([...ips].filter((ip) => attackers.has(ip))).toEqual([]);
+    expect(access.every((e) => e.userAgent.startsWith('Mozilla/5.0'))).toBe(true);
+  });
+
+  it('has 8 searches with an apostrophe; each answers 500 (the shop\'s search is injectable) and its shopper searches again without it', () => {
+    expect(quoted.length).toBe(8);
+    for (const q of quoted) {
+      expect(q.status).toBe(500);
+      const retry = access.find((e) => e.ip === q.ip && e.t > q.t && /^\/rest\/products\/search\?q=[^&]/.test(e.target) && !e.target.includes('%27'));
+      expect(retry?.status, q.target).toBe(200);
+    }
+    expect(access.filter((e) => e.status >= 500)).toEqual(quoted); // nothing else broke
+  });
+
+  it('has double-quoted searches and two feedbacks with quotes, and no attack payloads', () => {
+    expect(access.filter((e) => /^\/rest\/products\/search\?q=%22/.test(e.target) && e.status === 200).length).toBeGreaterThanOrEqual(2);
+    const feedbacks = dbOf(r).filter((e) => e.table === 'Feedbacks' && e.op === 'insert');
+    expect(feedbacks.length).toBe(2);
+    expect(feedbacks.every((e) => /['"]/.test(String(e.after?.comment)))).toBe(true);
+    expect(access.filter((e) => /union|select|--|<script|\.\.\/|\.php/i.test(e.target))).toEqual([]);
   });
 });
 

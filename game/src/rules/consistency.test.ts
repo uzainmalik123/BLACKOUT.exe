@@ -27,20 +27,20 @@ const stopperAction = (s: Stopper): ActionId => s.action;
 const preEmptive = (s: Stopper) => !('undo' in s);
 
 describe('the PRD tables (SYS-17)', () => {
-  it('has the PRD counts: 17 moves (10 must, 7 should), 20 actions (17 must, 3 should), 4 minions', () => {
+  it('has the PRD counts: 17 moves (10 must, 7 should), 21 actions (18 must, 3 should), 4 minions', () => {
     expect(MOVES).toHaveLength(17);
     expect(MOVES.filter((m) => m.pri === 'M')).toHaveLength(10);
-    expect(ACTIONS).toHaveLength(20);
-    expect(ACTIONS.filter((a) => a.pri === 'M')).toHaveLength(17);
+    expect(ACTIONS).toHaveLength(21);
+    expect(ACTIONS.filter((a) => a.pri === 'M')).toHaveLength(18);
     expect(MINIONS).toHaveLength(4);
   });
 
   it('ids are unique, numbered in PRD order, and the BY_ID maps cover every row', () => {
     expect(MOVES.map((m) => m.id)).toEqual([...Array(17)].map((_, i) => `ATK-${String(i + 1).padStart(2, '0')}`));
-    expect(ACTIONS.map((a) => a.id)).toEqual([...Array(20)].map((_, i) => `DEF-${String(i + 1).padStart(2, '0')}`));
+    expect(ACTIONS.map((a) => a.id)).toEqual([...Array(21)].map((_, i) => `DEF-${String(i + 1).padStart(2, '0')}`));
     expect(MINIONS.map((m) => m.id)).toEqual(['MIN-01', 'MIN-02', 'MIN-03', 'MIN-04']);
     expect(Object.keys(MOVE_BY_ID)).toHaveLength(17);
-    expect(Object.keys(ACTION_BY_ID)).toHaveLength(20);
+    expect(Object.keys(ACTION_BY_ID)).toHaveLength(21);
     expect(Object.keys(MINION_BY_ID)).toHaveLength(4);
   });
 
@@ -112,7 +112,7 @@ describe('the PRD tables (SYS-17)', () => {
 
   it('actions map to the right phase and place', () => {
     const byPhase = (p: (typeof ACTIONS)[number]['phase']) => ACTIONS.filter((a) => a.phase === p).map((a) => a.id);
-    expect(byPhase('investigate')).toEqual(['DEF-01', 'DEF-02', 'DEF-03', 'DEF-04']);
+    expect(byPhase('investigate')).toEqual(['DEF-01', 'DEF-02', 'DEF-03', 'DEF-04', 'DEF-21']); // D-233: the flag
     expect(byPhase('preserve')).toEqual(['DEF-05']);
     expect(byPhase('contain')).toEqual(['DEF-06', 'DEF-07', 'DEF-08', 'DEF-09', 'DEF-10', 'DEF-11']);
     expect(byPhase('eradicate')).toEqual(['DEF-12', 'DEF-13', 'DEF-14', 'DEF-15', 'DEF-16']);

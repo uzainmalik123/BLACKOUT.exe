@@ -21,12 +21,14 @@ export const EMPTY_LIBRARY: RecordingLibrary = { variantsOf: () => [] };
 /** What the engine needs to know about a recording before playing it (D-24). */
 export function variantInfo(r: Recording): VariantInfo {
   const targets = new Set<string>();
+  const userAgents = new Set<string>();
   for (const e of r.events) {
+    if (e.kind === 'access') userAgents.add(e.userAgent);
     if (e.kind !== 'db' || e.table !== 'Users') continue;
     const email = e.after?.email ?? e.before?.email ?? SEED_ACCOUNTS.find((a) => a.id === Number(Object.values(e.key)[0]))?.email;
     if (typeof email === 'string') targets.add(email); // a real update carries only the changed columns (D-15): the id names the user
   }
-  return { ip: r.attackerIp, quiet: r.label.toLowerCase().startsWith('quiet'), targets: [...targets], move: r.move, variant: r.variant };
+  return { ip: r.attackerIp, quiet: r.label.toLowerCase().startsWith('quiet'), targets: [...targets], move: r.move, variant: r.variant, userAgents: [...userAgents] };
 }
 
 /** Builds a library; throws when a recording fails D-15 validation. Variants come back sorted by name. */

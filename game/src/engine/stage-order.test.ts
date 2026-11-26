@@ -5,13 +5,14 @@ import { applyAction } from './actions';
 import { advance } from './advance';
 import { eventsOfKind } from './log';
 import { initialWorld, type World } from './state';
+import { lab } from './test-fixtures/lab';
 import { FIXTURE_LIBRARY } from './test-fixtures/recordings';
 import { WHOLE_RUN_TIMEOUT_MS } from './test-fixtures/timeouts';
 
 const REAL_S = 1000;
 
 function run(seed: number, player?: (w: World, t: number) => void): World {
-  const w = initialWorld(seed, 'medium');
+  const w = lab(initialWorld(seed, 'medium'));
   for (let t = 0; t < 12 * 60 * REAL_S && !w.ending; t += REAL_S) {
     player?.(w, t);
     advance(w, FIXTURE_LIBRARY, REAL_S);

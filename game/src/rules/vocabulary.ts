@@ -9,7 +9,7 @@ export type MoveId =
   | 'ATK-10' | 'ATK-11' | 'ATK-12' | 'ATK-13' | 'ATK-14' | 'ATK-15' | 'ATK-16' | 'ATK-17';
 export type ActionId =
   | 'DEF-01' | 'DEF-02' | 'DEF-03' | 'DEF-04' | 'DEF-05' | 'DEF-06' | 'DEF-07' | 'DEF-08' | 'DEF-09' | 'DEF-10'
-  | 'DEF-11' | 'DEF-12' | 'DEF-13' | 'DEF-14' | 'DEF-15' | 'DEF-16' | 'DEF-17' | 'DEF-18' | 'DEF-19' | 'DEF-20';
+  | 'DEF-11' | 'DEF-12' | 'DEF-13' | 'DEF-14' | 'DEF-15' | 'DEF-16' | 'DEF-17' | 'DEF-18' | 'DEF-19' | 'DEF-20' | 'DEF-21';
 export type MinionId = 'MIN-01' | 'MIN-02' | 'MIN-03' | 'MIN-04';
 /** The leaky taps (PRD §4.1, D-42): small exposures anyone can scrape. */
 export type TapId = 'TAP-01' | 'TAP-02' | 'TAP-03';
@@ -119,4 +119,5 @@ export type PlayerAction =
   | { type: 'DEF-17'; backupId: number }
   | { type: 'DEF-18'; what: 'nginx' | Feature }
   | { type: 'DEF-19' }
-  | { type: 'DEF-20'; to: 'legal' | 'customers' };
+  | { type: 'DEF-20'; to: 'legal' | 'customers' }
+  | { type: 'DEF-21'; ip: string; note?: string }; // D-233: flag an address (a suspicion until a hostile request confirms it)

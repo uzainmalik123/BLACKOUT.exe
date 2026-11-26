@@ -1,6 +1,6 @@
 """Ordinary shoppers (docs/PRD.md REC-06, D-60, D-61). Runs inside the rig's tools container only.
 
-    python3 shoppers.py <shop URL> [a|b]  e.g. http://10.66.0.10 (through nginx, so it's logged); a by default
+    python3 shoppers.py <shop URL> [a|b|c]  e.g. http://10.66.0.10 (through nginx, so it's logged); a by default
     python3 shoppers.py setup-b <shop URL> CUST.b's setup, straight at the shop before the window (not logged)
 
 Variant a (CUST.a): about ten minutes of customers using the shop the way its own Angular front-end does: page loads,
@@ -13,6 +13,12 @@ shopper does that CUST.a never shows: forgot-password (the security question loo
 typed, a mistyped answer, then the right one, then a login with the new password; one gives up) and
 /ftp (the About page's "Terms of Use" link to /ftp/legal.md; one curious shopper opens /ftp itself).
 Its setup gives the reset shoppers the security answer they set long ago, outside the recording.
+
+Variant c (CUST.c, SYS-23, D-237): about two minutes of the same kind of shoppers whose searches and feedback
+hold quotes, the way people write: `dad's juice`, `O'Brien`, `"apple juice"`, feedback with "didn't" in it.
+They are what a naive SQLi rule set flags (the false positives of a WAF rule). The shop's own search is
+injectable, so an apostrophe in a search really answers 500 (SQLITE_ERROR); the shopper then tries again
+without it, as people do.
 
 Each visitor is named in X-Forwarded-For (trusted from the tools box only, D-27), always inside
 203.0.113.0/24 and never on an address a Death or minion recording uses. Every choice comes from a
@@ -52,6 +58,11 @@ WINDOW_B_S = 150      # sessions start in the first 150 s; the last ones finish 
 LONG_BY_B_S = 100
 ATTACKER_HOSTS_B = ATTACKER_HOSTS | {13, 85, 86, 88, 90, 96, 97}
 SOURCES_B = 20
+SEED_C = 6120
+WINDOW_C_S = 90       # sessions start in the first 90 s; the last ones finish by about 120 s
+LONG_BY_C_S = 45
+ATTACKER_HOSTS_C = ATTACKER_HOSTS_B | {26, 45}
+SOURCES_C = 12
 ABOUT_CHUNK = "/about.component-HWmrgSem.js"   # v20.4.0's lazy chunk for the About page (its name is in main.js)
 CAROUSEL = [f"/assets/public/images/carousel/{n}" for n in ("1.jpg", "2.jpg", "3.jpg", "4.jpg", "5.png", "6.jpg", "7.jpg")]
 
@@ -93,6 +104,16 @@ CITIES = [("Springfield", "IL", "United States"), ("Leeds", "West Yorkshire", "U
           ("Melbourne", "Victoria", "Australia")]
 
 QUESTION_ANSWERS = ["Maria", "Smith", "Rex", "Paris", "Blue", "Pizza"]
+
+# CUST.c: what people type with quotes in it, and what they try next when the shop errors.
+QUOTED_SEARCHES = [("dad's juice", "dads juice"), ("O'Brien", "Brien"), ("kid's t-shirt", "kids t-shirt"),
+                   ("children's juice", "childrens juice"), ("lemon 'n' lime", "lemon lime"), ("chef's apron", "apron"),
+                   ("Valentine's", "valentine"), ("people's choice", "best seller")]
+DOUBLE_QUOTED = ['"apple juice"', '"green smoothie"', '"fruit press"']
+QUOTED_FEEDBACK = [
+    ("Didn't expect the banana juice to be this good. My kids' new favourite!", 5),
+    ("The \"Best Juice Shop\" mug arrived chipped, but you've replaced it already. Thanks!", 4),
+]
 
 
 def pdf(text):
@@ -561,6 +582,68 @@ def run_b(shop, s, seen, seen_lock):
         v.checkout(full_name(who["email"]))
 
 
+# --- CUST.c (SYS-23): quotes in searches and feedback -------------------------------------------
+
+def plan_c():
+    """CUST.c's sessions: plain browsers, shoppers who type a quote into search, and two who leave feedback."""
+    rng = random.Random(SEED_C)
+    hosts = rng.sample([h for h in range(2, 128) if h not in ATTACKER_HOSTS_C], SOURCES_C)
+    agent_of = {h: rng.choice(AGENTS) for h in hosts}
+    seeded = rng.sample(customers(), 4)
+    kinds = ["browse"] * 4 + ["quoted"] * 8 + ["exact"] * 2 + ["feedback"] * 2
+    timed = sorted((rng.uniform(0, LONG_BY_C_S if k == "feedback" else WINDOW_C_S), k) for k in kinds)
+    starts, kinds = [t for t, _ in timed], [k for _, k in timed]
+    starts[0] = 0.5
+    order = hosts + [rng.choice(hosts) for _ in range(len(kinds) - len(hosts))]
+    rng.shuffle(order)
+    sessions, taken, quoted, fed = [], 0, 0, 0
+    for i, (kind, start, host) in enumerate(zip(kinds, starts, order)):
+        s = {"n": i, "kind": kind, "start": start, "ip": f"203.0.113.{host}", "agent": agent_of[host], "who": None}
+        if kind == "quoted":
+            s["query"], quoted = QUOTED_SEARCHES[quoted % len(QUOTED_SEARCHES)], quoted + 1
+        if kind == "feedback":
+            s["who"], taken = seeded[taken], taken + 1
+            s["feedback"], fed = QUOTED_FEEDBACK[fed % len(QUOTED_FEEDBACK)], fed + 1
+        sessions.append(s)
+    return sessions
+
+
+def run_c(shop, s, seen, seen_lock):
+    rng = random.Random(f"{SEED_C}-{s['n']}")
+    v = Visitor(shop, s["ip"], s["agent"], rng)
+    with seen_lock:
+        first = s["ip"] not in seen
+        seen.add(s["ip"])
+    v.page_load(first)
+    kind = s["kind"]
+    if kind == "browse":
+        browse_a_bit(v, rng, views=(1, 3), searches=(1, 2))
+        return
+    if kind == "quoted":
+        typed, retry = s["query"]
+        v.think(3, 8)
+        status, _ = v.call("GET", "/rest/products/search?q=" + urllib.parse.quote(typed))
+        if status >= 500:            # the shop shows an error; they try again without the apostrophe
+            v.think(4, 9)
+            v.search(retry)
+        v.think(4, 12)
+        v.view_product()
+        return
+    if kind == "exact":
+        v.think(3, 8)
+        v.search(rng.choice(DOUBLE_QUOTED))
+        v.think(4, 12)
+        v.view_product()
+        return
+    who = s["who"]                   # feedback: a seeded customer signs in and writes a line with quotes in it
+    v.think(5, 12)
+    if not v.login(who["email"], who["password"]):
+        print(f"login failed for {who['email']}", file=sys.stderr)
+        return
+    v.think(3, 8)
+    v.feedback(*s["feedback"])
+
+
 STATUS = {}
 STATUS_LOCK = threading.Lock()
 
@@ -571,7 +654,7 @@ def tally(status):
 
 
 def main(shop, variant="a"):
-    sessions, runner = (plan_b(), run_b) if variant == "b" else (plan(), run)
+    sessions, runner = {"a": (plan(), run), "b": (plan_b(), run_b), "c": (plan_c(), run_c)}[variant]
     seen, seen_lock = set(), threading.Lock()
     began = time.monotonic()
     threads = []
@@ -594,7 +677,7 @@ def main(shop, variant="a"):
 if __name__ == "__main__":
     if sys.argv[1:2] == ["setup-b"] and len(sys.argv) == 3:
         setup_b(sys.argv[2].rstrip("/"))
-    elif len(sys.argv) == 2 or (len(sys.argv) == 3 and sys.argv[2] in ("a", "b")):
+    elif len(sys.argv) == 2 or (len(sys.argv) == 3 and sys.argv[2] in ("a", "b", "c")):
         main(sys.argv[1].rstrip("/"), sys.argv[2] if len(sys.argv) == 3 else "a")
     else:
         sys.exit(__doc__)
