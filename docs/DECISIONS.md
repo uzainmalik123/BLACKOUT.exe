@@ -1114,3 +1114,15 @@
   6. **At the desk the lines have their own places:** Kiro's spoken lines go into her panel (not over the screen, never twice); Death's lines and the first alert's warning go into the Now strip under the top bar.
 - **Tests:** `presence.test.ts` (the modes on each event, nothing else moves him, his places visible past the real dock layout, varied per visit; on the real engine: away in the calm, back with the scan, gone when the player blocks it).
 - **Consequences:** UI-05; KI-252, KI-253 fixed.
+
+### D-255: The night answers the fight: the lights flicker at a breach and steady at a fix, silence at his return, a heartbeat that reads theft too (UI-05, UI-08; amends D-223)
+- **Context:** (2026-11-26) The team lead's brief: the environment must respond to the player's situation (a serious breach flickers the lights, successful containment stabilises the room, a critical business health makes the heartbeat urgent, an unexpected return brings a moment of disturbing silence) without constant jumpscares, heavy shake, loud rain or aggressive glitches, and with reduced motion respected.
+- **Decision** (`night/environment.ts`, pure; `battle.ts`, `director.ts`, `sound.ts`):
+  1. **A breach** (one of his moves landing, or a theft of three records or more) flickers the light: two quick dips over 1.2 s, then the lights come back; on the battlefield and in the office. Never more than three flashes a second; under reduced motion one slow, shallow dip.
+  2. **Relief:** a fix of the player's that stops an attack (a cut, a shut door, a leak closed by the player, a move frozen) lifts the light a little for 2.4 s, the room steadied.
+  3. **His return:** everything falls silent for 2.6 s (the soundscape's `hush`), then his cue and his line.
+  4. **The heartbeat** reads the worse of the business's health and the records left (`urgencyOf`), so heavy theft quickens it as a failing business does.
+  5. **The camera breathes:** the battlefield drifts slowly by a few pixels and scales by 1 % (none under reduced motion).
+  6. **The office's alarm flicker** is slowed to under two flashes a second (it was 3.7, over the limit; already off under reduced motion).
+- **Not changed:** the stage beats (D-223), the rain's level, the lightning.
+- **Tests:** `environment.test.ts` (which events start which reaction, nothing else; the flicker's flashes per second; reduced motion; relief; the silence's shape; the heartbeat's reading).

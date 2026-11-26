@@ -14,6 +14,7 @@ import type { World } from '../../engine/state';
 import { MOVE_BY_ID } from '../../rules/moves';
 import type { Foothold, MoveId } from '../../rules/vocabulary';
 import { drawDeath } from '../screen3-briefing/cinema/characters';
+import { envStep, lightAt, startEnv, type Env } from './environment';
 import { danger as dangerOf } from './judge';
 import { HOLD, placeDeath, presenceStep, startPresence, type Presence, type Rect, type Spot } from './presence';
 import { liveAttacks } from './results';
@@ -187,6 +188,8 @@ export class Battle {
   private endedAt = -1;
   /** Death's presence (D-254) and where he is drawn (eased toward his spot). */
   presence: Presence = startPresence();
+  /** How the field's light answers the fight (D-255). */
+  env: Env = startEnv();
   private target: Spot | null = null;
   private targetKey = '';
   private targetAt = -1;
@@ -226,6 +229,7 @@ export class Battle {
       }
     }
     this.lastFrozen = frozen;
+    this.env = envStep(this.env, t, fresh, frozeHis);
     if (!world.ending)
       this.presence = presenceStep(this.presence, {
         t,
@@ -251,7 +255,7 @@ export class Battle {
    * pixels: Death is placed where he can be seen past them (he is drawn under them, so he never covers their text).
    */
   paint(g: G, w: number, h: number, dpr: number, t: number, v: BattleView, focus: GateId | null, ending: { kind: string; through?: Foothold } | null = null, cover: readonly Rect[] = [], reduce = false): void {
-    paintBattle(g, w, h, dpr, t, v, this.fx, focus, this.shown, ending && this.endedAt >= 0 ? { ...ending, e: t - this.endedAt } : null, this.death(w, h, t, cover), reduce);
+    paintBattle(g, w, h, dpr, t, v, this.fx, focus, this.shown, ending && this.endedAt >= 0 ? { ...ending, e: t - this.endedAt } : null, this.death(w, h, t, cover), reduce, lightAt(this.env, t, reduce));
   }
 
   /** How Death is drawn this frame: his spot for his mode, eased; his form, tearing and gesture by the mode. */
@@ -345,8 +349,15 @@ interface EndingView {
   e: number;
 }
 
-function paintBattle(g: G, w: number, h: number, dpr: number, t: number, v: BattleView, fx: Fx[], focus: GateId | null, menace: number, ending: EndingView | null, dd: DeathDraw | null, reduce: boolean): void {
+function paintBattle(g: G, w: number, h: number, dpr: number, t: number, v: BattleView, fx: Fx[], focus: GateId | null, menace: number, ending: EndingView | null, dd: DeathDraw | null, reduce: boolean, light = 1): void {
   const L = layout(w, h);
+  // the camera breathes: a slow drift and the slightest scale (none under reduced motion)
+  g.save();
+  if (!reduce) {
+    g.translate(w / 2 + Math.sin(t * 0.07) * w * 0.004, h / 2 + Math.cos(t * 0.05) * h * 0.005);
+    g.scale(1.012, 1.012);
+    g.translate(-w / 2, -h / 2);
+  }
   const health = clamp(v.heartbeat / 100);
   // the ground: night fog, a grid of streets fading out
   const bg = g.createRadialGradient(L.shop.x, L.shop.y, h * 0.05, L.shop.x, L.shop.y, w * 0.8);
@@ -490,6 +501,18 @@ function paintBattle(g: G, w: number, h: number, dpr: number, t: number, v: Batt
     g.fillText(`EVIDENCE ×${v.evidence}`, w * 0.08, h * 0.91);
   }
   if (ending) paintEnding(g, w, h, t, v, ending, L, end ? { x: end.x, y: end.y } : d);
+  g.restore();
+  // the field's light answers the fight (D-255): a flicker at a breach, a lift when the player stops an attack
+  if (light < 0.999) {
+    g.fillStyle = `rgba(0, 0, 0, ${(0.85 * (1 - light)).toFixed(3)})`;
+    g.fillRect(0, 0, w, h);
+  } else if (light > 1.001) {
+    g.save();
+    g.globalCompositeOperation = 'lighter';
+    g.fillStyle = `rgba(70, 180, 230, ${(0.35 * (light - 1)).toFixed(3)})`;
+    g.fillRect(0, 0, w, h);
+    g.restore();
+  }
   // the vignette
   const vg = g.createRadialGradient(w / 2, h / 2, h * 0.3, w / 2, h / 2, w * 0.7);
   vg.addColorStop(0, 'rgba(0, 0, 0, 0)');
