@@ -41,6 +41,8 @@ export interface NightHost {
   office: HTMLCanvasElement;
   haunt: HTMLCanvasElement;
   monitors(): Record<MonitorName, Rect> | null;
+  /** What the haunting must never cover while the shift is live: windows, panels, controls (D-254). */
+  exclude(): Rect[];
 }
 
 /** Kiro's lines in the prologue: phase, seconds into it, the line (the brief's words). */
@@ -706,6 +708,7 @@ export class Night {
       lastChance: this.lastChance >= 0 && this.t - this.lastChance < 6.5 ? Math.sin(clamp((this.t - this.lastChance) / 6.5) * Math.PI) : 0,
       kiroTalk: talkLevel(this.kiroSpeech, this.t, this.reduce),
       reduce: this.reduce,
+      exclude: seated && !this.ending ? this.host.exclude() : [],
       hand,
       ink,
     });

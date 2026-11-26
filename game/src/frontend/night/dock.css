@@ -184,6 +184,27 @@
   letter-spacing: 2px;
   color: var(--amber);
 }
+/* the first alert's warning, and Death's lines, in the strip: never over the screen's text (D-254) */
+.pl-now.is-alarm {
+  border-left-color: #ff2a4a;
+  background: rgba(48, 4, 10, 0.9);
+}
+.pl-now.is-alarm b {
+  color: #ff6b7a;
+}
+.pl-taunt {
+  margin-left: auto;
+  font-family: var(--caps);
+  font-size: 14px;
+  letter-spacing: 1px;
+  color: #ff8a95;
+}
+.pl-taunt::before {
+  content: 'Death: “';
+}
+.pl-taunt::after {
+  content: '”';
+}
 .pl-now em {
   margin-left: auto;
   font-style: normal;

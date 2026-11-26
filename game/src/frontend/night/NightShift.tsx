@@ -70,6 +70,11 @@ export function NightShift({ difficulty, skipPrologue = false, onMenu, onAgain }
     const id = lineId.current++;
     setKiroLines((ls) => [...ls.slice(-40), { ...l, id }]);
   }, []);
+  /** At the desk Kiro's spoken lines go into her panel, not over the screen (D-254); a line already there is not repeated. */
+  const kiroSays = useCallback((text: string, urgent?: boolean) => {
+    const id = lineId.current++;
+    setKiroLines((ls) => (ls.length && ls[ls.length - 1]!.text === text ? ls : [...ls.slice(-40), { who: 'kiro', text, urgent, id }]));
+  }, []);
 
   // the director: made once per mount, given the canvases and the screen's setters
   useEffect(() => {
@@ -85,11 +90,24 @@ export function NightShift({ difficulty, skipPrologue = false, onMenu, onAgain }
         const third = field.w / 3;
         return { left: { ...field, w: third }, centre: field, right: { ...field, x: field.x + 2 * third, w: third } };
       },
+      exclude: (): Rect[] => {
+        const base = office.current?.getBoundingClientRect();
+        if (!base) return [];
+        const out: Rect[] = [];
+        for (const el of office.current?.parentElement?.querySelectorAll<HTMLElement>('.pl-top, .pl-kiro, .pl-actions, .pl-dock, .pl-now, .pl-toasts, .ns-win, .pl-alert, .pl-evidence, .pl-result') ?? []) {
+          const r = rectOf(el, base);
+          if (r && r.w > 0 && r.h > 0) out.push(r);
+        }
+        return out;
+      },
     };
     const n = new Night(difficulty, skipPrologue, host, {
       phase: setPhase,
       prompt: (text) => setCue(text),
-      sub: setSub,
+      sub: (line) => {
+        setSub(line);
+        if (line?.who === 'Kiro' && SEATED.has(night.current?.phaseNow ?? 'dark')) kiroSays(line.text);
+      },
       run: (r) => {
         setRun(r);
         // the level's first windows (the dial, D-241: Easy the log and the alerts, Medium also the terminal, Hard the terminal)
@@ -178,6 +196,8 @@ export function NightShift({ difficulty, skipPrologue = false, onMenu, onAgain }
           kiroLines={kiroLines}
           addKiro={addKiro}
           say={(text) => night.current?.say('Kiro', text)}
+          taunt={sub?.who === 'Death' ? sub.text : null}
+          alarm={phase === 'alarm'}
           sfx={(k) => night.current?.sfx(k)}
           onResult={onResult}
           toasts={toasts}
@@ -204,7 +224,8 @@ export function NightShift({ difficulty, skipPrologue = false, onMenu, onAgain }
           <p className="ns-login-dots">{run ? 'status: monitoring' : 'logging in…'}</p>
         </div>
       )}
-      {phase === 'alarm' && <div className="ns-warning">WARNING — SUSPICIOUS ACTIVITY DETECTED</div>}
+      {/* at the desk the warning and the lines are shown in the play screen's own places, never over its text (D-254) */}
+      {phase === 'alarm' && !seated && <div className="ns-warning">WARNING — SUSPICIOUS ACTIVITY DETECTED</div>}
 
       {cue && !menu && (
         <div className="ns-prompt">
@@ -212,7 +233,7 @@ export function NightShift({ difficulty, skipPrologue = false, onMenu, onAgain }
         </div>
       )}
 
-      {sub && (
+      {sub && !seated && (
         <p className={`ns-sub who-${sub.who.toLowerCase() || 'none'}`} aria-live="polite">
           {sub.who && <b>{sub.who}</b>}
           {sub.text}

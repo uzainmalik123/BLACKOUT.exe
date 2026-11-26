@@ -40,6 +40,8 @@ export interface HauntView {
   kiroTalk?: number;
   /** Reduced motion: no glitch on her. */
   reduce?: boolean;
+  /** What the haunting must never cover (windows, panels, controls, D-254): it shows only in the gaps. */
+  exclude?: readonly Rect[];
   /** 0..1 the ink closing in ("you're taken"). */
   ink: number;
   /** 0..1 his hand settling on the shoulder. */
@@ -54,6 +56,12 @@ const clamp = (v: number, a = 0, b = 1): number => Math.max(a, Math.min(b, v));
 
 export function paintHaunt(g: G, w: number, h: number, dpr: number, v: HauntView): void {
   g.clearRect(0, 0, w, h);
+  paintAll(g, w, h, dpr, v);
+  // then cleared from over every window, panel and control (overlapping ones included), so it shows only in the gaps
+  for (const r of v.exclude ?? []) g.clearRect(r.x, r.y, r.w, r.h);
+}
+
+function paintAll(g: G, w: number, h: number, dpr: number, v: HauntView): void {
   const m = v.monitors;
   if (m) {
     if (v.face && v.face.a > 0.01) monitorFace(g, m[v.face.at], v.face.a, v.t, dpr);

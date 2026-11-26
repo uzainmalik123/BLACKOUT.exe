@@ -52,6 +52,25 @@ const rand = (n: number) => {
   return s - Math.floor(s);
 };
 
+let portrait: string | null = null;
+
+/** A still of him (a PNG data URL, made once), for a faint reflection behind text that must stay readable. */
+export function deathPortrait(): string {
+  if (portrait !== null) return portrait;
+  try {
+    const c = document.createElement('canvas');
+    c.width = 260;
+    c.height = 300;
+    const g = c.getContext('2d');
+    if (!g) return (portrait = '');
+    drawDeath(g, 150, 292, 270, { t: 0, form: 1, point: 1, fragment: 0, eyes: 1, menace: 1, reduce: true }, 1);
+    portrait = c.toDataURL('image/png');
+  } catch {
+    portrait = '';
+  }
+  return portrait;
+}
+
 /** His head's tilt at `t` (radians): still for a while, then a quick snap to one side, held, and slowly back. */
 export function tiltAt(t: number): number {
   const win = Math.floor(t / 3.7);
