@@ -1777,11 +1777,27 @@ button.is-armed {
   border: 1px solid rgba(144, 70, 255, 0.35);
   background: rgba(144, 70, 255, 0.05);
 }
-.ns-rep-debrief p {
-  margin: 0;
-  font-size: 19px;
+.ns-rep-debrief p,
+.ns-rep-debrief li {
+  margin: 0 0 8px;
+  font-size: 18px;
   line-height: 1.5;
-  white-space: pre-wrap;
+}
+.ns-rep-debrief h3 {
+  margin: 14px 0 6px;
+  font-family: var(--caps);
+  font-size: 14px;
+  letter-spacing: 3px;
+  color: #c8a6ff;
+}
+.ns-rep-debrief ul {
+  margin: 0;
+  padding-left: 20px;
+}
+.ns-rep-debrief summary {
+  cursor: pointer;
+  font-size: 14px;
+  color: #c8a6ff;
 }
 .ns-rep-actions {
   display: flex;

@@ -430,6 +430,7 @@ function paintBattle(g: G, w: number, h: number, dpr: number, t: number, v: Batt
   // him: a shadow under him, his robe, his eyes.
   const d = dd ? { x: dd.x, y: dd.y - dd.s * 0.5 } : { x: w * 0.9, y: h * 0.62 };
   const end = ending ? endingDeath(ending, d, w, h, L) : null;
+  if (ending?.kind === 'return' && ending.e >= 2.8) returnCrack(g, L, h, ending, t);
   if (end) {
     if (end.form > 0.01) {
       const size = h * (0.34 + 0.3 * menace + 0.02 * v.stage) * end.scale;
@@ -745,6 +746,20 @@ function endingDeath(en: EndingView, d: { x: number; y: number }, w: number, h: 
   }
 }
 
+/** The return's twist, under him (D-254: nothing over his face): the root of the way back he kept splits the shop's floor. */
+function returnCrack(g: G, L: Layout, h: number, en: EndingView, t: number): void {
+  const k = ROOTS.indexOf(en.through ?? 'hidden-admin');
+  root(g, L.shop.x, L.shop.y, h, k < 0 ? 0 : k, t, 1);
+  const crack = clamp((en.e - 2.8) / 0.4);
+  g.strokeStyle = `rgba(255, 40, 60, ${(0.9 * crack).toFixed(3)})`;
+  g.lineWidth = 3;
+  g.beginPath();
+  g.moveTo(L.shop.x - h * 0.08 * crack, L.shop.y + h * 0.1);
+  g.lineTo(L.shop.x, L.shop.y - h * 0.02);
+  g.lineTo(L.shop.x + h * 0.06 * crack, L.shop.y + h * 0.12);
+  g.stroke();
+}
+
 /** The ending's scene over the battlefield: light, darkness, the heart line, the souls, the twist. */
 function paintEnding(g: G, w: number, h: number, t: number, v: BattleView, en: EndingView, L: Layout, death: { x: number; y: number }): void {
   const e = en.e;
@@ -772,17 +787,7 @@ function paintEnding(g: G, w: number, h: number, t: number, v: BattleView, en: E
         glow(g, L.shop.x, L.shop.y, L.R * 1.8 * ease(e / 2.5), `rgba(190, 240, 255, ${(0.3 * clamp(e / 2.5)).toFixed(3)})`);
         break;
       }
-      // the way back he kept: its root splits the floor of the shop, crimson; the light dies from inside out
-      const k = ROOTS.indexOf(en.through ?? 'hidden-admin');
-      root(g, L.shop.x, L.shop.y, h, k < 0 ? 0 : k, t, 1);
-      const crack = clamp((e - 2.8) / 0.4);
-      g.strokeStyle = `rgba(255, 40, 60, ${(0.9 * crack).toFixed(3)})`;
-      g.lineWidth = 3;
-      g.beginPath();
-      g.moveTo(L.shop.x - h * 0.08 * crack, L.shop.y + h * 0.1);
-      g.lineTo(L.shop.x, L.shop.y - h * 0.02);
-      g.lineTo(L.shop.x + h * 0.06 * crack, L.shop.y + h * 0.12);
-      g.stroke();
+      // the floor's split is drawn under him (returnCrack); here the light dies from inside out
       if (e < 3.3) {
         g.fillStyle = `rgba(255, 20, 40, ${(0.35 * (1 - (e - 2.8) / 0.5)).toFixed(3)})`;
         g.fillRect(0, 0, w, h);

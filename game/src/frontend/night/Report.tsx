@@ -10,10 +10,47 @@ import { buildReport, renderMarkdown, type Report as EngineReport } from '../../
 import type { Difficulty } from '../../rules/vocabulary';
 import { KiroCanvas } from '../shared/KiroCanvas';
 import { DIFFICULTY_LABEL } from '../screen2-menu/menu';
+import { parseMarkdown, type Block, type Inline } from '../screen3-briefing/markdown';
 import { PHASE_NAMES, aftermathOf, type Aftermath } from './aftermath';
 import { ENDINGS, kiroMood, kiroVerdict } from './judge';
 import type { Run } from './run';
 import { clockAt, timelineOf } from './words';
+
+/** A line of Kiro's debrief: its **bold** and `code` as elements, never raw HTML. */
+function Line({ xs }: { xs: Inline[] }) {
+  return (
+    <>
+      {xs.map((x, i) => (x.kind === 'bold' ? <b key={i}>{x.text}</b> : x.kind === 'code' ? <code key={i}>{x.text}</code> : <span key={i}>{x.text}</span>))}
+    </>
+  );
+}
+
+/** Kiro's debrief as written (Markdown), rendered as elements (D-257): headings, paragraphs, lists. */
+function Debrief({ blocks }: { blocks: Block[] }) {
+  return (
+    <>
+      {blocks.map((b, i) =>
+        b.kind === 'heading' ? (
+          <h3 key={i}>
+            <Line xs={b.text} />
+          </h3>
+        ) : b.kind === 'list' ? (
+          <ul key={i}>
+            {b.items.map((it, j) => (
+              <li key={j}>
+                <Line xs={it} />
+              </li>
+            ))}
+          </ul>
+        ) : b.kind === 'para' ? (
+          <p key={i}>
+            <Line xs={b.text} />
+          </p>
+        ) : null,
+      )}
+    </>
+  );
+}
 
 /** The report's own sections, appended to the engine's Markdown for the download. */
 function aftermathMarkdown(m: Aftermath): string {
@@ -72,6 +109,7 @@ export function ReportWall({ run, onAgain, onMenu }: { run: Run; onAgain: (d: Di
   }, [run, w]);
   const ending = w.ending ? ENDINGS[w.ending] : null;
   const m = useMemo(() => aftermathOf(w), [w]);
+  const debriefBlocks = useMemo(() => (debrief ? parseMarkdown(debrief.text).filter((b) => b.kind !== 'code' && b.kind !== 'table') : []), [debrief]);
   const timeline = useMemo(() => timelineOf(w.events).slice(-60), [w]);
   const markdown = report ? `${debrief ? renderMarkdown(report, debrief) : report.markdown}\n${aftermathMarkdown(m)}` : null;
   const download = () => {
@@ -247,7 +285,20 @@ export function ReportWall({ run, onAgain, onMenu }: { run: Run; onAgain: (d: Di
 
       <section className="ns-rep-debrief">
         <h2>Kiro's debrief{debrief?.offline ? ' (offline)' : ''}</h2>
-        <p>{debrief ? debrief.text : 'Kiro is writing…'}</p>
+        {debrief ? (
+          <>
+            {/* her short take first; the rest is there for whoever wants it */}
+            <Debrief blocks={debriefBlocks.slice(0, 1)} />
+            {debriefBlocks.length > 1 && (
+              <details>
+                <summary>Read her full debrief</summary>
+                <Debrief blocks={debriefBlocks.slice(1)} />
+              </details>
+            )}
+          </>
+        ) : (
+          <p>Kiro is writing…</p>
+        )}
       </section>
 
       <nav className="ns-rep-actions">

@@ -141,6 +141,8 @@ export function Play({ toasts, ...p }: PlayProps) {
     const g = c?.getContext('2d');
     if (!c || !g) return;
     const battle = new Battle();
+    // the browser checks read Death's presence from here (development only: the production build drops it)
+    if (import.meta.env.DEV) (window as unknown as { __battle?: Battle }).__battle = battle;
     const reduce = !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
     let lastStrike = -1;
     let raf = 0;

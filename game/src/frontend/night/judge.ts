@@ -160,10 +160,18 @@ export function kiroMood(i: MoodInput): Mood {
   return 'calm';
 }
 
+/** What Kiro says when the grades were good and the night was still lost: each loss its own reason. */
+const GOOD_BUT_LOST: Partial<Record<Ending, string>> = {
+  return: 'You read the evidence well. He only needed the one way in you missed.',
+  'souls-lost': 'You read the evidence well. He was faster with the records than you were with the doors.',
+  flatline: 'You read the evidence well. The business could not survive what it cost.',
+  'walked-away': 'You read the evidence well. You just never shut him out before the shift ran out.',
+};
+
 /** Kiro's verdict on the report: the grades, and (D-256) the ending, so she never praises a night that was lost. */
 export function kiroVerdict(grades: Record<string, 'A' | 'B' | 'C' | 'D' | 'F'>, ending?: Ending): string {
   const good = Object.values(grades).filter((g) => g === 'A' || g === 'B').length >= 3;
   const lost = ending !== undefined && !WON.has(ending) && ending !== 'rough-handover';
-  if (lost) return good ? 'You read the evidence well. He only needed the one way in you missed.' : 'You panicked when you needed to think. Death counted on that.';
+  if (lost) return good ? (GOOD_BUT_LOST[ending] ?? 'You read the evidence well, and still lost the night.') : 'You panicked when you needed to think. Death counted on that.';
   return good ? "You followed the evidence. That's why you're still here." : 'You got through it. Next time, follow the evidence sooner.';
 }

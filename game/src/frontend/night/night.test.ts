@@ -118,6 +118,8 @@ describe('the room reacts to the engine, and the endings are the engine\'s', () 
     // D-256: she never praises a lost night, and never scolds a won one as a panic
     expect(kiroVerdict({ detect: 'A', contain: 'F', eradicate: 'A', recover: 'A' }, 'return')).toMatch(/one way in you missed/);
     expect(kiroVerdict({ detect: 'A', contain: 'F', eradicate: 'A', recover: 'A' }, 'return')).not.toMatch(/still here/);
+    expect(kiroVerdict({ detect: 'A', contain: 'F', eradicate: 'A', recover: 'A' }, 'souls-lost')).toMatch(/faster with the records/);
+    expect(kiroVerdict({ detect: 'A', contain: 'F', eradicate: 'A', recover: 'A' }, 'flatline')).toMatch(/could not survive/);
     expect(kiroVerdict({ detect: 'C', contain: 'F', eradicate: 'B', recover: 'D' }, 'clean-handover')).toMatch(/follow the evidence sooner/);
   });
 });
