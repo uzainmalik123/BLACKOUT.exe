@@ -31,6 +31,7 @@ export function renderMarkdown(g: Pick<Assessment, 'facts' | 'grades' | 'missed'
 
 /** ENGINE_API §5: the report for a finished (or unfinished) run: the assessor's snapshot of the world as it stands. */
 export async function buildReport(world: World): Promise<Report> {
+  if (world.training) throw new Error('The training shift has no report: it ends on the drill-complete card (SYS-24, D-236)');
   const { facts, grades, mistakes, missed } = evaluate(world);
   const debrief = { text: OFFLINE_DEBRIEF, offline: true };
   const g = { facts, grades, mistakes: mistakes.map(({ title, why }) => ({ title, why })), missed };

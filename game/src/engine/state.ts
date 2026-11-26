@@ -8,6 +8,7 @@ import { shiftSeed } from './shift-seed';
 import { FEATURE_DEFAULTS } from '../rules/vocabulary';
 import { CONFIG } from './config';
 import { SEED_ACCOUNTS } from './seed';
+import type { TrainingState } from './training';
 
 export interface Account {
   id: number;
@@ -242,6 +243,7 @@ export interface World {
   flags: Flag[]; // DEF-21 (D-233)
   bandages: Bandage[]; // SYS-23 (D-231)
   playbook: { phase: PlaybookPhase; since: number; lastDeathActiveAt?: number }; // D-233: the "Now:" strip's phase, from the player's acts and visible events, never from the assessor
+  training?: TrainingState; // SYS-24 (D-236): only in a training run (`new Engine({ scenario: 'training' })`); the real game's worlds never carry it
   detect: { logCursor: number; dbCursor: number; flagCursor: number; files: string[]; windows: Record<string, number[]> }; // D-232: the detectors' cursors and sliding windows (game ms per key)
 }
 

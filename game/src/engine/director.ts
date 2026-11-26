@@ -55,8 +55,8 @@ function freshIp(world: World): string {
   return bump(ip, range === RANGES[0] ? held : new Set([...held, ...blocked])); // a customer's address: step past it without another draw
 }
 
-/** Starts one of Death's variants: from its recorded address, a fresh one if that is blocked (D-24), or a proxy pool (D-46). */
-function play(world: World, chosen: Variant): void {
+/** Starts one of Death's variants: from its recorded address, a fresh one if that is blocked (D-24), or a proxy pool (D-46). The training drill plays through it too (D-236). */
+export function play(world: World, chosen: Variant): void {
   if (world.death.proxies) {
     const ips = proxyPool(world);
     startReplay(world, { ...chosen, info: { ...chosen.info, ip: ips[0]! } }, 'death', ips);
