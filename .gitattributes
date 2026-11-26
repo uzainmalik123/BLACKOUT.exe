@@ -1,0 +1,21 @@
+# Line endings are LF in the repository and in every checkout, on Windows too (D-251), whatever a machine's
+# core.autocrlf says. Tests read some files byte for byte (the Kiro steering files' front matter, KDEV-01), and the
+# recording rig's shell scripts run inside Linux containers, where a CRLF line breaks bash.
+* text=auto eol=lf
+
+# Never touched as text.
+*.sqlite binary
+*.wasm binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.mp3 binary
+*.mp4 binary
+*.webm binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.pdf binary
