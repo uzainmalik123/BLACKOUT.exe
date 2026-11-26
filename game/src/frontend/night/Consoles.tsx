@@ -1,27 +1,19 @@
-// The right monitor's consoles (UI-04, D-223; PRD DEF-07..20, SYS-08): WAF, firewall, feature flags, accounts,
-// sessions, deploy, backups, comms and legal, and the big red button. Every button is one `engine.act` call and its
-// answer is shown on the desk with what it did to the meters. On Easy the consoles also carry buttons for the
-// terminal's actions (SYS-08); on Medium and Hard those stay in the terminal, and the console says which command.
+// The consoles (UI-04, UI-11, D-223, D-234; PRD DEF-05..20, SYS-08): WAF, firewall, feature flags, accounts,
+// sessions, deploy, backups, comms and legal, and the big red button, each its own window on the dock. Every button is
+// one `engine.act` call and its answer is shown with what it did to the meters. Where the level has investigation
+// buttons (Easy and Medium, SYS-08) the firewall, the snapshot and the shop's restart carry buttons too; on Hard those
+// stay in the terminal, and the console says which command. During the change freeze (SYS-22) every change control
+// shows locked, with the engine's reason above it; reads and the escalation stay open.
 
-import { useEffect, useState } from 'react';
+import { useContext, useEffect, useState } from 'react';
 import { PATCH_BY_ID } from '../../content/patches';
 import { FEATURE_DEFAULTS, FEATURES, PATCHES, type Feature, type Patch, type PlayerAction, type WafRule } from '../../rules/vocabulary';
+import { DIAL } from '../shared/dial';
 import type { Run } from './run';
+import { Freeze, LockNote } from './Tools';
 import { clockAt } from './words';
 
-type Tab = 'waf' | 'firewall' | 'flags' | 'accounts' | 'sessions' | 'deploy' | 'backups' | 'comms' | 'plug';
-
-const TABS: Array<[Tab, string]> = [
-  ['waf', 'WAF'],
-  ['firewall', 'Firewall'],
-  ['flags', 'Flags'],
-  ['accounts', 'Accounts'],
-  ['sessions', 'Sessions'],
-  ['deploy', 'Deploy'],
-  ['backups', 'Backups'],
-  ['comms', 'Comms'],
-  ['plug', 'Power'],
-];
+export type ConsoleId = 'waf' | 'firewall' | 'features' | 'accounts' | 'sessions' | 'deploy' | 'backups' | 'comms' | 'plug';
 
 const FEATURE_WORDS: Record<Feature, string> = {
   search: 'Product search',
@@ -45,28 +37,22 @@ function ruleWords(r: WafRule): string {
   }
 }
 
-export function Consoles({ run, act, eyes }: { run: Run; tick: number; act: (a: PlayerAction) => unknown; eyes: boolean }) {
-  const [tab, setTab] = useState<Tab>('waf');
-  const easy = run.difficulty === 'easy';
+/** One console, as its own window's body (UI-11: one dock entry each, no tabs). */
+export function ConsolePanel({ id, run, act, eyes }: { id: ConsoleId; run: Run; tick: number; act: (a: PlayerAction) => unknown; eyes: boolean }) {
+  const easy = DIAL[run.difficulty].investigate;
   return (
     <div className="ns-consoles">
-      <nav className="ns-ctabs" role="tablist">
-        {TABS.map(([id, label]) => (
-          <button key={id} type="button" role="tab" aria-selected={tab === id} className={`${tab === id ? 'is-on' : ''}${id === 'plug' ? ' is-red' : ''}`} onClick={() => setTab(id)}>
-            {label}
-          </button>
-        ))}
-      </nav>
       <div className="ns-cbody">
-        {tab === 'waf' && <Waf run={run} act={act} />}
-        {tab === 'firewall' && <Firewall run={run} act={act} easy={easy} />}
-        {tab === 'flags' && <Flags run={run} act={act} />}
-        {tab === 'accounts' && <Accounts run={run} act={act} eyes={eyes} />}
-        {tab === 'sessions' && <Sessions run={run} act={act} />}
-        {tab === 'deploy' && <Deploy run={run} act={act} />}
-        {tab === 'backups' && <Backups run={run} act={act} easy={easy} />}
-        {tab === 'comms' && <Comms run={run} act={act} />}
-        {tab === 'plug' && <Plug run={run} act={act} easy={easy} />}
+        <LockNote />
+        {id === 'waf' && <Waf run={run} act={act} />}
+        {id === 'firewall' && <Firewall run={run} act={act} easy={easy} />}
+        {id === 'features' && <Flags run={run} act={act} />}
+        {id === 'accounts' && <Accounts run={run} act={act} eyes={eyes} />}
+        {id === 'sessions' && <Sessions run={run} act={act} />}
+        {id === 'deploy' && <Deploy run={run} act={act} />}
+        {id === 'backups' && <Backups run={run} act={act} easy={easy} />}
+        {id === 'comms' && <Comms run={run} act={act} />}
+        {id === 'plug' && <Plug run={run} act={act} easy={easy} />}
       </div>
     </div>
   );
@@ -74,8 +60,12 @@ export function Consoles({ run, act, eyes }: { run: Run; tick: number; act: (a: 
 
 type P = { run: Run; act: (a: PlayerAction) => unknown };
 
-/** A button that asks once more in place ("sure?") before it acts; a modal would stop the night. */
+/** True while the change freeze locks change controls (SYS-22). */
+const useLocked = (): boolean => !!useContext(Freeze);
+
+/** A button that asks once more in place ("sure?") before it acts; a modal would stop the night. Locked by the freeze. */
 function Confirm({ label, onConfirm, className }: { label: string; onConfirm: () => void; className?: string }) {
+  const locked = useLocked();
   const [armed, setArmed] = useState(false);
   useEffect(() => {
     if (!armed) return;
@@ -86,6 +76,7 @@ function Confirm({ label, onConfirm, className }: { label: string; onConfirm: ()
     <button
       type="button"
       className={`${className ?? ''}${armed ? ' is-armed' : ''}`}
+      disabled={locked}
       onClick={() => {
         if (!armed) return setArmed(true);
         setArmed(false);
@@ -121,21 +112,22 @@ function Waf({ run, act }: P) {
   const [method, setMethod] = useState('GET');
   const [path, setPath] = useState('');
   const [limit, setLimit] = useState('');
+  const lk = useLocked();
   return (
     <div className="ns-cgrid">
       <div className="ns-card">
         <h4>Rule sets</h4>
-        <button type="button" onClick={() => act({ type: 'DEF-12', rule: { kind: 'sqli' } })}>
+        <button type="button" disabled={lk} onClick={() => act({ type: 'DEF-12', rule: { kind: 'sqli' } })}>
           Enable SQL injection rule set
         </button>
-        <button type="button" onClick={() => act({ type: 'DEF-07' })}>
+        <button type="button" disabled={lk} onClick={() => act({ type: 'DEF-07' })}>
           Rate-limit the login
         </button>
       </div>
       <div className="ns-card">
         <h4>Block a user agent</h4>
         <Field label="contains" value={ua} set={setUa} placeholder="e.g. a tool's name" onEnter={() => ua.trim() && act({ type: 'DEF-12', rule: { kind: 'block-user-agent', pattern: ua.trim() } })} />
-        <button type="button" disabled={!ua.trim()} onClick={() => act({ type: 'DEF-12', rule: { kind: 'block-user-agent', pattern: ua.trim() } })}>
+        <button type="button" disabled={lk || !ua.trim()} onClick={() => act({ type: 'DEF-12', rule: { kind: 'block-user-agent', pattern: ua.trim() } })}>
           Block
         </button>
       </div>
@@ -150,14 +142,14 @@ function Waf({ run, act }: P) {
           </select>
         </label>
         <Field label="path" value={path} set={setPath} placeholder="/api/…" />
-        <button type="button" disabled={!path.trim().startsWith('/')} onClick={() => act({ type: 'DEF-12', rule: { kind: 'block-path', method, path: path.trim() } })}>
+        <button type="button" disabled={lk || !path.trim().startsWith('/')} onClick={() => act({ type: 'DEF-12', rule: { kind: 'block-path', method, path: path.trim() } })}>
           Block path
         </button>
       </div>
       <div className="ns-card">
         <h4>Rate-limit a path</h4>
         <Field label="path" value={limit} set={setLimit} placeholder="/rest/…" />
-        <button type="button" disabled={!limit.trim().startsWith('/')} onClick={() => act({ type: 'DEF-12', rule: { kind: 'rate-limit', path: limit.trim() } })}>
+        <button type="button" disabled={lk || !limit.trim().startsWith('/')} onClick={() => act({ type: 'DEF-12', rule: { kind: 'rate-limit', path: limit.trim() } })}>
           Rate-limit
         </button>
       </div>
@@ -174,6 +166,7 @@ function Firewall({ run, act, easy }: P & { easy: boolean }) {
   const [ip, setIp] = useState('');
   const [name, setName] = useState('');
   const [file, setFile] = useState('');
+  const lk = useLocked();
   return (
     <div className="ns-cgrid">
       <div className="ns-card">
@@ -186,7 +179,7 @@ function Firewall({ run, act, easy }: P & { easy: boolean }) {
               <li key={b}>
                 {b}{' '}
                 {easy && (
-                  <button type="button" className="ns-mini" onClick={() => act({ type: 'DEF-06', ip: b, op: 'delete' })}>
+                  <button type="button" className="ns-mini" disabled={lk} onClick={() => act({ type: 'DEF-06', ip: b, op: 'delete' })}>
                     unblock
                   </button>
                 )}
@@ -202,7 +195,7 @@ function Firewall({ run, act, easy }: P & { easy: boolean }) {
             <h4>Address</h4>
             <Field label="ip" value={ip} set={setIp} placeholder="203.0.113.9" />
             <div className="ns-row">
-              <button type="button" disabled={!ip.trim()} onClick={() => act({ type: 'DEF-06', ip: ip.trim(), op: 'add' })}>
+              <button type="button" disabled={lk || !ip.trim()} onClick={() => act({ type: 'DEF-06', ip: ip.trim(), op: 'add' })}>
                 Block
               </button>
               <button type="button" disabled={!ip.trim()} onClick={() => act({ type: 'DEF-04', ip: ip.trim(), mode: 'passive' })}>
@@ -216,11 +209,11 @@ function Firewall({ run, act, easy }: P & { easy: boolean }) {
           <div className="ns-card">
             <h4>Evidence and files</h4>
             <Field label="snapshot" value={name} set={setName} placeholder="before-changes" />
-            <button type="button" disabled={!name.trim()} onClick={() => act({ type: 'DEF-05', name: name.trim() })}>
+            <button type="button" disabled={lk || !name.trim()} onClick={() => act({ type: 'DEF-05', name: name.trim() })}>
               Snapshot the logs
             </button>
             <Field label="upload" value={file} set={setFile} placeholder="path in uploads/" />
-            <button type="button" disabled={!file.trim()} onClick={() => act({ type: 'DEF-15', path: file.trim() })}>
+            <button type="button" disabled={lk || !file.trim()} onClick={() => act({ type: 'DEF-15', path: file.trim() })}>
               Delete file
             </button>
           </div>
@@ -232,6 +225,7 @@ function Firewall({ run, act, easy }: P & { easy: boolean }) {
 
 function Flags({ run, act }: P) {
   const w = run.engine.world;
+  const lk = useLocked();
   return (
     <div className="ns-card ns-wide">
       <h4>Feature flags</h4>
@@ -247,6 +241,7 @@ function Flags({ run, act }: P) {
                 type="button"
                 className={`ns-switch${on ? ' is-on' : ''}`}
                 aria-pressed={on}
+                disabled={lk}
                 onClick={() => act(toDefault ? { type: 'DEF-18', what: f } : { type: 'DEF-10', feature: f, enabled: !on })}
               >
                 {on ? 'ON' : 'OFF'}
@@ -264,6 +259,7 @@ function Accounts({ run, act, eyes }: P & { eyes: boolean }) {
   const [admins, setAdmins] = useState(true);
   const [q, setQ] = useState('');
   const rows = w.accounts.filter((a) => (!admins || a.role === 'admin') && (!q || a.email.toLowerCase().includes(q.toLowerCase())));
+  const lk = useLocked();
   return (
     <div className="ns-card ns-wide ns-accounts">
       {eyes && <div className="ns-eyes" aria-hidden />}
@@ -292,10 +288,10 @@ function Accounts({ run, act, eyes }: P & { eyes: boolean }) {
               <td>{a.role}</td>
               <td>{a.lockedAt !== undefined ? 'locked' : a.passwordResetAt !== undefined ? 'reset' : 'active'}</td>
               <td className="ns-acts">
-                <button type="button" className="ns-mini" onClick={() => act({ type: 'DEF-08', email: a.email })}>
+                <button type="button" className="ns-mini" disabled={lk} onClick={() => act({ type: 'DEF-08', email: a.email })}>
                   lock
                 </button>
-                <button type="button" className="ns-mini" onClick={() => act({ type: 'DEF-16', email: a.email })}>
+                <button type="button" className="ns-mini" disabled={lk} onClick={() => act({ type: 'DEF-16', email: a.email })}>
                   reset pw
                 </button>
                 <Confirm className="ns-mini is-red" label="delete" onConfirm={() => act({ type: 'DEF-14', email: a.email })} />
@@ -328,6 +324,7 @@ function Deploy({ run, act }: P) {
   const w = run.engine.world;
   const [open, setOpen] = useState<Patch | null>(null);
   const entry = open ? PATCH_BY_ID[open] : null;
+  const lk = useLocked();
   return (
     <div className="ns-deploy">
       <ul className="ns-patches">
@@ -350,7 +347,7 @@ function Deploy({ run, act }: P) {
             <b>{entry.file}</b> lines {entry.lines[0]}–{entry.lines[1]}. {entry.why}
           </p>
           <pre>{entry.diff}</pre>
-          <button type="button" onClick={() => act({ type: 'DEF-13', patch: entry.patch })}>
+          <button type="button" disabled={lk} onClick={() => act({ type: 'DEF-13', patch: entry.patch })}>
             Deploy this patch
           </button>
         </div>
@@ -396,6 +393,7 @@ function Backups({ run, act, easy }: P & { easy: boolean }) {
 function Comms({ run, act }: P) {
   const w = run.engine.world;
   const clock = run.engine.notificationClock();
+  const lk = useLocked();
   return (
     <div className="ns-cgrid">
       <div className="ns-card">
@@ -410,10 +408,10 @@ function Comms({ run, act }: P) {
         <p className={`ns-big is-${clock.state}`}>{clock.label}</p>
         <p className="ns-note">{clock.state === 'idle' ? 'Starts when a breach is confirmed.' : clock.state === 'notified' ? 'Legal notified.' : clock.state === 'overdue' ? 'Overdue.' : 'Running.'}</p>
         <div className="ns-row">
-          <button type="button" onClick={() => act({ type: 'DEF-20', to: 'legal' })}>
+          <button type="button" disabled={lk} onClick={() => act({ type: 'DEF-20', to: 'legal' })}>
             Notify legal
           </button>
-          <button type="button" onClick={() => act({ type: 'DEF-20', to: 'customers' })}>
+          <button type="button" disabled={lk} onClick={() => act({ type: 'DEF-20', to: 'customers' })}>
             Notify customers
           </button>
         </div>

@@ -67,7 +67,7 @@ export function KiroPanel({ run, lines, add, insert, onClose }: { run: Run; line
   };
   return (
     <aside className="ns-kiro" aria-label="Kiro">
-      <header>
+      <header data-drag>
         <span className="ns-kiro-sigil" aria-hidden>
           ☾
         </span>

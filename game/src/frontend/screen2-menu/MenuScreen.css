@@ -376,6 +376,43 @@
   }
 }
 
+/* what the chosen level switches on (UI-02, D-234): the whisper's voice, smaller, under it */
+.ms-dials {
+  margin: clamp(4px, 1vh, 12px) 0 0;
+  padding: 0 6px 0 44px;
+  font: italic 500 clamp(14px, 1.9vh, 20px) / 1.35 var(--italic);
+  color: var(--ash);
+  text-shadow: 0 1px 2px #000;
+}
+.ms-same {
+  margin: 0 0 4px;
+  color: var(--gold-dim);
+}
+.ms-dial {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  columns: 2;
+  column-gap: 2.4em;
+  animation: ms-word 0.45s ease both;
+}
+.ms-dial li {
+  break-inside: avoid;
+}
+.ms-dial li::before {
+  content: "◆ ";
+  font-style: normal;
+  font-size: 0.6em;
+  vertical-align: 0.2em;
+  color: var(--gold-dim);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ms-dial {
+    animation: none;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .ms-grain,
   .ms-menu > *,

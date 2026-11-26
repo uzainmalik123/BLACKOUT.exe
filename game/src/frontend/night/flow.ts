@@ -15,9 +15,9 @@ export type Phase =
   | 'walk' // she walks to the desk; W follows
   | 'seat' // at the chair: E to sit
   | 'sitting' // the camera lowers to the desk
-  | 'login' // the workstation logs the operator in; waits for the engine to show him
-  | 'alarm' // lights flicker, the alarm, the incident begins
-  | 'shift'; // the play screen is live
+  | 'login' // the workstation logs the operator in; waits for the run to be ready
+  | 'alarm' // the first alert: lights flicker, the alarm (over the live play screen, D-243)
+  | 'shift'; // the play screen is live: the shift begins, the calm (SYS-22)
 
 export interface Flow {
   phase: Phase;
@@ -31,7 +31,8 @@ export type Input =
   | { kind: 'time'; dt: number }
   | { kind: 'interact' } // E (or a click on her hand)
   | { kind: 'walk'; dt: number } // W held for dt seconds
-  | { kind: 'alarm' } // the engine has shown him
+  | { kind: 'ready' } // the run is ready: the desk shows and the shift begins
+  | { kind: 'alarm' } // the first alert opened during the shift
   | { kind: 'skip' }; // jump straight to the shift (retries, the menu)
 
 /** How long the story phases last on their own, in seconds. */
@@ -79,7 +80,7 @@ export function step(f: Flow, input: Input): Flow {
       const d = DURATION[f.phase];
       const n = NEXT[f.phase];
       if (d !== undefined && n && next.t >= d) return go(next, n);
-      return next; // the login waits for the alarm, which comes from the engine
+      return next; // the login waits for the run
     }
     case 'interact':
       if (f.phase === 'offer') return go(f, 'shake');
@@ -90,8 +91,11 @@ export function step(f: Flow, input: Input): Flow {
       const walked = Math.min(1, f.walked + Math.max(0, input.dt) / WALK_SECONDS);
       return walked >= 1 ? { ...go(f, 'seat'), walked } : { ...f, walked };
     }
+    case 'ready':
+      if (f.phase === 'login' && f.t >= (DURATION.login ?? 0)) return go(f, 'shift');
+      return f;
     case 'alarm':
-      if (f.phase === 'login' && f.t >= (DURATION.login ?? 0)) return go(f, 'alarm');
+      if (f.phase === 'shift') return go(f, 'alarm');
       return f;
   }
 }
