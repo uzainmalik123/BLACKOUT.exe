@@ -18,6 +18,7 @@ export type GameEventBody =
   | { kind: 'tip-off'; by: ActionId }
   | { kind: 'alert-opened'; alert: number; about: Actor; route: string; symptom: string } // D-232: opened by a per-route detector; `about` is the spoiler, `route` and `symptom` are what to show
   | { kind: 'alert-closed'; alert: number; about: Actor }
+  | { kind: 'decision-missed'; alert: number; about: Actor } // SYS-25 (D-261): its window ended with no decision; the heartbeat dipped
   | { kind: 'shift-begun' } // D-230: engine.beginShift(): the desk is in view; Death's first move waits its seeded delay from here
   | { kind: 'incident-declared'; by: 'alert' | 'escalation' | 'flag' } // D-230: the change freeze lifts
   | { kind: 'flag-confirmed'; ip: string; about: Actor } // D-233: a hostile request from a flagged address, after the flag (`about` is the spoiler: don't show it)

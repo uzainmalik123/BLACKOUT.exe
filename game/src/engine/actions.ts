@@ -6,6 +6,7 @@ import { CONFIG } from './config';
 import { dip } from './heartbeat';
 import { summariseShown } from './assess';
 import { emit } from './log';
+import { answerAlerts } from './decisions';
 import { confirmBreach } from './notification';
 import { deathAddresses } from './pool';
 import { changeFrozen, declareIncident } from './shift';
@@ -188,6 +189,7 @@ export function applyAction(world: World, action: PlayerAction): ActionResult {
     action = { ...rest, shownTotal: action.shownTotal ?? shown.length, ...summariseShown(world, shown.slice(0, SHOWN_LINES_MAX)) };
   }
   emit(world, { kind: 'action', action, ok: result.ok, note: result.message });
+  if (result.ok) answerAlerts(world, action.type); // SYS-25 (D-261): a decision inside an alert's window
   return result;
 }
 

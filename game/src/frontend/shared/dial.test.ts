@@ -18,14 +18,14 @@ describe("the difficulty pick's lists (UI-02)", () => {
     expect(dialLines('easy')).toContain('The calm before the first sign of trouble: 8–10 s');
     expect(dialLines('medium')).toContain('The calm before the first sign of trouble: 6–9 s');
     expect(dialLines('hard')).toContain('The calm before the first sign of trouble: 5–8 s');
-    // D-258 (approved 2026-11-26): his rests shortened from 45–60, 30–45 and 20–35 s
-    expect(dialLines('easy')).toContain('Death rests 25–35 s between moves');
-    // D-259: on Medium and Hard a second move may start while one plays
-    expect(dialLines('medium')).toContain('Death rests 15–25 s between moves, and runs up to two at once');
-    expect(dialLines('hard')).toContain('Death rests 10–18 s between moves, and runs up to two at once');
-    expect(dialLines('easy')).toContain('The shift lasts about 20 minutes');
-    expect(dialLines('medium')).toContain('The shift lasts about 11 minutes'); // D-259: was 16
-    expect(dialLines('hard')).toContain('The shift lasts about 9 minutes'); // D-259: was 13
+    // D-260 (approved 2026-11-26): the 3-minute night, his rests shortened again (25–35, 15–25, 10–18 s after D-258),
+    // and a second move may start while one plays on every level (D-259)
+    expect(dialLines('easy')).toContain('Death rests 15–20 s between moves, and runs up to two at once');
+    expect(dialLines('medium')).toContain('Death rests 8–12 s between moves, and runs up to two at once');
+    expect(dialLines('hard')).toContain('Death rests 5–8 s between moves, and runs up to two at once');
+    expect(dialLines('easy')).toContain('The shift lasts about 4 minutes'); // D-260: was 20
+    expect(dialLines('medium')).toContain('The shift lasts about 3 minutes'); // D-260: was 11 (D-259), 16 before
+    expect(dialLines('hard')).toContain('The shift lasts about 2.5 minutes'); // D-260: was 9 (D-259), 13 before
     for (const d of ['easy', 'medium', 'hard'] as const) expect(dialLines(d)).toContain(CONFIG[d].pausable ? 'You can pause' : 'No pausing');
   });
 

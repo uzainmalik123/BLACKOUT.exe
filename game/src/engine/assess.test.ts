@@ -8,6 +8,8 @@ import { evaluate, fmtGameMs, GAP_TYPES, GRADING, judgeAction, NO_EFFECTS, stepA
 import { CONFIG } from './config';
 import { emit, eventsOfKind, type GameEventBody } from './log';
 import { runSim } from './sim';
+import { noShift } from './shift';
+import { noDecisions } from './decisions';
 import { initialWorld, type World } from './state';
 import { lab } from './test-fixtures/lab';
 import { FIXTURE_LIBRARY } from './test-fixtures/recordings';
@@ -69,21 +71,21 @@ describe('SYS-11: the grading rules, one by one (from the assessor)', () => {
 
   it("time to notice each stage: the first RELEVANT action after the stage's first move; an unfocused read, comms or bringing back don't count", () => {
     const r = run()
-      .at(0).start('ATK-01', 1).at(20 * REAL_S).act({ type: 'DEF-20', to: 'legal' }).act({ type: 'DEF-01', query: 'ls -la' }).act({ type: 'DEF-18', what: 'nginx' }, false).at(45 * REAL_S).look()
-      .at(100 * REAL_S).start('ATK-03', 2).at(100 * REAL_S + 20_000).start('ATK-04', 2).at(190 * REAL_S).look() // 90 s after the stage's FIRST move
-      .at(300 * REAL_S).start('ATK-06', 3).at(900 * REAL_S).end('souls-lost', 40); // never noticed: the run ends 600 s later
+      .at(0).start('ATK-01', 1).at(5 * REAL_S).act({ type: 'DEF-20', to: 'legal' }).act({ type: 'DEF-01', query: 'ls -la' }).act({ type: 'DEF-18', what: 'nginx' }, false).at(11 * REAL_S).look()
+      .at(25 * REAL_S).start('ATK-03', 2).at(25 * REAL_S + 5_000).start('ATK-04', 2).at(47 * REAL_S).look() // 22 s after the stage's FIRST move
+      .at(75 * REAL_S).start('ATK-06', 3).at(235 * REAL_S).end('souls-lost', 40); // never noticed: the run ends 160 s later
     const g = grade(r);
-    expect(fact(g, 'Time to notice stage 1')).toBe(fmtGameMs(45 * REAL_S));
-    expect(fact(g, 'Time to notice stage 2')).toBe(fmtGameMs(90 * REAL_S));
+    expect(fact(g, 'Time to notice stage 1')).toBe(fmtGameMs(11 * REAL_S));
+    expect(fact(g, 'Time to notice stage 2')).toBe(fmtGameMs(22 * REAL_S));
     expect(fact(g, 'Time to notice stage 3')).toBe('never');
     expect(titles(g, 'detect')).toEqual([expect.stringMatching(/^Stage 3 .* was never noticed/)]);
-    expect(g.grades.detect).toBe('D'); // the mean counts the unnoticed stage to the end of the run: (45 + 90 + 600) / 3 real s
-    const slow = grade(run().at(0).start('ATK-01', 1).at(150 * REAL_S).look().at(200 * REAL_S).end('banished'));
-    expect(titles(slow, 'detect')).toEqual([`Stage 1 went unnoticed for ${fmtGameMs(150 * REAL_S)}`]);
-    expect(slow.grades.detect).toBe('C'); // 2.5 real min
+    expect(g.grades.detect).toBe('D'); // the mean counts the unnoticed stage to the end of the run: (11 + 22 + 160) / 3 real s (D-260's bands)
+    const slow = grade(run().at(0).start('ATK-01', 1).at(40 * REAL_S).look().at(50 * REAL_S).end('banished'));
+    expect(titles(slow, 'detect')).toEqual([`Stage 1 went unnoticed for ${fmtGameMs(40 * REAL_S)}`]);
+    expect(slow.grades.detect).toBe('C'); // 40 real s
   });
 
-  it('detect grades by the mean time to notice: A ≤ 1, B ≤ 2, C ≤ 4, D ≤ 8 real min, F past that', () => {
+  it('detect grades by the mean time to notice: A ≤ 15 s, B ≤ 30 s, C ≤ 1 min, D ≤ 2 real min, F past that (D-260)', () => {
     const after = (ms: number) => grade(run().at(0).start('ATK-01', 1).at(ms).look().at(ms + 1).end('banished')).grades.detect;
     expect([after(GRADING.notice.A), after(GRADING.notice.A + 1), after(GRADING.notice.B + 1), after(GRADING.notice.C + 1), after(GRADING.notice.D + 1)]).toEqual(['A', 'B', 'C', 'D', 'F']);
   });
@@ -91,8 +93,8 @@ describe('SYS-11: the grading rules, one by one (from the assessor)', () => {
   it('time to contain: from his first move to the first fix that held (a cut by anything but an IP block, a door shut, or banishment); never → F', () => {
     const ipOnly = run().at(10 * REAL_S).start('ATK-01', 1).at(20 * REAL_S).act({ type: 'DEF-06', ip: HIS_IP, op: 'add' }).e({ kind: 'move-cut', move: 'ATK-01', variant: 'a', by: 'DEF-06' }).at(600 * REAL_S).end('souls-lost', 30);
     expect(fact(grade(ipOnly), 'Time to contain')).toBe('never');
-    const cut = run().at(10 * REAL_S).start('ATK-01', 1).at(100 * REAL_S).e({ kind: 'move-cut', move: 'ATK-01', variant: 'a', by: 'DEF-12' }).at(200 * REAL_S).end('banished');
-    expect(fact(grade(cut), 'Time to contain')).toBe(fmtGameMs(90 * REAL_S));
+    const cut = run().at(10 * REAL_S).start('ATK-01', 1).at(30 * REAL_S).e({ kind: 'move-cut', move: 'ATK-01', variant: 'a', by: 'DEF-12' }).at(200 * REAL_S).end('banished');
+    expect(fact(grade(cut), 'Time to contain')).toBe(fmtGameMs(20 * REAL_S)); // A: within 30 real s (D-260)
     expect(grade(cut).grades.contain).toBe('A');
     const shut = run().at(10 * REAL_S).start('ATK-08', 4).at(10 * REAL_S + GRADING.contain.B + 1).e({ kind: 'door-shut', move: 'ATK-08', by: 'DEF-10' }).at(900 * REAL_S).end('banished');
     expect(grade(shut).grades.contain).toBe('C');
@@ -109,13 +111,13 @@ describe('SYS-11: the grading rules, one by one (from the assessor)', () => {
     expect(lost(241).grades.contain).toBe('C'); // 75.1 %
   });
 
-  it('downtime caused: the plug pulled until nginx is back (or the end), summed; over a real minute a grade, over three two', () => {
-    const r = run().at(0).start('ATK-01', 1).act({ type: 'DEF-19' }).at(10 * REAL_S).act({ type: 'DEF-11' }).at(40 * REAL_S).act({ type: 'DEF-18', what: 'nginx' })
-      .at(50 * REAL_S).act({ type: 'DEF-11' }).at(100 * REAL_S).e({ kind: 'banished' }).end('banished'); // 30 s + 50 s (open at the end)
+  it('downtime caused: the plug pulled until nginx is back (or the end), summed; over 15 real s a grade, over 45 two (D-260)', () => {
+    const r = run().at(0).start('ATK-01', 1).act({ type: 'DEF-19' }).at(10 * REAL_S).act({ type: 'DEF-11' }).at(20 * REAL_S).act({ type: 'DEF-18', what: 'nginx' })
+      .at(25 * REAL_S).act({ type: 'DEF-11' }).at(35 * REAL_S).e({ kind: 'banished' }).end('banished'); // 10 s + 10 s (open at the end)
     const g = grade(r);
-    expect(fact(g, 'Downtime caused (plug pulled)')).toBe(fmtGameMs(80 * REAL_S));
+    expect(fact(g, 'Downtime caused (plug pulled)')).toBe(fmtGameMs(20 * REAL_S));
     expect(g.grades.recover).toBe('B');
-    expect(titles(g, 'recover')).toEqual([`The shop was offline for ${fmtGameMs(80 * REAL_S)} by your own hand`]);
+    expect(titles(g, 'recover')).toEqual([`The shop was offline for ${fmtGameMs(20 * REAL_S)} by your own hand`]);
     const long = grade(run().at(0).start('ATK-01', 1).act({ type: 'DEF-19' }).act({ type: 'DEF-11' }).at(GRADING.downtime.long + 1).e({ kind: 'banished' }).end('banished'));
     expect(long.grades.recover).toBe('C');
     expect(fact(grade(cleanRun()), 'Downtime caused (plug pulled)')).toBe('0 min');
@@ -642,10 +644,10 @@ describe('the assessor inside advance() (SYS-21)', () => {
 });
 
 describe('a player who only spams ls and pwd (D-114)', { timeout: WHOLE_RUN_TIMEOUT_MS }, () => {
-  it('has no relevant action, every stage unseen, and a poor detect grade after eight real minutes', () => {
-    const r = runSim({ seed: 1, library: FIXTURE_LIBRARY, maxRealMs: 8 * 60_000, player: (_w, t) => (t % 2000 === 0 ? [{ type: 'DEF-03', path: '/srv/juice-shop' }, { type: 'DEF-01', query: 'ls -la /var/log/nginx' }] : []) });
+  it('has no relevant action, every stage unseen, and a poor detect grade after spamming to the end of the run (eight real minutes at most)', () => {
+    const r = runSim({ seed: 1, library: FIXTURE_LIBRARY, maxRealMs: 8 * 60_000, setup: (w) => { noShift(w); noDecisions(w); }, player: (_w, t) => (t % 2000 === 0 ? [{ type: 'DEF-03', path: '/srv/juice-shop' }, { type: 'DEF-01', query: 'ls -la /var/log/nginx' }] : []) }); // eight minutes, past the 3-minute night (D-260)
     const g = evaluate(r.world);
-    expect(r.events.filter((e) => e.kind === 'action').length).toBeGreaterThan(400);
+    expect(r.events.filter((e) => e.kind === 'action').length).toBeGreaterThanOrEqual(2 * Math.floor(r.realMs / 2000)); // two every 2 s, to the end (D-260: his faster story ends it sooner)
     expect(g.relevant).toEqual([]);
     expect(g.lastRelevantActionAt).toBe(0);
     expect(g.phases.detect.status).toBe('behind');

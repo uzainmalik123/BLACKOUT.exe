@@ -13,7 +13,7 @@ describe('buildReport (ENGINE_API §5)', () => {
     w.clock.gameMs = 30_000;
     emit(w, { kind: 'move-started', move: 'ATK-01', variant: 'a', stage: 1, ip: '203.0.113.9' });
     w.taps.open.push({ id: 'TAP-01', openedAt: 0, nextDripAt: 0, drips: 0 });
-    w.clock.gameMs = 10 * 60 * 30_000; // never noticed for ten real minutes: detect F
+    w.clock.gameMs = 150 * 30_000; // never noticed for 2.5 real minutes: detect F (D-260's bands)
     w.ending = 'banished';
     emit(w, { kind: 'banished' });
     emit(w, { kind: 'ending', ending: 'banished', souls: 0, heartbeat: 90 });
@@ -22,7 +22,7 @@ describe('buildReport (ENGINE_API §5)', () => {
     expect(r.debrief).toEqual({ text: OFFLINE_DEBRIEF, offline: true });
     for (const m of r.mistakes) expect(Object.keys(m).sort()).toEqual(['title', 'why']);
     for (const f of r.facts) expect(Object.keys(f).sort()).toEqual(['label', 'value']);
-    expect(r.grades).toEqual({ detect: 'F', contain: 'D', eradicate: 'A', recover: 'B' }); // noticed never; the first fix (banishment) 9 real min after his move
+    expect(r.grades).toEqual({ detect: 'F', contain: 'D', eradicate: 'A', recover: 'B' }); // noticed never; the first fix (banishment) 149 real s after his move
     expect(r.markdown).toMatch(/^# Post-incident report: Banished\n/); // D-118: the verdict first
     for (const f of r.facts) expect(r.markdown).toContain(`**${f.label}:** ${f.value}`);
     expect(r.markdown).toContain('| Recover | B |');

@@ -72,7 +72,7 @@ engine.beginShift();   // call it when the desk (the dashboard) is in view; idem
 | Comms | `comms`, `tickets` | Escalated / notified times. `tickets`: customers' support tickets (`t`, `ip`, `userAgent`, `about` what they were doing, `status` what they got: `503`, `429`, `403` or `'blocked'`, `text`), newest last; list them in the comms console (D-65) |
 | Customers | `customers.served`, `.failed`, `.lost` | How many customer requests went through, how many the player's actions failed, how many shoppers gave up (for the report) |
 | The ending | `ending` | `'banished'`, `'souls-lost'`, `'flatline'`, `'return'`, or the shift's verdict `'clean-handover'`, `'rough-handover'`, `'walked-away'` (D-118); undefined while playing |
-| The shift | `clock.shiftEndsAt` | Game ms when the shift ends (Easy ~20, Medium ~11, Hard ~9 real min, D-259): a countdown the dashboard may show; at the limit the run ends with a verdict |
+| The shift | `clock.shiftEndsAt` | Game ms when the shift ends (Easy ~4, Medium ~3, Hard ~2.5 real min, D-260): a countdown the dashboard may show; at the limit the run ends with a verdict |
 | Everything that happened | `events` | See §4. The source for animations and the report |
 
 ### 2.1 Detection data (SYS-20, D-110)
@@ -133,6 +133,7 @@ Every button, console and (later) shell command sends one of these. It returns `
 | `souls-stolen` | `count` souls just taken (`stolen`/`total` so far) | Souls meter drains, wisps fly out |
 | `wave-started` / `wave-ended` | A minion wave arrives / leaves (`closedBy` if the player closed it) | Rats skitter in / scatter |
 | `alert-opened` / `alert-closed` | An alert appears (`route`, `symptom`; D-232) / clears | Alert panel: the symptom, never `about` |
+| `decision-missed` | An alert's decision window (SYS-25, D-261: Easy 20, Medium 12, Hard 10 real s) ended with no player action but a read; the heartbeat dipped once. `alert.answeredAt` / `alert.missedAt` hold the outcome | The countdown's "Too late", Death's taunt; the report's "Decisions in time" |
 | `shift-begun` | `beginShift()` was called (D-230) | The calm begins |
 | `incident-declared` | The freeze lifts (`by`: `alert`, `escalation` or `flag`) | Unlock the consoles |
 | `flag-confirmed` | A flagged address (`ip`) made a hostile request after the flag (D-233); `about` is a spoiler | "flagged" → "confirmed" |

@@ -109,6 +109,8 @@ export interface Alert {
   route: string; // the path family: '/', '/rest/user/login', '/rest/products/search', '/api/Users', ...
   symptom: string; // one plain sentence built from what the detector counted; never a move id, never who
   gate: string; // the player-facing gate name derived from the route (front door, login, passwords, sign-up, search, admin API, products, uploads, feedback, a tap's name)
+  answeredAt?: number; // SYS-25 (D-261): a player action inside its decision window
+  missedAt?: number; // SYS-25 (D-261): its window ended with no decision (a heartbeat dip)
 }
 
 /** A flagged address (DEF-21, D-233): a suspicion until a hostile request from it, after the flag, confirms it. Carries no verdict on purpose. */
@@ -238,7 +240,7 @@ export interface World {
   logs: { access: AccessLine[]; app: AppLine[]; dbChanges: DbChange[] };
   events: GameEvent[]; // SYS-10
   ending?: Ending;
-  shift: { beganAt?: number; firstMoveAt?: number; rng: number }; // SYS-22 (D-230): engine.beginShift() sets beganAt; Death's first move sets firstMoveAt (minions and taps count from it); rng is the shift's own seeded stream (the first-move delay)
+  shift: { beganAt?: number; firstMoveAt?: number; rng: number; noDecisions?: true }; // noDecisions: a lab sim measuring one cost, without SYS-25's dips (decisions.ts); SYS-22 (D-230): engine.beginShift() sets beganAt; Death's first move sets firstMoveAt (minions and taps count from it); rng is the shift's own seeded stream (the first-move delay)
   incident: { declaredAt?: number; by?: 'alert' | 'escalation' | 'flag' }; // SYS-22 (D-230): the change freeze holds from beganAt until declaredAt
   flags: Flag[]; // DEF-21 (D-233)
   bandages: Bandage[]; // SYS-23 (D-231)

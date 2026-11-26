@@ -4,6 +4,8 @@ import { decodeUtf8 } from '../text';
 import { finish, sanitize } from '../output';
 import { COMMANDS } from '../registry';
 import { makeFixture, WHOLE_RUN_TIMEOUT_MS, type PlantSpec } from '../test-fixtures/fixture';
+import { noDecisions } from '../../engine/decisions';
+import { noShift } from '../../engine/shift';
 
 const T = 30_000;
 const HOME = '/srv/juice-shop';
@@ -404,7 +406,9 @@ describe('internal errors (R15.1, R15.4)', () => {
 describe('performance on a whole-run access log (G15)', () => {
   it('grep over the access log of a whole run resolves well inside 5,000 ms', async () => {
     const fx = makeFixture({ baseline: false });
-    for (let i = 0; i < 10 && !fx.world.ending; i++) fx.engine.advance(60_000); // 10 real minutes: inside Medium's 11-minute shift (D-259)
+    noShift(fx.world); // a whole-run-sized log: past the 3-minute night, without the decision dips (D-260, D-261)
+    noDecisions(fx.world);
+    for (let i = 0; i < 10 && !fx.world.ending && fx.world.logs.access.length <= 1_100; i++) fx.engine.advance(60_000);
     expect(fx.world.ending).toBeUndefined();
     expect(fx.world.logs.access.length).toBeGreaterThan(1_000);
     const started = performance.now();

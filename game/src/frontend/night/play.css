@@ -446,9 +446,72 @@
 
 /* ---- the bottom: three actions */
 .pl-actions {
+  position: relative;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr)) minmax(150px, 0.55fr);
   gap: 1.2vw;
+}
+/* UI-15 (D-261): the countdown on the choices. Above them, out of the layout (nothing moves when it comes and goes). */
+.pl-decide {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(100% + 0.5vh);
+  height: clamp(22px, 2.6vh, 30px);
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  pointer-events: none;
+}
+.pl-decide::before,
+.pl-decide i {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 5px;
+  border-radius: 3px;
+}
+.pl-decide::before {
+  right: 0;
+  background: rgba(236, 229, 211, 0.14);
+}
+.pl-decide i {
+  background: var(--amber);
+  transition: width 0.25s linear;
+}
+.pl-decide span {
+  position: relative;
+  padding: 1px 10px;
+  border-radius: 3px;
+  background: rgba(13, 17, 23, 0.88);
+  color: var(--amber);
+  font: clamp(12px, 0.85vw, 16px) var(--mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.pl-decide.is-urgent i,
+.pl-decide.is-too-late i {
+  background: var(--red);
+}
+.pl-decide.is-urgent span,
+.pl-decide.is-too-late span {
+  color: var(--red);
+}
+.pl-decide.is-too-late i {
+  width: 100% !important;
+  opacity: 0.45;
+}
+.pl-decide.is-in-time i {
+  background: var(--green);
+}
+.pl-decide.is-in-time span {
+  color: var(--green);
+}
+@media (prefers-reduced-motion: reduce) {
+  .pl-decide i {
+    transition: none;
+  }
 }
 .pl-act {
   display: flex;

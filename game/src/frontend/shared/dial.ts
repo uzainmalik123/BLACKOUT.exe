@@ -53,6 +53,7 @@ export function dialLines(d: Difficulty): string[] {
   const rest = range(realS(c.breatherGameMs.min, d), realS(c.breatherGameMs.max, d));
   // D-259: on Medium and Hard a second move may start while one plays
   out.push(`Death rests ${rest} s between moves${c.movesAtOnce > 1 ? `, and runs up to ${c.movesAtOnce === 2 ? 'two' : c.movesAtOnce} at once` : ''}`);
-  out.push(`The shift lasts about ${Math.round(realS(c.shiftGameMs, d) / 60)} minutes`);
+  const minutes = realS(c.shiftGameMs, d) / 60;
+  out.push(`The shift lasts about ${Number.isInteger(minutes) ? minutes : minutes.toFixed(1)} minutes`); // D-260: Hard's is 2.5
   return out;
 }
