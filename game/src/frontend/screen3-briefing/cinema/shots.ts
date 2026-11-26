@@ -1721,7 +1721,7 @@ function death(f: Frame): void {
   g.beginPath();
   g.rect(W * 0.06, H * 0.05, W * 0.88, H * 0.78);
   g.clip();
-  drawDeath(g, W * 0.4 + f.mx * W * 0.015, H * 0.98, H * 0.95, { t, form: form * 0.92, point, fragment: 0.25 + 0.5 * ramp(st, 3, 5.6), eyes: 0.5 + 0.5 * point }, f.dpr);
+  drawDeath(g, W * 0.4 + f.mx * W * 0.015, H * 0.98, H * 0.95, { t, form: form * 0.92, point, fragment: 0, eyes: 0.5 + 0.5 * point, reduce: f.reduced }, f.dpr);
   g.restore();
   // the glass's own sheen over her
   const sheen = g.createLinearGradient(W * 0.06, 0, W * 0.94, 0);

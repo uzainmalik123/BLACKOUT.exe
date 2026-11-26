@@ -362,7 +362,7 @@ function paintBattle(g: G, w: number, h: number, dpr: number, t: number, v: Batt
     }
     g.save();
     g.globalAlpha = 0.92 * (end?.form ?? 1);
-    drawDeath(g, at.x, at.y + size * 0.72, size, { t, form: end?.form ?? 1, point: lunge !== undefined || (end?.point ?? 0) > 0.5 ? 1 : 0, fragment: end?.fragment ?? (recoil !== undefined ? 0.45 : 0.05 + 0.25 * (1 - menace)), eyes: 0.4 + 0.6 * menace }, dpr);
+    drawDeath(g, at.x, at.y + size * 0.72, size, { t, form: end?.form ?? 1, point: lunge !== undefined || (end?.point ?? 0) > 0.5 ? 1 : 0, fragment: end?.fragment ?? (recoil !== undefined ? 0.3 : 0), eyes: 0.4 + 0.6 * menace }, dpr);
     g.restore();
     if (v.key && !end) key(g, at.x - size * 0.18, at.y - size * 0.2, h * 0.05, t, 1);
   }

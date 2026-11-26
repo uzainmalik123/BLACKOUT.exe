@@ -66,7 +66,7 @@ export function IdentityArchive() {
       // upside down, as a reflection in the table's dark wood
       g.translate(0, H);
       g.scale(1, -1);
-      drawDeath(g, W * (0.15 + 0.7 * pass), H * 1.25, H * 1.2, { t, form: Math.sin(pass * Math.PI) * 0.9, point: 0, fragment: 0.4, eyes: 1 }, 1);
+      drawDeath(g, W * (0.15 + 0.7 * pass), H * 1.25, H * 1.2, { t, form: Math.sin(pass * Math.PI) * 0.9, point: 0, fragment: 0, eyes: 1 }, 1);
       g.restore();
     };
     raf = requestAnimationFrame(frame);

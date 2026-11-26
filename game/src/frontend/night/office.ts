@@ -926,7 +926,7 @@ export function paintOffice(g: G, w: number, h: number, dpr: number, v: OfficeVi
       const p = L.at(x, -0.1, 13.4);
       if (p) {
         g.globalAlpha = Math.sin(Math.PI * v.shadow) * 0.85;
-        drawDeath(g, p.x, p.y, p.k * 2.6, { t: v.t, form: 1, point: 0, fragment: 0.1, eyes: 0.5 }, dpr);
+        drawDeath(g, p.x, p.y, p.k * 2.2, { t: v.t, form: 1, point: 0, fragment: 0, eyes: 0.5 }, dpr);
         g.globalAlpha = 1;
       }
     }
@@ -1059,71 +1059,22 @@ export function walkCam(walked: number): Cam {
 
 // ------------------------------------------------------------------ the close-ups
 
-/** Death's eyes in the dark: crimson, slit-pupilled, following the mouse (look in -1..1). */
+/**
+ * Death's eyes in the dark (D-253): his skull rises out of the black, close, the hood a darker dark round it; his big
+ * black eyes, and in them two tiny red points that follow the player's mouse. Nothing else.
+ */
 export function paintEyes(g: G, w: number, h: number, t: number, open: number, look: { x: number; y: number }): void {
   g.fillStyle = '#000';
   g.fillRect(0, 0, w, h);
   if (open <= 0.01) return;
-  const cx = w / 2;
-  const cy = h * 0.46;
-  const gap = h * 0.13;
-  const ew = h * 0.085;
-  const blink = t % 4.3 > 4.15 ? 0.08 : 1;
-  const o = open * blink;
-  for (const side of [-1, 1]) {
-    const x = cx + side * gap;
-    const tilt = side * 0.16;
-    g.save();
-    g.translate(x, cy);
-    g.rotate(tilt);
-    // the glow round the socket
-    glow(g, 0, 0, ew * 2.4, `rgba(160, 0, 20, ${(0.25 * o).toFixed(3)})`);
-    // the almond
-    g.beginPath();
-    g.moveTo(-ew, 0);
-    g.quadraticCurveTo(0, -ew * 0.62 * o, ew, side * ew * 0.08);
-    g.quadraticCurveTo(0, ew * 0.5 * o, -ew, 0);
-    g.closePath();
-    const sclera = g.createRadialGradient(0, 0, 0, 0, 0, ew);
-    sclera.addColorStop(0, '#ff4a3a');
-    sclera.addColorStop(0.55, '#b0101e');
-    sclera.addColorStop(1, '#3a0008');
-    g.fillStyle = sclera;
-    g.save();
-    g.shadowColor = 'rgba(255, 30, 40, 0.9)';
-    g.shadowBlur = ew * 0.5;
-    g.fill();
-    g.restore();
-    g.save();
-    g.clip();
-    // veins
-    g.strokeStyle = 'rgba(60, 0, 6, 0.6)';
-    g.lineWidth = Math.max(0.6, ew * 0.012);
-    for (let i = 0; i < 7; i++) {
-      const a = rand(i + side * 10) * Math.PI * 2;
-      g.beginPath();
-      g.moveTo(Math.cos(a) * ew, Math.sin(a) * ew * 0.5);
-      g.quadraticCurveTo(Math.cos(a + 0.4) * ew * 0.6, Math.sin(a + 0.3) * ew * 0.3, Math.cos(a) * ew * 0.35, Math.sin(a) * ew * 0.15);
-      g.stroke();
-    }
-    // the iris, following the mouse, and the slit
-    const ix = look.x * ew * 0.38;
-    const iy = look.y * ew * 0.16;
-    const iris = g.createRadialGradient(ix, iy, 0, ix, iy, ew * 0.4);
-    iris.addColorStop(0, '#ffd27a');
-    iris.addColorStop(0.5, '#ff7a1a');
-    iris.addColorStop(1, '#7a0a00');
-    g.fillStyle = iris;
-    g.beginPath();
-    g.arc(ix, iy, ew * 0.4, 0, Math.PI * 2);
-    g.fill();
-    g.fillStyle = '#050000';
-    g.beginPath();
-    g.ellipse(ix, iy, ew * 0.06 * (1 + 0.3 * Math.sin(t * 0.7)), ew * 0.36, 0, 0, Math.PI * 2);
-    g.fill();
-    g.restore();
-    g.restore();
-  }
+  const s = h * 1.9;
+  drawDeath(g, w / 2 + s * 0.035, h * 0.5 + s * 0.69, s, { t, form: open * 0.75, point: 0, fragment: 0, eyes: open, menace: 0.9, look: clamp(look.x, -1, 1) }, 1);
+  // the dark closes in round him: only his face holds the light
+  const vg = g.createRadialGradient(w / 2, h * 0.5, h * 0.2, w / 2, h * 0.5, h * 0.75);
+  vg.addColorStop(0, 'rgba(0, 0, 0, 0)');
+  vg.addColorStop(1, 'rgba(0, 0, 0, 0.96)');
+  g.fillStyle = vg;
+  g.fillRect(0, 0, w, h);
 }
 
 /**
