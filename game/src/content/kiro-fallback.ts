@@ -1,5 +1,5 @@
 // Kiro's offline texts (PRD CON-03, KIRO-09): what the Kiro panel shows, labelled "Kiro (offline)", when the real
-// Kiro times out, fails or is out of budget. Rule-written, never an LLM. Three parts:
+// Kiro times out, fails or is out of budget. Rule-written, never an LLM. Four parts:
 //   1. hints per move and per alert at three levels (KIRO-03): Easy explains and suggests a next step, Medium nudges,
 //      Hard answers only when asked. A hint about one of Death's moves never contains the action that closes it
 //      (kiro-fallback.test.ts pins the vocabulary). Minion and leaky-tap hints may: Kiro may close minions (KIRO-04).
@@ -7,6 +7,10 @@
 //      (.kiro/steering/game-shell.md, SYS-09) and only the flags its spec lists. `<…>` placeholders are the player's.
 //   3. the debrief template (KIRO-06): filled from the report's facts, grades, mistakes and misses (ENGINE_API §5),
 //      quoting every fact and grade exactly as given.
+//   4. the tutorial (CON-03 extended, D-238): the opening's steps per level, shown during the change freeze (SYS-22), and
+//      the training shift's steps and its "drill complete" card (SYS-24, UI-12). They teach where to look and which tool to
+//      open; they never name Death, his moves, the gates or how to beat the real shift (kiro-fallback.test.ts pins that).
+//      The live Kiro may rephrase them under KIRO-03's rules.
 // No text here names an internal id: the player only ever sees what a real defender would.
 import type { Actor, Difficulty, MinionId, MoveId, TapId } from '../rules/vocabulary';
 
@@ -374,3 +378,175 @@ export function debriefTemplate(report: DebriefInput): string {
   out.push('- Escalate once you are sure, and notify on time if customer data left.');
   return out.join('\n') + '\n';
 }
+
+// ---- 4. The tutorial (CON-03 extended, D-238) ----
+
+/** A panel or tool a tutorial step points at; the screens highlight it and the dock lights its entry (UI-11, UI-12). */
+export type TutorialPanel =
+  | 'logs' | 'alerts' | 'meters' | 'terminal' | 'dock' | 'top-talkers' | 'cheat-sheet'
+  | 'waf' | 'feature-flags' | 'deploy' | 'backups' | 'kiro';
+
+export interface TutorialStep {
+  id: string;
+  /** The panels this step points at, in the order the text names them. */
+  panels: readonly TutorialPanel[];
+  /** What Kiro says when the step starts, one paragraph per entry. */
+  lines: readonly string[];
+}
+
+/**
+ * The opening (SYS-22): shown by the Kiro panel while the change freeze is on, one step at a time. Easy walks the room in
+ * five steps, Medium in three lines, Hard in one. No step mentions an attacker's moves or the shop's gates.
+ */
+export const OPENING_TUTORIAL: Readonly<Record<Difficulty, readonly TutorialStep[]>> = {
+  easy: [
+    {
+      id: 'logs',
+      panels: ['logs'],
+      lines: [
+        'This is the live access log: every request to the shop, one line each, the newest at the bottom. Right now it is ordinary shoppers browsing, searching and logging in. Watch it for a while: knowing what normal looks like is how you will notice what is not.',
+      ],
+    },
+    {
+      id: 'alerts',
+      panels: ['alerts'],
+      lines: [
+        'This is the alerts panel. It is empty because nothing unusual has been seen yet. When the traffic on a path crosses a line, an alert opens here with the path and what looked wrong. An alert never tells you who did it: that part is your job.',
+      ],
+    },
+    {
+      id: 'meters',
+      panels: ['meters'],
+      lines: [
+        'These two meters are what you are here to protect. Souls is the customers\' data still safe. Heartbeat is the business itself: it weakens when the shop is attacked, and it also weakens when your own changes turn real customers away.',
+      ],
+    },
+    {
+      id: 'terminal',
+      panels: ['terminal'],
+      lines: [
+        `This is the terminal: a real shell with real commands. Reading is always allowed. Try one safe command now: \`tail -n 20 ${ACCESS_LOG}\` shows the twenty newest requests.`,
+      ],
+    },
+    {
+      id: 'dock',
+      panels: ['dock', 'cheat-sheet'],
+      lines: [
+        'Every other tool is one click on the dock: the consoles, Kiro, the briefing files and a cheat sheet of every command with an example. Open as many windows as you like. Until an incident is declared, change control keeps every production change locked; the first alert declares it. Look around.',
+      ],
+    },
+  ],
+  medium: [
+    {
+      id: 'room',
+      panels: ['logs', 'alerts', 'meters'],
+      lines: ['The log, the alerts and the two meters are your view of the shop. Learn what normal traffic looks like while it is calm.'],
+    },
+    {
+      id: 'tools',
+      panels: ['dock', 'terminal', 'cheat-sheet'],
+      lines: ['Every tool is one click on the dock, and the terminal is always open. The cheat sheet lists its commands.'],
+    },
+    {
+      id: 'freeze',
+      panels: ['alerts'],
+      lines: ['Change freeze is on until an incident is declared: reads work, changes wait for the first alert.'],
+    },
+  ],
+  hard: [{ id: 'freeze', panels: [], lines: ['Change freeze is on until an incident is declared. Look around.'] }],
+};
+
+export interface TrainingStep extends TutorialStep {
+  /** The step's number in the playtest-round-1 design (1–6); step 5 has two parts. */
+  step: 1 | 2 | 3 | 4 | 5 | 6;
+  /** What Kiro says once the player has done the step's action (or its timeout passed), before the next step. */
+  done: string;
+}
+
+/**
+ * The training shift (SYS-24, UI-12): a drill run by the company's own security team, loud and slow, never Death. Each step
+ * names the panel to look at and the tool to use; the player performs every action. SYS-24's script carries one entry per
+ * part, in this order, as its `teach`.
+ */
+export const TRAINING_STEPS: readonly TrainingStep[] = [
+  {
+    id: 'room',
+    step: 1,
+    panels: ['logs', 'alerts', 'meters', 'dock', 'terminal', 'cheat-sheet'],
+    lines: [
+      'This is a drill. For the next five minutes your own security team plays an intruder against the shop, loudly and slowly, so you can learn the room. You do every step yourself; I only point.',
+      'The live log shows every request. The alerts panel opens an alert when a path looks wrong. The two meters are the customers\' data and the health of the business.',
+      'Every tool is one click on the dock, and the terminal takes real commands; the cheat sheet lists them. Nothing may change in production until an incident is declared. Wait for the first alert.',
+    ],
+    done: 'There it is. The first alert declares the incident, and the consoles unlock.',
+  },
+  {
+    id: 'flag',
+    step: 2,
+    panels: ['alerts', 'top-talkers', 'terminal'],
+    lines: [
+      'Read the alert: it names a path and a symptom, never a person. Thousands of requests for pages that do not exist is someone mapping the site.',
+      'Now open the top talkers. One address is making far more requests than any shopper: that is your suspect. Flag it: press flag on its row, or type `flag <ip>` in the terminal. A flag is a suspicion; it is confirmed when that address does something hostile again.',
+    ],
+    done: 'Flagged, and confirmed by its next request. Knowing who is attacking comes before acting against them.',
+  },
+  {
+    id: 'block',
+    step: 3,
+    panels: ['top-talkers', 'terminal'],
+    lines: ['Block the address you confirmed: press block on its row, or type `iptables -A INPUT -s <ip> -j DROP` in the terminal.'],
+    done: 'Blocked. Now watch the top talkers: the same pattern comes back from a new address. Blocking an address buys time; it never closes the way in.',
+  },
+  {
+    id: 'rate-limit',
+    step: 4,
+    panels: ['alerts', 'logs', 'waf'],
+    lines: [
+      'A new alert on the login page: a burst of failed logins. The log shows them one after another, faster than any person types. Someone is guessing passwords.',
+      'Open the WAF console and switch on the login rate limit. A person tries a password a few times a minute; a guessing tool tries hundreds.',
+    ],
+    done: 'The guesses now hit the limit and fail. A rate limit has a cost too: a customer who mistypes waits a little longer.',
+  },
+  {
+    id: 'search-off',
+    step: 5,
+    panels: ['alerts', 'logs', 'feature-flags'],
+    lines: [
+      'A new alert on search: it is answering with errors, and the log shows searches full of quotes and database words. The intruder is talking to the database through the search box.',
+      'Open the feature flags console and switch search off to stop the bleeding.',
+    ],
+    done: 'Search is off, and the leak with it. Watch the heartbeat: your customers have lost a feature they use.',
+  },
+  {
+    id: 'patch',
+    step: 5,
+    panels: ['deploy'],
+    lines: [
+      'Switching a feature off is a tourniquet, not a cure. Open the deploy console, read the fix to the search code next to the code it replaces, and deploy it. Then switch search back on.',
+    ],
+    done: 'Deployed. The hole is closed at its root: only a patch does that.',
+  },
+  {
+    id: 'evidence',
+    step: 6,
+    panels: ['backups', 'terminal'],
+    lines: [
+      `Before you change anything more, keep the evidence. Open the backups and evidence console and take a snapshot, or type \`tar czf /evidence/drill.tgz /var/log ${UPLOADS}\` in the terminal. Deleting and restoring destroy what happened; a snapshot keeps it for the report.`,
+    ],
+    done: 'Snapshot taken. That is the drill.',
+  },
+];
+
+/** The "drill complete" card (UI-12): what the training shift taught. Never a grade, never the report. */
+export const DRILL_COMPLETE: Readonly<{ title: string; learned: readonly string[]; next: string }> = {
+  title: 'Drill complete',
+  learned: [
+    'Learn what normal looks like before anything happens.',
+    'An alert names a path and a symptom; finding who is your job. Flag an address when its behaviour says attacker.',
+    'Blocking an address buys time. The intruder comes back from another one.',
+    'A rate limit or a switched-off feature stops the bleeding, at a cost to your customers.',
+    'Only a deployed patch closes a hole for good.',
+    'Snapshot the evidence before you change more.',
+  ],
+  next: 'A real shift grades four things: how soon you noticed, how well you contained it, whether you closed every way in at its root, and how the business came back.',
+};
