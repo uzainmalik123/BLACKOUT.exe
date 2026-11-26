@@ -121,7 +121,7 @@ function fail(world: World, library: RecordingLibrary, e: AccessEvent, t: number
     world.tickets.push(ticket);
     emit(world, { kind: 'ticket', ticket: ticket.id, about, status });
   }
-  if (n >= CONFIG[world.difficulty].customers.giveUpAfter && !c.gone.includes(e.ip)) {
+  if (!world.training && n >= CONFIG[world.difficulty].customers.giveUpAfter && !c.gone.includes(e.ip)) { // D-236: in the drill nobody gives up for good
     c.gone.push(e.ip);
     angryFeedback(world, library, e, t, ip, about, status);
     churn(world, about);

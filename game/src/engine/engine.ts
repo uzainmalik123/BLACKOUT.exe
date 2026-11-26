@@ -13,6 +13,7 @@ import { renderAccessLog, renderAppLog } from './replay';
 import { beginShift } from './shift';
 import { openBaseline, syncDb, type GameDb } from './sqldb';
 import { initialWorld, type Evidence, type VFile, type World } from './state';
+import { initialTraining, trainingView, type TrainingView } from './training';
 
 export { statusClass, type StatusClass } from './detection'; // SYS-20 c: colour a log line by its status
 
@@ -23,12 +24,26 @@ export { statusClass, type StatusClass } from './detection'; // SYS-20 c: colour
 const COMMITTED = import.meta.glob<Recording>(['../recordings/*.json', '../recordings/traffic/*.json'], { eager: true, import: 'default' }); // traffic/: the customers (D-62)
 export const COMMITTED_LIBRARY: RecordingLibrary = libraryFrom(Object.keys(COMMITTED).sort().map((path) => COMMITTED[path]!));
 
-export interface EngineOptions {
-  seed: number;
-  difficulty: Difficulty;
+interface CommonOptions {
   library?: RecordingLibrary;
   baseline?: Uint8Array; // juiceshop.sqlite; needed for db()
 }
+
+/** The night shift (the real game): a seed and a level, both required. */
+export interface NightShiftOptions extends CommonOptions {
+  scenario?: 'night-shift';
+  seed: number;
+  difficulty: Difficulty;
+}
+
+/** SYS-24 (D-236): the training shift, a scripted drill; seed 1 and Easy unless given. */
+export interface TrainingOptions extends CommonOptions {
+  scenario: 'training';
+  seed?: number;
+  difficulty?: Difficulty;
+}
+
+export type EngineOptions = NightShiftOptions | TrainingOptions;
 
 export class Engine {
   readonly world: World;
@@ -38,7 +53,8 @@ export class Engine {
   private readonly listeners = new Set<(world: World) => void>();
 
   constructor(opts: EngineOptions) {
-    this.world = initialWorld(opts.seed, opts.difficulty);
+    this.world = initialWorld(opts.seed ?? 1, opts.difficulty ?? 'easy');
+    if (opts.scenario === 'training') this.world.training = initialTraining();
     this.library = opts.library ?? COMMITTED_LIBRARY;
     this.baseline = opts.baseline;
   }
@@ -56,6 +72,14 @@ export class Engine {
   beginShift(): void {
     beginShift(this.world);
     this.notify();
+  }
+
+  /**
+   * SYS-24 (D-236): the training shift's current step for the overlay (UI-12): the TRAINING_STEPS entry, `teach` until
+   * its action is done (or it timed out, `by`), then `done`; `complete` once the drill is over. Undefined in the real game.
+   */
+  training(): TrainingView | undefined {
+    return trainingView(this.world);
   }
 
   act(action: PlayerAction): ActionResult {
