@@ -1,0 +1,14 @@
+{
+  "format": 1,
+  "move": "ATK-03",
+  "variant": "b",
+  "label": "quiet: one login injection, quote and comment as JSON unicode escapes, browser user agent",
+  "recordedAt": "2026-11-26T08:57:20.195Z",
+  "durationMs": 336,
+  "attackerIp": "203.0.113.26",
+  "juiceShop": "bkimminich/juice-shop:v20.4.0",
+  "tool": "curl 8.x",
+  "events": [
+    {"t":233,"kind":"access","ip":"203.0.113.26","method":"POST","target":"/rest/user/login","protocol":"HTTP/1.1","status":200,"bytes":784,"referer":"https://juice-sh.op/","userAgent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36","requestTimeMs":7}
+  ]
+}
