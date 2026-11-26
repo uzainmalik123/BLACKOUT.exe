@@ -32,7 +32,7 @@ function act(w: ReturnType<typeof initialWorld>, action: Parameters<typeof apply
 }
 
 describe('struggling (SYS-13)', () => {
-  it('idle: no RELEVANT action for 90 real s; a look that shows his line resets the clock, ls/pwd, a refused action or an unfocused read do not', () => {
+  it('idle: no RELEVANT action for 30 real s (D-260); a look that shows his line resets the clock, ls/pwd, a refused action or an unfocused read do not', () => {
     const w = initialWorld(1, 'medium');
     knowsHim(w);
     w.clock.gameMs = idleGameMs - 1;
@@ -131,22 +131,22 @@ describe('struggling (SYS-13)', () => {
     expect(eventsOfKind(w, 'suggestion')).toEqual([]);
   });
 
-  it('runs inside advance(): an idle player on Medium gets a suggestion every 90 real s', () => {
+  it('runs inside advance(): an idle player on Medium gets a suggestion every 30 real s (D-260)', () => {
     const w = initialWorld(1, 'medium');
-    advance(w, FIXTURE_LIBRARY, 5 * 60_000); // 5 real minutes
+    advance(w, FIXTURE_LIBRARY, 100_000); // 100 real s: three windows, inside the 3-minute night
     expect(eventsOfKind(w, 'suggestion').map((e) => e.t / idleGameMs)).toEqual([1, 2, 3]);
   });
 });
 
 describe('SYS-13 sims', { timeout: WHOLE_RUN_TIMEOUT_MS }, () => {
-  it('an idle player on Medium gets exactly one suggestion per struggle window: one per 90 real s of idling, never two inside a window, up to the ending', () => {
+  it('an idle player on Medium gets exactly one suggestion per struggle window: one per 30 real s of idling (D-260), never two inside a window, up to the ending', () => {
     const r = runSim({ seed: 1, player: () => [], library: FIXTURE_LIBRARY, maxRealMs: 20 * REAL_MIN });
     const suggestions = eventsOfKind(r.world, 'suggestion');
     const end = eventsOfKind(r.world, 'ending')[0]!.t;
-    expect(suggestions.length).toBe(Math.floor(end / idleGameMs)); // one per window the run lasted
+    expect(suggestions.length).toBe(Math.ceil(end / idleGameMs) - 1); // one per window that ended before the run did (the 3-minute night ends on a window's edge: no suggestion at the ending)
     expect(suggestions.map((e) => e.n)).toEqual(suggestions.map((_, i) => i + 1));
     for (let i = 1; i < suggestions.length; i++) expect(suggestions[i]!.t - suggestions[i - 1]!.t).toBe(idleGameMs); // the idle windows, back to back
-    expect(suggestions.length).toBeGreaterThanOrEqual(4); // several windows: the idle run flatlines at 7.2 min (D-259; 5 windows before)
+    expect(suggestions.length).toBeGreaterThanOrEqual(5); // several windows (D-260: 30 s windows in the 3-minute night)
     for (const s of suggestions) expect(s.gap, `suggestion ${s.n}`).toBeDefined(); // each aimed at the gap standing then
     const easy = runSim({ seed: 1, difficulty: 'easy', player: () => [], library: FIXTURE_LIBRARY, maxRealMs: 20 * REAL_MIN });
     expect(eventsOfKind(easy.world, 'suggestion')).toEqual([]);

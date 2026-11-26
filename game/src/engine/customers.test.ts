@@ -17,6 +17,7 @@ import { committedLibrary } from './test-fixtures/committed';
 import { FIXTURE_IPS, FIXTURE_LIBRARY, FIXTURE_TRAFFIC, FIXTURE_VISIT, withTraffic } from './test-fixtures/recordings';
 import type { AccessEvent, Recording } from '../recordings/format';
 import { WHOLE_RUN_TIMEOUT_MS } from './test-fixtures/timeouts';
+import { noShift } from './shift';
 
 const REAL_MIN = 60_000;
 const TRAFFIC = withTraffic(FIXTURE_LIBRARY); // the made-up moves and customers
@@ -325,7 +326,7 @@ describe('the backlash: cost, complaints, churn (D-65)', () => {
 
 describe('the committed customers (REC-06) in whole runs', { timeout: WHOLE_RUN_TIMEOUT_MS }, () => {
   const real = committedLibrary();
-  const idle = (difficulty: Difficulty, seed = 1) => runSim({ seed, difficulty, library: real, maxRealMs: 20 * REAL_MIN, player: () => [] });
+  const idle = (difficulty: Difficulty, seed = 1) => runSim({ seed, difficulty, library: real, maxRealMs: 20 * REAL_MIN, player: () => [], setup: noShift }); // whole runs, past the 3-minute night (D-260)
 
   it('an idle Medium run: customers write at least 60% of the lines outside the scan and the minions\' waves, about 2 a second; Easy about 1, Hard about 4 (SYS-19, D-134)', () => {
     const r = idle('medium');

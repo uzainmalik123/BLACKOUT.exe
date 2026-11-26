@@ -377,6 +377,9 @@ export class Night {
       case 'tip-off':
         this.taunt(SPECIAL_TAUNTS.tippedOff, true);
         break;
+      case 'decision-missed': // UI-15 (D-261): the window ran out; he says so
+        this.taunt(SPECIAL_TAUNTS.tooSlow, true);
+        break;
       case 'return':
         this.sound.hush(LASTS.silence);
         this.later(LASTS.silence * 1000, () => {

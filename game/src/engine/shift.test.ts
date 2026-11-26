@@ -40,6 +40,20 @@ describe('the verdict at the end of the shift (D-118)', () => {
     expect(shiftVerdict(w, FIXTURE_LIBRARY)).toBe('clean-handover');
   });
 
+  it('D-260: the shop handed over down (the plug left pulled) is walked away from; a defacement still live is a rough handover at best', () => {
+    const down = initialWorld(1, 'medium');
+    gotInto(down, 0.1);
+    down.patches.applied.push('search', 'users-access');
+    expect(shiftVerdict(down, FIXTURE_LIBRARY)).toBe('clean-handover');
+    down.nginx = 'stopped';
+    expect(shiftVerdict(down, FIXTURE_LIBRARY)).toBe('walked-away');
+    const defaced = initialWorld(1, 'medium');
+    gotInto(defaced, 0.1);
+    defaced.patches.applied.push('search', 'users-access');
+    defaced.defacements.push({ productId: 1, kind: 'deface', by: 'ATK-15' });
+    expect(shiftVerdict(defaced, FIXTURE_LIBRARY)).toBe('rough-handover');
+  });
+
   it('rough handover: the shop alive, souls lost under half, a found door shut only by containment', () => {
     const w = initialWorld(1, 'medium');
     gotInto(w, 0.3);
@@ -86,8 +100,8 @@ describe('the verdict at the end of the shift (D-118)', () => {
     expect(JSON.parse(JSON.stringify(v.clock))).toEqual(v.clock);
   });
 
-  it('the shift is Easy ~20, Medium ~11, Hard ~9 real minutes (D-259: were 16 and 13)', () => {
-    expect([CONFIG.easy.shiftGameMs, CONFIG.medium.shiftGameMs, CONFIG.hard.shiftGameMs].map((ms) => ms / REAL_MIN)).toEqual([20, 11, 9]);
+  it('the shift is Easy ~4, Medium ~3, Hard ~2.5 real minutes (D-260: the 3-minute night; were 20, 11 and 9)', () => {
+    expect([CONFIG.easy.shiftGameMs, CONFIG.medium.shiftGameMs, CONFIG.hard.shiftGameMs].map((ms) => ms / REAL_MIN)).toEqual([4, 3, 2.5]);
   });
 });
 

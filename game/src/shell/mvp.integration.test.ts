@@ -11,7 +11,7 @@ const noDate = /\d{4}-\d{2}-\d{2}/; // KI-91: a locked account's deletedAt is ne
 
 describe('MVP session: investigate, then contain', () => {
   it('runs a full session and leaves the World as the actions say', { timeout: WHOLE_RUN_TIMEOUT_MS }, async () => {
-    const f = makeFixture({ plant: [{ path: 'rip.php', content: '<?php echo 1;' }], advanceMs: 180_000 });
+    const f = makeFixture({ plant: [{ path: 'rip.php', content: '<?php echo 1;' }], advanceMs: 120_000 }); // two real minutes: inside Medium's 3-minute night (D-260)
     const { shell, world, engine } = f;
     const advance = vi.spyOn(engine, 'advance');
     const lockedBefore = world.accounts.filter((a) => a.lockedAt !== undefined).length;

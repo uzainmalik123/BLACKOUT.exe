@@ -97,6 +97,12 @@ export const SPECIAL_TAUNTS = {
     'You closed a door. I have others.',
     'You saw me. Now watch me move.',
   ],
+  /** An alert waited past its window with no decision (SYS-25, D-261). */
+  tooSlow: [
+    'Too slow.',
+    'Tick, tock. I don’t wait.',
+    'You hesitated. I didn’t.',
+  ],
   /** The player tipped him off (an active lookup, locking an account he uses). */
   tippedOff: [
     'You’ve noticed me. Then I won’t take my time.',

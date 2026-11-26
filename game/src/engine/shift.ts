@@ -74,8 +74,10 @@ export function unfixedDoors(world: World, library: RecordingLibrary): { unfixed
 export function shiftVerdict(world: World, library: RecordingLibrary): Extract<Ending, 'clean-handover' | 'rough-handover' | 'walked-away'> {
   const lost = world.souls.total > 0 ? world.souls.stolen.length / world.souls.total : 0;
   const doors = unfixedDoors(world, library);
-  if (lost >= VERDICTS.rough || doors.open.length > 0) return 'walked-away';
-  if (doors.unfixed.length === 0 && lost < VERDICTS.clean) return 'clean-handover';
+  // D-260: a 3-minute night ends on the shop's state as well: handed over down (the plug left pulled) is walking away,
+  // and a defacement still live is no clean handover (on a long night both flatlined the shop first)
+  if (lost >= VERDICTS.rough || doors.open.length > 0 || world.nginx === 'stopped') return 'walked-away';
+  if (doors.unfixed.length === 0 && lost < VERDICTS.clean && world.defacements.length === 0) return 'clean-handover';
   return 'rough-handover';
 }
 

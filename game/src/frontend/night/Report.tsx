@@ -177,6 +177,11 @@ export function ReportWall({ run, onAgain, onMenu }: { run: Run; onAgain: (d: Di
           <b>{m.damage.customersLost || '0'}</b>
           <em>their errands failed</em>
         </div>
+        <div className="ns-pin">
+          <span>Decisions in time</span>
+          <b>{m.damage.decisions || '–'}</b>
+          <em>alerts answered before the bar ran out</em>
+        </div>
       </section>
 
       <section className="ns-rep-grades" aria-label="Grades">

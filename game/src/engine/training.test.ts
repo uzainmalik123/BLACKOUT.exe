@@ -9,6 +9,7 @@ import { eventsOfKind } from './log';
 import { buildReport } from './report';
 import { WHOLE_RUN_TIMEOUT_MS } from './test-fixtures/timeouts';
 import { TRAINING_SCRIPT } from './training';
+import { countdownOf } from '../frontend/night/countdown';
 
 const REAL_S = 1000;
 const FRAME = 100; // real ms per advance, like a screen's frame loop (coarser, for speed)
@@ -103,6 +104,15 @@ describe('the training shift (SYS-24, D-236)', { timeout: WHOLE_RUN_TIMEOUT_MS }
     expect(eventsOfKind(e.world, 'drill-complete')).toHaveLength(1);
     expect(real).toBeLessThan(6 * 60 * REAL_S);
     expect(e.training()).toMatchObject({ complete: true, state: 'done', index: TRAINING_STEPS.length - 1 });
+  });
+
+  it('the drill has no decision timer (SYS-25, D-261): a trainee who waits on every step misses nothing and the countdown never shows', () => {
+    const e = new Engine({ scenario: 'training' });
+    play(e, () => undefined); // nobody acts: every step runs to its timeout
+    expect(eventsOfKind(e.world, 'alert-opened').length).toBeGreaterThan(0);
+    expect(eventsOfKind(e.world, 'decision-missed')).toEqual([]);
+    expect(e.world.alerts.every((a) => a.missedAt === undefined)).toBe(true);
+    expect(countdownOf(e.world)).toBeNull();
   });
 
   it('the password and the dump steps start on their own alert, so their text ("a new alert…") is true', () => {

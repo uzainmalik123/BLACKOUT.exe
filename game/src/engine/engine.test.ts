@@ -8,6 +8,7 @@ import { gains } from './facts';
 import { eventsOfKind } from './log';
 import { startReplay } from './replay';
 import { runSim } from './sim';
+import { noShift } from './shift';
 import { WHOLE_RUN_TIMEOUT_MS } from './test-fixtures/timeouts';
 
 const baseline = () => readFileSync(new URL('../recordings/juiceshop.sqlite', import.meta.url));
@@ -90,7 +91,7 @@ describe('Engine', () => {
 describe('a real run on the committed recordings, nobody at the keyboard (KI-17)', { timeout: WHOLE_RUN_TIMEOUT_MS }, () => {
   const REAL_MIN = 60_000;
   // D-42: half a door per visit, so an idle run lasts longer than it did; 30 real minutes is room for every level.
-  const idle = (seed: number, difficulty: 'easy' | 'medium' | 'hard') => runSim({ seed, difficulty, library: COMMITTED_LIBRARY, maxRealMs: 30 * REAL_MIN, player: () => [] });
+  const idle = (seed: number, difficulty: 'easy' | 'medium' | 'hard') => runSim({ seed, difficulty, library: COMMITTED_LIBRARY, maxRealMs: 30 * REAL_MIN, player: () => [], setup: noShift }); // his whole story, past the 3-minute night (D-260)
 
   it('seed 1, Medium: Death climbs the stages in order (scan, break in, admin, harvest), keeps robbing the search door, and the player loses; no false win', () => {
     const r = idle(1, 'medium');

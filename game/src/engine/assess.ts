@@ -11,6 +11,7 @@ import { CONFIG } from './config';
 import { footholds } from './facts';
 import { falseLeads } from './flags';
 import { eventsOfKind, type GameEvent } from './log';
+import { decisionsTally } from './decisions';
 import { confirmBreach } from './notification';
 import type { World } from './state';
 
@@ -118,12 +119,13 @@ const GAME_MIN = 60_000;
 
 /** Thresholds, in game ms (D-112, D-114, all "tune"). */
 export const GRADING = {
-  notice: { A: 1 * REAL_MIN, B: 2 * REAL_MIN, C: 4 * REAL_MIN, D: 8 * REAL_MIN }, // the mean time a stage went unnoticed
-  slowNotice: 2 * REAL_MIN, // a stage unnoticed this long is a mistake of its own
-  contain: { A: 2 * REAL_MIN, B: 4 * REAL_MIN, C: 8 * REAL_MIN, D: 12 * REAL_MIN }, // from his first move to the first fix that held
+  // D-260: the time bands compressed to a quarter with the 3-minute night (were 1/2/4/8 min, 2 min, 2/4/8/12 min, 1/3 min)
+  notice: { A: 15 * REAL_S, B: 30 * REAL_S, C: 1 * REAL_MIN, D: 2 * REAL_MIN }, // the mean time a stage went unnoticed
+  slowNotice: 30 * REAL_S, // a stage unnoticed this long is a mistake of its own
+  contain: { A: 30 * REAL_S, B: 1 * REAL_MIN, C: 2 * REAL_MIN, D: 3 * REAL_MIN }, // from his first move to the first fix that held
   soulsLost: { some: 0.25, most: 0.75 }, // shares of the souls that cost a grade and two
   whackAMole: 3, // IP blocks on his addresses (PRD SYS-11)
-  downtime: { some: 1 * REAL_MIN, long: 3 * REAL_MIN }, // the plug pulled, in total
+  downtime: { some: 15 * REAL_S, long: 45 * REAL_S }, // the plug pulled, in total
   churn: 10, // customers who gave up
   falseLeads: 2, // D-233: flags on addresses that were never an attacker's
 } as const;
@@ -439,6 +441,8 @@ export function evaluate(world: World): Assessment {
   const held = events.find((e) => (e.kind === 'move-cut' && e.by !== 'DEF-06') || e.kind === 'door-shut' || e.kind === 'banished');
   const contained = firstStart !== undefined && held !== undefined && held.t >= firstStart ? held.t - firstStart : undefined;
   facts.push({ label: 'Time to contain', value: contained === undefined ? 'never' : fmtGameMs(contained) });
+  const decided = decisionsTally(world); // SYS-25 (D-261): a fact, no grade
+  if (decided.of > 0) facts.push({ label: 'Decisions in time', value: `${decided.inTime} of ${decided.of}` });
   const containBase: Grade = starts.length === 0 ? 'A' : bandOf(contained, GRADING.contain);
   if (starts.length > 0) {
     phases.contain.status = held ? 'holding' : 'open';

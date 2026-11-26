@@ -91,7 +91,7 @@ describe('a breather after every Death move (D-41 rule 4)', () => {
   });
 });
 
-describe('two of his moves at once on Medium and Hard (D-259)', () => {
+describe('two of his moves at once on every level (D-259, D-260)', () => {
   /** His login replayed slowly, two real minutes long, beside the fixture's other moves. */
   const slow = libraryFrom([
     fakeRecording('ATK-03', 'a', { ip: '203.0.113.9', durationMs: 120_000 }),
@@ -114,7 +114,7 @@ describe('two of his moves at once on Medium and Hard (D-259)', () => {
     return { w, t0, later, slowEnd, most };
   }
 
-  for (const level of ['medium', 'hard'] as const) {
+  for (const level of ['easy', 'medium', 'hard'] as const) { // D-260: Easy overlaps too
     it(`${level}: while a long move plays, a second starts a breather after it began, never the same move, never a third`, () => {
       const { min, max } = CONFIG[level].breatherGameMs;
       const { t0, later, slowEnd, most } = beside(level, 100);
@@ -127,12 +127,6 @@ describe('two of his moves at once on Medium and Hard (D-259)', () => {
       expect(most).toBe(2);
     });
   }
-
-  it('easy: nothing else of his starts while the long move plays', () => {
-    const { later, slowEnd, most } = beside('easy', 100);
-    expect(most).toBe(1);
-    expect(later.every((e) => e.t >= slowEnd)).toBe(true);
-  });
 });
 
 describe('no same-move loops (D-41 rule 3)', () => {

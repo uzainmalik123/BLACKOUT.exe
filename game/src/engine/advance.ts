@@ -2,6 +2,7 @@
 // so the order of effects never depends on the frame rate. Everything the engine does over time happens here.
 import { applyPendingPatches, takeBackupIfDue } from './actions';
 import { stepAlerts } from './alerts';
+import { stepDecisions } from './decisions';
 import { stepAssess } from './assess';
 import { stepBandages } from './bandages';
 import { stepFlags } from './flags';
@@ -44,6 +45,7 @@ function step(world: World, library: RecordingLibrary, dt: number): void {
   }
   stepCustomers(world, library); // SYS-19: after Death and the minions, so their addresses are known (D-65)
   stepAlerts(world); // SYS-20, D-232: the detectors over this tick's lines, changes and uploads
+  if (!drill) stepDecisions(world); // SYS-25, D-261: an alert left past its window costs a heartbeat dip (the drill waits for the trainee)
   stepFlags(world); // DEF-21, D-233: a hostile line from a flagged address confirms it
   if (!drill) stepBandages(world, library); // SYS-23, D-231: a bandage whose breathers are over has failed
   refreshDoors(world, library); // D-44: a door is shut only while its fix holds
