@@ -112,13 +112,13 @@ function detectLine(world: World, l: AccessLine, th: AlertThresholds): void {
   // 6. A scraper's pace on an API route.
   const paced = PACED_ROUTES.find((r) => path === r || path.startsWith(`${r}/`));
   if (paced !== undefined) {
-    const n = count(world, `pace|${paced}|${l.ip}`, t, th.apiPace.windowRealS);
-    if (crossed(n, th.apiPace) && hostile(l.by)) openAlert(world, l.by, paced, `unusual activity on ${paced}: ${n} requests in ${th.apiPace.windowRealS} s from one address`);
+    const n = count(world, `pace|${paced}`, t, th.apiPace.windowRealS); // over every address: a scraper wave rotates its addresses
+    if (crossed(n, th.apiPace) && hostile(l.by)) openAlert(world, l.by, paced, `unusual activity on ${paced}: ${n} requests in ${th.apiPace.windowRealS} s`);
   }
   // 7. Feedback spam.
   if (l.method === 'POST' && path.startsWith('/api/Feedbacks')) {
-    const n = count(world, `feedback|${l.ip}`, t, th.feedback.windowRealS);
-    if (crossed(n, th.feedback) && hostile(l.by)) openAlert(world, l.by, '/api/Feedbacks', `unusual activity on /api/Feedbacks: ${n} posts in ${th.feedback.windowRealS} s from one address`);
+    const n = count(world, 'feedback|*', t, th.feedback.windowRealS); // over every address: a spam wave rotates its addresses
+    if (crossed(n, th.feedback) && hostile(l.by)) openAlert(world, l.by, '/api/Feedbacks', `unusual activity on /api/Feedbacks: ${n} posts in ${th.feedback.windowRealS} s`);
   }
 }
 

@@ -52,8 +52,8 @@ export function allowedVariants(world: World, move: Move): string[] | undefined 
 export function doorHalves(world: World, library: RecordingLibrary, move: Move): Variant[] {
   const allowed = allowedVariants(world, move);
   // D-231: an evaded rule unlocks the quiet halves the pin keeps for other levels (Hard: .d/.e), never a retired variant
-  const pin = CONFIG[world.difficulty].pinnedVariants[move.id];
-  const unlocked = pin !== undefined && anyEvaded(world, move.id) ? [...pin.normal, ...pin.tippedOff] : [];
+  const pins = Object.values(CONFIG).map((c) => c.pinnedVariants[move.id]).filter((p) => p !== undefined);
+  const unlocked = anyEvaded(world, move.id) ? pins.flatMap((p) => [...p.normal, ...p.tippedOff]) : [];
   return library.variantsOf(move.id).filter((v) => allowed === undefined || allowed.includes(v.variant) || (v.info.quiet && unlocked.includes(v.variant)));
 }
 

@@ -431,7 +431,6 @@ export function evaluate(world: World): Assessment {
   facts.push({ label: 'Addresses flagged', value: world.flags.length === 0 ? 'none' : `${world.flags.length} (${confirmedFlags} confirmed)` });
   facts.push({ label: 'False leads chased', value: `${leads}` });
   if (leads >= GRADING.falseLeads) {
-    points.detect += 1;
     mistakes.push({ phase: 'detect', title: `Chased ${leads} false leads`, why: 'Every address flagged on a hunch is time spent watching a customer while the attacker works. Confirm an address by its behaviour (its requests, its errors, its pace) before you flag it, and act on what the data shows (NIST SP 800-61, detection and analysis: avoid false positives).' });
     phases.detect.evidence.push(`${leads} flags on addresses that were never his`);
   }
@@ -640,6 +639,7 @@ export function evaluate(world: World): Assessment {
     eradicate: letter(points.eradicate),
     recover: letter(points.recover),
   };
+  if (leads >= GRADING.falseLeads) grades.detect = letter('ABCDF'.indexOf(grades.detect) + 1); // D-233: a letter off whatever the timing earned
   const failed = ending ? ENDING_FAILS[ending.ending] : undefined;
   if (failed) grades[failed] = 'F';
   mistakes.sort((a, b) => PHASES.indexOf(a.phase) - PHASES.indexOf(b.phase));

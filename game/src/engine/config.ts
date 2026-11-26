@@ -70,8 +70,8 @@ export interface AlertThresholds {
   failedLogins: { count: number; windowRealS: number }; // 401s on /rest/user/login from one address
   failedLoginsAll: { count: number; windowRealS: number }; // 401s on /rest/user/login from any address (credential stuffing)
   searchErrors: { count: number; windowRealS: number }; // 5xx on /rest/products/search from one address (KI-236: customers' quoted searches answer 500 too, a few per address)
-  apiPace: { count: number; windowRealS: number }; // requests from one address to one scraped API route
-  feedback: { count: number; windowRealS: number }; // POST /api/Feedbacks from one address
+  apiPace: { count: number; windowRealS: number }; // requests to one scraped API route (/api/Users, /api/Products, /rest/memories, /support/logs), any address: waves rotate theirs
+  feedback: { count: number; windowRealS: number }; // POST /api/Feedbacks, any address
 }
 
 const ALERTS: AlertThresholds = {

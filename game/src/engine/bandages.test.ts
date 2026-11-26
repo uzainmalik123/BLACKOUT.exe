@@ -173,7 +173,7 @@ describe('the WAF-only player on every level (D-231, SYS-23)', { timeout: WHOLE_
         return w;
       };
       const wafOnly = run(false);
-      const cut = eventsOfKind(wafOnly.world ?? wafOnly, 'move-cut').find((e) => e.move === 'ATK-08' && e.by === 'DEF-12')!;
+      const cut = eventsOfKind(wafOnly, 'move-cut').find((e) => e.move === 'ATK-08' && e.by === 'DEF-12')!;
       expect(cut).toBeDefined();
       expect(eventsOfKind(wafOnly, 'rule-evaded')).toMatchObject([{ move: 'ATK-08', rule: sqli }]);
       expect(eventsOfKind(wafOnly, 'souls-stolen').filter((e) => e.by === 'ATK-08' && e.t > cut.t).length).toBeGreaterThan(0); // robbed again

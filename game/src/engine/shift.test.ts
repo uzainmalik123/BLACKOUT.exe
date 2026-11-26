@@ -8,7 +8,8 @@ import { footholds } from './facts';
 import { emit, eventsOfKind } from './log';
 import { buildReport } from './report';
 import { runSim } from './sim';
-import { noShift, shiftVerdict, unfixedDoors, VERDICTS } from './shift';
+import { applyAction, FREEZE_MESSAGE } from './actions';
+import { beginShift, noShift, shiftVerdict, unfixedDoors, VERDICTS } from './shift';
 import { initialWorld, type World } from './state';
 import type { PlayerAction } from '../rules/vocabulary';
 import { committedLibrary } from './test-fixtures/committed';
@@ -150,5 +151,64 @@ describe('whole runs against the shift (D-118)', { timeout: WHOLE_RUN_TIMEOUT_MS
     expect(r.facts[0]).toEqual({ label: 'Outcome', value: 'Clean handover' });
     expect(r.missed).toEqual(['a hidden admin account (plant a hidden second admin)', 'a planted file in uploads/ (plant a file)']);
     expect(r.grades.eradicate).toBe('C'); // two footholds left: the report says so, the verdict does not
+  });
+});
+
+describe('the shift start and the change freeze (SYS-22, D-230)', { timeout: WHOLE_RUN_TIMEOUT_MS }, () => {
+  const lib = committedLibrary();
+
+  it("nothing of his happens before beginShift(); then his first move lands inside the level's window on every level and seed, and no wave or tap starts before it", () => {
+    const idle = initialWorld(1, 'medium');
+    advance(idle, lib, 60_000);
+    expect(eventsOfKind(idle, 'move-started')).toEqual([]);
+    for (const difficulty of ['easy', 'medium', 'hard'] as const) {
+      const { min, max } = CONFIG[difficulty].firstMoveDelayRealMs;
+      for (const seed of [1, 2, 3, 4, 5]) {
+        const w = initialWorld(seed, difficulty);
+        advance(w, lib, 5_000); // the screens may run the clock before the desk shows
+        const began = w.clock.gameMs;
+        beginShift(w);
+        beginShift(w); // idempotent
+        for (let i = 0; i < 400 && !eventsOfKind(w, 'move-started').length; i++) advance(w, lib, 100);
+        const first = eventsOfKind(w, 'move-started')[0]!;
+        const delay = first.t - began;
+        expect(delay, `${difficulty} seed ${seed}`).toBeGreaterThanOrEqual(min * 30);
+        expect(delay, `${difficulty} seed ${seed}`).toBeLessThanOrEqual(max * 30 + CONFIG[difficulty].directorPeriodGameMs);
+        expect(w.customers.loop, 'customers flow from the start').toBeGreaterThanOrEqual(1);
+        expect([...eventsOfKind(w, 'wave-started'), ...eventsOfKind(w, 'tap-opened')].filter((e) => e.t < first.t)).toEqual([]);
+        expect(w.shift.firstMoveAt).toBe(first.t);
+      }
+    }
+  });
+
+  it('a change at second 5 is refused with the change-control message and leaves the world unchanged; reads and flags work; the first alert lifts the freeze for good', () => {
+    const w = initialWorld(1, 'medium');
+    beginShift(w);
+    advance(w, lib, 5_000);
+    const before = structuredClone({ ...w, events: [] });
+    const changes: PlayerAction[] = [
+      { type: 'DEF-06', ip: '203.0.113.9', op: 'add' }, { type: 'DEF-12', rule: { kind: 'sqli' } }, { type: 'DEF-10', feature: 'search', enabled: false },
+      { type: 'DEF-11' }, { type: 'DEF-05', name: 'x' }, { type: 'DEF-13', patch: 'search' }, { type: 'DEF-20', to: 'legal' },
+    ];
+    for (const a of changes) expect(applyAction(w, a)).toEqual({ ok: false, message: FREEZE_MESSAGE });
+    expect({ ...w, events: [] }).toEqual(before);
+    expect(applyAction(w, { type: 'DEF-01', query: 'tail' }).ok).toBe(true);
+    expect(applyAction(w, { type: 'DEF-21', ip: '192.0.2.77' }).ok).toBe(true);
+    for (let i = 0; i < 600 && w.incident.declaredAt === undefined; i++) advance(w, lib, 100);
+    expect(w.incident.by).toBe('alert');
+    expect(eventsOfKind(w, 'incident-declared')).toHaveLength(1);
+    expect(eventsOfKind(w, 'alert-opened')[0]!.t).toBe(w.incident.declaredAt);
+    expect(applyAction(w, { type: 'DEF-12', rule: { kind: 'sqli' } }).ok).toBe(true);
+    advance(w, lib, 120_000);
+    expect(applyAction(w, { type: 'DEF-10', feature: 'search', enabled: false }).ok).toBe(true); // never returns
+  });
+
+  it('an escalation is allowed during the freeze and lifts it; a world never begun is not frozen (the lab)', () => {
+    const w = initialWorld(1, 'medium');
+    beginShift(w);
+    expect(applyAction(w, { type: 'DEF-19' }).ok).toBe(true);
+    expect(w.incident.by).toBe('escalation');
+    expect(applyAction(w, { type: 'DEF-11' }).ok).toBe(true);
+    expect(applyAction(initialWorld(1, 'medium'), { type: 'DEF-11' }).ok).toBe(true);
   });
 });

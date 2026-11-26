@@ -31,6 +31,17 @@ const unsubscribe = engine.subscribe((world) => render(world));
 - **Same seed = same game.** Useful for the trailer and for testing a screen against the exact same run.
 - **The `world` object is the engine's own.** Read it; never change it. All changes go through `engine.act(...)`.
 
+### 1.1 The shift start and the change freeze (SYS-22, D-230)
+
+```ts
+engine.beginShift();   // call it when the desk (the dashboard) is in view; idempotent
+```
+
+- **Nothing of Death's happens before `beginShift()`.** Customers flow from the first `advance()`, so the logs show what normal looks like. His first move waits a seeded 25–30 (Easy), 20–30 (Medium) or 15–25 (Hard) real seconds from the call; the minion waves and the leaky taps wait for that first move. `runOn()` in `night/run.ts` calls it today (KI-230): move the call to wherever the desk becomes visible.
+- **The change freeze.** From `beginShift()` until the incident is **declared**, every change action (DEF-05..DEF-20 except DEF-19) answers `{ ok: false, message: 'No incident declared. Change control forbids production changes outside an incident.' }` (`FREEZE_MESSAGE` in `engine/actions.ts`); the shell prints that message for `iptables`, `systemctl`, `rm`, `tar czf /evidence/…` and `sqlite3` locks and deletes. Reads (DEF-01..04) and flags (DEF-21) always work. Show the freeze as **locked controls with that reason**, never as hidden ones.
+- **Declared** by the first alert, an escalation (DEF-19) or a confirmed flag (DEF-21): `world.incident = { declaredAt, by: 'alert' | 'escalation' | 'flag' }` and the event `incident-declared`. The freeze never returns.
+- **The "Now:" strip** reads `world.playbook.phase` (D-233), never the assessor: `watch` (freeze on: look around), `identify` (find out who and how), `contain` (after the first confirmed flag, and again whenever a new Death move starts), `eradicate` (no Death move for one breather), `recover` (a patch deployed or a backup restored). `world.playbook.since` is when it changed (game ms).
+
 ## 2. What to read (all on `engine.world`)
 
 | What | Field | Notes |
@@ -39,7 +50,11 @@ const unsubscribe = engine.subscribe((world) => render(world));
 | 🫀 Heartbeat | `heartbeat`, `heartbeatMax` | 0–`heartbeatMax`. 0 = flatline (an ending). The maximum starts at 100 and drops for good as customers give up (churn, D-65): draw the lost part of the meter as dead |
 | Game clock | `clock.gameMs`, `clock.paused` | |
 | Difficulty | `difficulty` | Decides which helpers the screens show (SCENES.md §0) |
-| Alerts | `alerts` (`about`, `openedAt`, `closedAt?`) | Open = no `closedAt`. `about` is the move, minion or leaky tap (`TAP-01`…) it's about; **don't show that id to the player**, it's a spoiler. Show what the logs show |
+| Alerts | `alerts` (`route`, `symptom`, `gate`, `openedAt`, `closedAt?`; `about` internal) | D-232: an alert opens when a detector crosses its threshold, never at move start. **Show `symptom` (one plain sentence, e.g. "unusual activity on /rest/user/login: 5 failed logins in 30 s from one address") and `route` (the path family)**; `gate` is the player-facing gate name (front door, login, passwords, sign-up, search, admin API, products, uploads, feedback, or a leaky tap's name): **show it on Easy only** (D-235). Open = no `closedAt`. `about` is the move, minion or tap: **never show it**, it's a spoiler |
+| Flags | `flags` (`ip`, `at`, `note?`, `confirmedAt?`) | DEF-21 (D-233): the player's suspicions. Show "flagged" until `confirmedAt` is set, then "confirmed" (and, if you like, on the gate the address's alert named). There is no correct/wrong field on purpose: an unconfirmed flag may be a customer, or an attacker who has not come back yet |
+| Incident / freeze | `incident` (`declaredAt?`, `by?`), `shift` (`beganAt?`, `firstMoveAt?`) | §1.1: frozen while `shift.beganAt` is set and `incident.declaredAt` is not |
+| Playbook phase | `playbook.phase`, `playbook.since` | §1.1: the "Now:" strip |
+| Bandages | `bandages` (`rule`, `at`, `evadesAt`; `move` internal) | SYS-23 (D-231): a WAF rule or the rate limit that cut one of his moves; after `evadesAt` his quiet variants slip it. Don't show `move`; a WAF console may say "this rule stopped something at HH:MM" |
 | Leaky taps | `taps.open` (`id`, `openedAt`) | Small exposures dripping customer data (PRD §4.1, D-42). Each is closed by one WAF path block: `TAP_BY_ID[id].closedBy.rule` in `src/rules/taps.ts` gives the exact `DEF-12` rule a console button should send |
 | Detection data | `engine.topTalkers(n?)`, `engine.errorRate()`, `statusClass(status)` | SYS-20 (D-110), for the three tools (UI-09): see §2.1 |
 | Logs | `engine.accessLog()`, `engine.appLog()` | Ready-made text, one line per entry (real nginx `combined` lines and real Juice Shop log lines). Also `world.logs.access` / `.app` as structured lines if you want to colour or filter them. Most access lines are ordinary customers (`by: 'CUST'`, SYS-19): **never colour by `by`**, it's a spoiler; what the player did to customers shows as their `503`/`429`/`403` lines |
@@ -101,7 +116,8 @@ Every button, console and (later) shell command sends one of these. It returns `
 | Backups | `DEF-17` restore | `{ type: 'DEF-17', backupId: 3 }` |
 | The big red button | `DEF-11` pull the plug · `DEF-18` bring back | `{ type: 'DEF-11' }` · `{ type: 'DEF-18', what: 'nginx' }` |
 | Comms | `DEF-19` escalate · `DEF-20` notify | `{ type: 'DEF-20', to: 'customers' }` |
-| Terminal (via the shell) | `DEF-01`–`06`, `08`, `11`, `14`, `15`, `18` | The shell sends these for you (§5). On **Easy**, the consoles also get buttons for them |
+| Flag an address (a log line, a top-talkers row, the terminal) | `DEF-21` | `{ type: 'DEF-21', ip: '203.0.113.9', note?: 'scanner' }`: a suspicion, confirmed by the next hostile request from it; allowed during the freeze; a second flag of the same address is refused. Two or more flags on addresses that never turn out hostile cost the report's detect grade a letter ("chased false leads") |
+| Terminal (via the shell) | `DEF-01`–`06`, `08`, `11`, `14`, `15`, `18`, `21` | The shell sends these for you (§5). On **Easy**, the consoles also get buttons for them |
 
 **What a read showed (D-115, D-122).** A `DEF-01`, `DEF-02` or `DEF-03` may carry `shown: string[]`, the lines the shell or console printed (at most 200: pass the first 200 and set `shownTotal` to the real count; the engine cuts longer lists). The judging engine decides from those lines whether the read was relevant (it showed something of Death's, and was focused): an accidental `tail` that shows his lines counts, a `cat` of the whole log does not. A read with no `shown` is never relevant. Pass the lines exactly as printed (access-log lines in `combined` format, SQL rows as the shell renders them, file names as listed). **What the shell passes (D-160):** it sends `DEF-01`/`02`/`03` when the Command_Line finishes, with `shown` = the first 200 lines of the line's final screen output (stdout, not stderr; `[]` for a `>` redirect) and `shownTotal` = that output's line count. **The text is never stored:** the logged action keeps only `shownCount`, `shownHis` (lines of his), `shownAbout` and `shownTotal`.
 
@@ -116,7 +132,11 @@ Every button, console and (later) shell command sends one of these. It returns `
 | `move-cut` | The player stopped a move (a fix held for 10 real s, or an IP block at once; a visit to a soul door is only paused, D-45) | He recoils; a hiss |
 | `souls-stolen` | `count` souls just taken (`stolen`/`total` so far) | Souls meter drains, wisps fly out |
 | `wave-started` / `wave-ended` | A minion wave arrives / leaves (`closedBy` if the player closed it) | Rats skitter in / scatter |
-| `alert-opened` / `alert-closed` | An alert appears / clears | Alert panel |
+| `alert-opened` / `alert-closed` | An alert appears (`route`, `symptom`; D-232) / clears | Alert panel: the symptom, never `about` |
+| `shift-begun` | `beginShift()` was called (D-230) | The calm begins |
+| `incident-declared` | The freeze lifts (`by`: `alert`, `escalation` or `flag`) | Unlock the consoles |
+| `flag-confirmed` | A flagged address (`ip`) made a hostile request after the flag (D-233); `about` is a spoiler | "flagged" → "confirmed" |
+| `rule-evaded` | A WAF rule (`rule`) that held one of his moves is slipped by its quiet variant now (D-231); `move` is a spoiler | The WAF console's rule flickers; he grins |
 | `tap-opened` / `tap-closed` | A leaky tap starts dripping / stops (`by: 'DEF-12'` if the player closed it, no `by` if it ran dry) | A small leak animation, then a seal |
 | `door-shut` | One of Death's soul doors (`move`) is shut (`by` the fix that holds now); he stays away while it holds (D-44) | He recoils from it. Don't name the move on screen |
 | `door-reopened` | That fix lapsed (a flag back on before its patch, a new session after a revoke): the door is his again (D-44) | He turns back toward it |
@@ -152,7 +172,7 @@ interface Shell {
 - `run(line)` always resolves, never rejects. `exitCode` is always set by the shell: 0 success, 1 command failure, 2 usage or parse error, 127 command not found. `clear: true` is set only by the `clear` command, and its `output` is empty. The terminal empties the screen first when `clear` is `true`.
 - `output` is **plain text**. The terminal window must render it as text (e.g. a React text node), never as HTML (D-106).
 - `onInternalError` receives anything the shell's catch-alls swallowed. It never reaches `output`.
-- `COMMAND_LIST` (the 31 commands, in steering order) and `checkCommandLine(line): boolean` are exported for KIRO-08 and KDEV-01. Both are pure and need no Engine. `checkCommandLine` never throws; an empty line, a parse error or an unknown command name gives `false`.
+- `COMMAND_LIST` (the 32 commands, in steering order; `flag` since D-233) and `checkCommandLine(line): boolean` are exported for KIRO-08 and KDEV-01. Both are pure and need no Engine. `checkCommandLine` never throws; an empty line, a parse error or an unknown command name gives `false`.
 - A read's `DEF-01`/`02`/`03` is sent when the Command_Line finishes, not at the moment of the read, with `shown` = the first 200 lines of the line's final screen output (stdout, not stderr; `[]` for a `>` redirect) and `shownTotal` = its line count (D-160).
 - The shell reads logs, uploads and the database through the Engine, and sends DEF actions through `engine.act` itself, so the world updates by itself. It never calls `advance`, `pause` or `resume`; the screen owns the clock.
 
@@ -162,6 +182,7 @@ interface Shell {
 | `sqlite3` `SELECT`, `.tables`, `.schema` | `DEF-02` (first SQL text per line) |
 | any command reading a file under uploads (`cat`, `ls`, `file`, `sha256sum`, `cp`, `grep`, …) | `DEF-03` (first path per line). `tar czf` sources are not counted as reads |
 | `whois`, `ping`, `nmap`, `curl` on an IPv4 target | `DEF-04` (`mode`: `passive` or `active`) |
+| `flag <ip> [note…]` | `DEF-21` (D-233; the 32nd command) |
 | `tar czf /evidence/<name>.tgz …` (only this form; `cp` never sends it) | `DEF-05` |
 | `iptables` add / delete | `DEF-06` |
 | `sqlite3` locking / deleting an account | `DEF-08` / `DEF-14` |
