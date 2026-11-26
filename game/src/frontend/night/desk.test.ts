@@ -59,9 +59,9 @@ describe('the desk words what the player could see, and nothing more (D-223)', (
   it('reads the clocks from the engine', () => {
     const { engine } = runOn(new Engine({ seed: 1, difficulty: 'medium', baseline: baseline() }));
     expect(clockAt(engine.world, 0)).toBe('22:00:00');
-    expect(shiftLeft(engine.world)).toBe('16:00');
+    expect(shiftLeft(engine.world)).toBe('11:00'); // D-259: Medium's shift is 11 minutes (was 16)
     engine.advance(60_000);
-    expect(shiftLeft(engine.world)).toBe('15:00');
+    expect(shiftLeft(engine.world)).toBe('10:00');
   });
 
   it("shows a meter's change only when the engine made one", () => {

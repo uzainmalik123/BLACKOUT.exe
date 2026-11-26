@@ -146,7 +146,7 @@ describe('SYS-13 sims', { timeout: WHOLE_RUN_TIMEOUT_MS }, () => {
     expect(suggestions.length).toBe(Math.floor(end / idleGameMs)); // one per window the run lasted
     expect(suggestions.map((e) => e.n)).toEqual(suggestions.map((_, i) => i + 1));
     for (let i = 1; i < suggestions.length; i++) expect(suggestions[i]!.t - suggestions[i - 1]!.t).toBe(idleGameMs); // the idle windows, back to back
-    expect(suggestions.length).toBeGreaterThanOrEqual(5);
+    expect(suggestions.length).toBeGreaterThanOrEqual(4); // several windows: the idle run flatlines at 7.2 min (D-259; 5 windows before)
     for (const s of suggestions) expect(s.gap, `suggestion ${s.n}`).toBeDefined(); // each aimed at the gap standing then
     const easy = runSim({ seed: 1, difficulty: 'easy', player: () => [], library: FIXTURE_LIBRARY, maxRealMs: 20 * REAL_MIN });
     expect(eventsOfKind(easy.world, 'suggestion')).toEqual([]);

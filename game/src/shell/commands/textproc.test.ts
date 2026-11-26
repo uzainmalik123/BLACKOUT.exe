@@ -404,7 +404,8 @@ describe('internal errors (R15.1, R15.4)', () => {
 describe('performance on a whole-run access log (G15)', () => {
   it('grep over the access log of a whole run resolves well inside 5,000 ms', async () => {
     const fx = makeFixture({ baseline: false });
-    for (let i = 0; i < 15 && !fx.world.ending; i++) fx.engine.advance(60_000);
+    for (let i = 0; i < 10 && !fx.world.ending; i++) fx.engine.advance(60_000); // 10 real minutes: inside Medium's 11-minute shift (D-259)
+    expect(fx.world.ending).toBeUndefined();
     expect(fx.world.logs.access.length).toBeGreaterThan(1_000);
     const started = performance.now();
     const r = await fx.shell.run(`grep -c GET ${ACCESS}`);
