@@ -100,6 +100,9 @@ function detectLine(world: World, l: AccessLine, th: AlertThresholds): void {
       const all = count(world, 'logins|*', t, th.failedLoginsAll.windowRealS);
       if (crossed(one, th.failedLogins) && hostile(l.by)) openAlert(world, l.by, '/rest/user/login (passwords)', `unusual activity on /rest/user/login: ${one} failed logins in ${th.failedLogins.windowRealS} s from one address`);
       else if (crossed(all, th.failedLoginsAll) && hostile(l.by)) openAlert(world, l.by, '/rest/user/login (passwords)', `unusual activity on /rest/user/login: ${all} failed logins in ${th.failedLoginsAll.windowRealS} s from many addresses`);
+      // 3b. A slow spray from one address: few tries a minute, so the burst never crosses, but they add up (ATK-04.b).
+      const slow = count(world, `slowlogins|${l.ip}`, t, th.slowFailedLogins.windowRealS);
+      if (crossed(slow, th.slowFailedLogins) && hostile(l.by)) openAlert(world, l.by, '/rest/user/login (passwords)', `unusual activity on /rest/user/login: ${slow} failed logins in ${th.slowFailedLogins.windowRealS} s from one address, spread out`);
     }
     // 4. A login that succeeded from a command-line client: no browser sends that agent.
     if (l.status === 200 && !/^Mozilla/.test(l.userAgent) && hostile(l.by)) openAlert(world, l.by, '/rest/user/login', `a login succeeded from a command-line client (${l.userAgent.split('/')[0] || 'unknown agent'}) on /rest/user/login`);

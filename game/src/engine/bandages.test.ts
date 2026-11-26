@@ -98,26 +98,19 @@ describe('a WAF rule is attempted, cuts, and is evaded (D-231)', () => {
     expect(playableVariants(w, lib, MOVE_BY_ID['ATK-04']).map((v) => v.variant)).toEqual(['c']); // the made-up quiet one
   });
 
-  it('a move with no quiet recording stays stopped for good: the committed ATK-03 and ATK-04 (KI-231), until their .b land', () => {
+  it('the login doors evade with their quiet recordings: ATK-03.b slips the SQLi rule set, ATK-04.b the rate limit (KI-231 closed by D-237)', () => {
     for (const move of ['ATK-03', 'ATK-04'] as const) {
       const lib = only(real, ['ATK-01', move]);
-      expect(lib.variantsOf(move).some((v) => v.info.quiet)).toBe(false); // the day a quiet recording lands, this test says so
+      expect(lib.variantsOf(move).filter((v) => v.info.quiet).map((v) => v.variant)).toEqual(['b']);
       const w = readyToHarvest('medium');
       const rule = move === 'ATK-03' ? sqli : { kind: 'rate-limit', path: '/rest/user/login' } as const;
       w.waf.push(rule);
       bandage(w, move, rule);
       w.clock.gameMs = w.bandages[0]!.evadesAt;
       stepBandages(w, lib);
-      expect(eventsOfKind(w, 'rule-evaded')).toEqual([]); // nothing to evade with
-      expect(playableVariants(w, lib, MOVE_BY_ID[move])).toEqual([]);
+      expect(eventsOfKind(w, 'rule-evaded')).toMatchObject([{ move }]);
+      expect(playableVariants(w, lib, MOVE_BY_ID[move]).map((v) => v.variant)).toEqual(['b']); // the loud .a stays stopped
     }
-    const fixture = only(FIXTURE_LIBRARY, ['ATK-01', 'ATK-03']);
-    const w = readyToHarvest('medium');
-    w.waf.push(sqli);
-    bandage(w, 'ATK-03', sqli);
-    w.clock.gameMs = w.bandages[0]!.evadesAt;
-    stepBandages(w, fixture);
-    expect(eventsOfKind(w, 'rule-evaded')).toMatchObject([{ move: 'ATK-03' }]); // the made-up library has ATK-03.c, quiet
   });
 
   it('a user-agent rule only ever matches a variant whose recorded agent carries the pattern: the ffuf rule never touches the browser-agent scan, the sqlmap rule never the quiet halves', () => {
