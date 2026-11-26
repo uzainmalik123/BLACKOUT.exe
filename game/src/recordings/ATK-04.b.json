@@ -1,0 +1,31 @@
+{
+  "format": 1,
+  "move": "ATK-04",
+  "variant": "b",
+  "label": "quiet: password spraying, 3 passwords over 6 staff accounts, 10 to 12 s apart, browser user agent",
+  "recordedAt": "2026-11-26T08:57:44.011Z",
+  "durationMs": 188098,
+  "attackerIp": "203.0.113.45",
+  "juiceShop": "bkimminich/juice-shop:v20.4.0",
+  "tool": "curl 8.x",
+  "events": [
+    {"t":521,"kind":"access","ip":"203.0.113.45","method":"POST","target":"/rest/user/login","protocol":"HTTP/1.1","status":401,"bytes":26,"referer":"https://juice-sh.op/","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36","requestTimeMs":4},
+    {"t":12329,"kind":"access","ip":"203.0.113.45","method":"POST","target":"/rest/user/login","protocol":"HTTP/1.1","status":401,"bytes":26,"referer":"https://juice-sh.op/","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36","requestTimeMs":3},
+    {"t":24837,"kind":"access","ip":"203.0.113.45","method":"POST","target":"/rest/user/login","protocol":"HTTP/1.1","status":401,"bytes":26,"referer":"https://juice-sh.op/","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36","requestTimeMs":3},
+    {"t":35346,"kind":"access","ip":"203.0.113.45","method":"POST","target":"/rest/user/login","protocol":"HTTP/1.1","status":401,"bytes":26,"referer":"https://juice-sh.op/","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36","requestTimeMs":4},
+    {"t":45854,"kind":"access","ip":"203.0.113.45","method":"POST","target":"/rest/user/login","protocol":"HTTP/1.1","status":401,"bytes":26,"referer":"https://juice-sh.op/","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36","requestTimeMs":3},
+    {"t":56662,"kind":"access","ip":"203.0.113.45","method":"POST","target":"/rest/user/login","protocol":"HTTP/1.1","status":401,"bytes":26,"referer":"https://juice-sh.op/","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36","requestTimeMs":3},
+    {"t":69570,"kind":"access","ip":"203.0.113.45","method":"POST","target":"/rest/user/login","protocol":"HTTP/1.1","status":401,"bytes":26,"referer":"https://juice-sh.op/","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36","requestTimeMs":3},
+    {"t":80578,"kind":"access","ip":"203.0.113.45","method":"POST","target":"/rest/user/login","protocol":"HTTP/1.1","status":401,"bytes":26,"referer":"https://juice-sh.op/","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36","requestTimeMs":3},
+    {"t":92287,"kind":"access","ip":"203.0.113.45","method":"POST","target":"/rest/user/login","protocol":"HTTP/1.1","status":401,"bytes":26,"referer":"https://juice-sh.op/","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36","requestTimeMs":4},
+    {"t":103597,"kind":"access","ip":"203.0.113.45","method":"POST","target":"/rest/user/login","protocol":"HTTP/1.1","status":401,"bytes":26,"referer":"https://juice-sh.op/","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36","requestTimeMs":5},
+    {"t":114006,"kind":"access","ip":"203.0.113.45","method":"POST","target":"/rest/user/login","protocol":"HTTP/1.1","status":401,"bytes":26,"referer":"https://juice-sh.op/","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36","requestTimeMs":3},
+    {"t":124115,"kind":"access","ip":"203.0.113.45","method":"POST","target":"/rest/user/login","protocol":"HTTP/1.1","status":401,"bytes":26,"referer":"https://juice-sh.op/","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36","requestTimeMs":4},
+    {"t":134225,"kind":"access","ip":"203.0.113.45","method":"POST","target":"/rest/user/login","protocol":"HTTP/1.1","status":401,"bytes":26,"referer":"https://juice-sh.op/","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36","requestTimeMs":4},
+    {"t":146533,"kind":"access","ip":"203.0.113.45","method":"POST","target":"/rest/user/login","protocol":"HTTP/1.1","status":401,"bytes":26,"referer":"https://juice-sh.op/","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36","requestTimeMs":4},
+    {"t":156742,"kind":"access","ip":"203.0.113.45","method":"POST","target":"/rest/user/login","protocol":"HTTP/1.1","status":401,"bytes":26,"referer":"https://juice-sh.op/","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36","requestTimeMs":4},
+    {"t":166758,"kind":"access","ip":"203.0.113.45","method":"POST","target":"/rest/user/login","protocol":"HTTP/1.1","status":401,"bytes":26,"referer":"https://juice-sh.op/","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36","requestTimeMs":10},
+    {"t":176773,"kind":"access","ip":"203.0.113.45","method":"POST","target":"/rest/user/login","protocol":"HTTP/1.1","status":401,"bytes":26,"referer":"https://juice-sh.op/","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36","requestTimeMs":6},
+    {"t":187986,"kind":"access","ip":"203.0.113.45","method":"POST","target":"/rest/user/login","protocol":"HTTP/1.1","status":200,"bytes":784,"referer":"https://juice-sh.op/","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36","requestTimeMs":7}
+  ]
+}
