@@ -241,6 +241,35 @@
   overflow: hidden;
   cursor: text;
 }
+/* Death's reflection in the terminal when one of his attacks lands (D-254): behind every line of text, faint, brief */
+.pl-term.is-haunted::before {
+  content: '';
+  position: absolute;
+  inset: 34px 0 0 0;
+  z-index: -1;
+  background: var(--death) no-repeat right 6% bottom 6% / auto 62%;
+  opacity: 0;
+  pointer-events: none;
+  animation: pl-haunt 2.2s ease-in-out;
+}
+@keyframes pl-haunt {
+  25% {
+    opacity: 0.16;
+  }
+  70% {
+    opacity: 0.11;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pl-term.is-haunted::before {
+    animation: none;
+    opacity: 0.1;
+  }
+}
+/* the stolen admin key: a line in the top bar, not a symbol by him (D-254) */
+.pl-keychip {
+  color: #ff8a8a;
+}
 .pl-term-bar {
   position: relative;
   display: flex;

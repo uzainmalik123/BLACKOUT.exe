@@ -141,7 +141,13 @@ describe('RESULT says what the engine did, never more (D-225)', () => {
   it('the button and the typed command are the same engine action', async () => {
     const a = fresh('medium', 7);
     const b = fresh('medium', 7);
-    for (const r of [a, b]) for (let i = 0; i < 160; i++) r.engine.advance(250); // past the calm and the first alert: the freeze is lifted (D-230)
+    // past the calm to the first alert (the scan), which lifts the freeze (D-230, D-252); both runs step alike
+    let n = 0;
+    while (n < 160 && a.engine.world.incident.declaredAt === undefined) {
+      a.engine.advance(250);
+      n++;
+    }
+    for (let i = 0; i < n; i++) b.engine.advance(250);
     const s = situationOf(a.engine.world);
     const ip = a.engine.topTalkers(1)[0]!.ip;
     // the button runs the situation's command; the player types the same line

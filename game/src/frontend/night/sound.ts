@@ -141,6 +141,15 @@ export class Soundscape {
     this.health = Math.max(0, Math.min(1, h));
   }
 
+  /** A moment of silence (D-255, his return): everything falls quiet fast, holds, and comes back. */
+  hush(seconds: number): void {
+    if (!this.ctx || !this.master) return;
+    const t = this.ctx.currentTime;
+    this.master.gain.cancelScheduledValues(t);
+    this.master.gain.setTargetAtTime(0, t, 0.04);
+    this.master.gain.setTargetAtTime(this.muted ? 0 : this.level, t + Math.max(0.2, seconds - 0.4), 0.25);
+  }
+
   /** Defeat: the heartbeat slows over a few beats and stops. */
   heartStop(): void {
     if (this.stopping < 0) this.stopping = 0;

@@ -1,7 +1,9 @@
 // The battlefield (UI-05, D-225): the fight with Death drawn as a place, in the centre of the play screen. The Juice
 // Shop in the middle, its seven entrances round it, the vault of souls inside, a barrier as strong as the business
-// is healthy, customers coming and going, Death outside, coming closer stage by stage, his shadows running at the
-// entrance he is attacking. Everything on it is read from the engine: an entrance is sealed when the engine says a
+// is healthy, customers coming and going, his shadows running at the entrance he is attacking. Death himself is
+// placed by his presence (presence.ts, D-254): away in the calm, back out of the dark when an attack begins, at the
+// gate under attack, striking when it lands, torn into the dark when the player's fix stops it, looming when the
+// business is close to failing; always under the windows, where he can be seen. Everything on it is read from the engine: an entrance is sealed when the engine says a
 // fix holds for every attack on it (`anyStopperHolds`), the stolen admin key is the engine's `gains`, the roots are
 // its `footholds`, the souls are its count. The effects (a shield, a gate slamming, the key shattering, a root
 // breaking, souls pulled out) play only on the engine events or the state changes that mean them.
@@ -12,6 +14,10 @@ import type { World } from '../../engine/state';
 import { MOVE_BY_ID } from '../../rules/moves';
 import type { Foothold, MoveId } from '../../rules/vocabulary';
 import { drawDeath } from '../screen3-briefing/cinema/characters';
+import { envStep, lightAt, startEnv, type Env } from './environment';
+import { danger as dangerOf } from './judge';
+import { HOLD, placeDeath, presenceStep, startPresence, type Presence, type Rect, type Spot } from './presence';
+import { liveAttacks } from './results';
 
 type G = CanvasRenderingContext2D;
 
@@ -180,6 +186,14 @@ export class Battle {
   private shown = 0.15;
   private lastT = 0;
   private endedAt = -1;
+  /** Death's presence (D-254) and where he is drawn (eased toward his spot). */
+  presence: Presence = startPresence();
+  /** How the field's light answers the fight (D-255). */
+  env: Env = startEnv();
+  private target: Spot | null = null;
+  private targetKey = '';
+  private targetAt = -1;
+  private at: Spot | null = null;
 
   /** Read the world: new events become effects, and state changes (the key gone, a root removed) do too. */
   update(world: World, t: number): BattleView {
@@ -189,9 +203,10 @@ export class Battle {
       this.seen = evs.length;
       this.started = true;
     }
-    for (let i = this.seen; i < evs.length; i++) {
-      for (const f of fxOf(evs[i]!)) this.fx.push({ ...f, start: t });
-      this.menace = clamp(this.menace + menaceStep(evs[i]!));
+    const fresh = evs.slice(this.seen);
+    for (const ev of fresh) {
+      for (const f of fxOf(ev)) this.fx.push({ ...f, start: t });
+      this.menace = clamp(this.menace + menaceStep(ev));
     }
     this.seen = evs.length;
     const dt = Math.min(0.1, Math.max(0, t - this.lastT));
@@ -203,13 +218,26 @@ export class Battle {
     for (const g of GATES) if (this.lastGates[g.id] && this.lastGates[g.id] !== 'sealed' && v.gates[g.id] === 'sealed') this.fx.push({ kind: 'seal', gate: g.id, start: t });
     // an attack the engine has just frozen: a shield at its gate, and he recoils
     const frozen = new Set(world.replays.filter((r) => r.frozenSince !== undefined).map((r) => r.id));
+    let frozeHis = 0;
     for (const r of world.replays) {
       if (r.frozenSince !== undefined && !this.lastFrozen.has(r.id)) {
         this.fx.push({ kind: 'shield', gate: gateOf(r.move)?.id, start: t }, { kind: 'recoil', start: t });
-        if (r.owner === 'death') this.menace = clamp(this.menace - 0.08);
+        if (r.owner === 'death') {
+          this.menace = clamp(this.menace - 0.08);
+          frozeHis++;
+        }
       }
     }
     this.lastFrozen = frozen;
+    this.env = envStep(this.env, t, fresh, frozeHis);
+    if (!world.ending)
+      this.presence = presenceStep(this.presence, {
+        t,
+        events: fresh,
+        frozen: frozeHis,
+        danger: dangerOf(world.heartbeat, world.souls.stolen.length, world.souls.total),
+        live: liveAttacks(world).length,
+      });
     this.lastKey = v.key;
     this.lastRoots = new Set(v.roots);
     this.lastGates = { ...v.gates };
@@ -222,9 +250,57 @@ export class Battle {
     return this.fx.filter((f) => t - f.start < s).map((f) => f.kind);
   }
 
-  paint(g: G, w: number, h: number, dpr: number, t: number, v: BattleView, focus: GateId | null, ending: { kind: string; through?: Foothold } | null = null): void {
-    paintBattle(g, w, h, dpr, t, v, this.fx, focus, this.shown, ending && this.endedAt >= 0 ? { ...ending, e: t - this.endedAt } : null);
+  /**
+   * Paint the battlefield. `cover` is what lies over it on screen (windows, the alert, the evidence card), in its own
+   * pixels: Death is placed where he can be seen past them (he is drawn under them, so he never covers their text).
+   */
+  paint(g: G, w: number, h: number, dpr: number, t: number, v: BattleView, focus: GateId | null, ending: { kind: string; through?: Foothold } | null = null, cover: readonly Rect[] = [], reduce = false): void {
+    paintBattle(g, w, h, dpr, t, v, this.fx, focus, this.shown, ending && this.endedAt >= 0 ? { ...ending, e: t - this.endedAt } : null, this.death(w, h, t, cover), reduce, lightAt(this.env, t, reduce));
   }
+
+  /** How Death is drawn this frame: his spot for his mode, eased; his form, tearing and gesture by the mode. */
+  private death(w: number, h: number, t: number, cover: readonly Rect[]): DeathDraw | null {
+    const p = this.presence;
+    if (p.mode === 'away') {
+      this.at = null;
+      return null;
+    }
+    const L = layout(w, h);
+    const gate = p.move ? L.gates.get(gateOf(p.move)?.id ?? 'front') : undefined;
+    // the place is chosen when the mode or the visit changes, and looked at again now and then (windows move)
+    const key = `${p.mode}:${p.visit}:${p.move ?? ''}:${Math.round(w)}x${Math.round(h)}`;
+    if (key !== this.targetKey || t - this.targetAt > 1.5 || !this.target) {
+      const place = p.mode === 'recoiling' && this.at ? this.at : placeDeath(p.sudden ? 'striking' : p.mode, p.visit, { w, h }, cover, { shop: L.shop, gate });
+      this.target = place;
+      this.targetKey = key;
+      this.targetAt = t;
+    }
+    const target = this.target!;
+    const e = t - p.since;
+    const dt = Math.min(0.1, Math.max(0, t - (this.lastPaint ?? t)));
+    this.lastPaint = t;
+    if (!this.at || p.mode === 'returning') this.at = { ...target };
+    else {
+      const k = 1 - Math.exp(-dt * (p.mode === 'striking' ? 6 : 2.2));
+      this.at = { ...this.at, x: this.at.x + (target.x - this.at.x) * k, y: this.at.y + (target.y - this.at.y) * k, s: this.at.s + (target.s - this.at.s) * k, lean: this.at.lean + (target.lean - this.at.lean) * k };
+    }
+    const at = this.at;
+    switch (p.mode) {
+      case 'returning':
+        return { ...at, form: ease(e / HOLD.returning), fragment: 0, point: p.sudden ? 1 : 0, menace: this.shown };
+      case 'striking':
+        return { ...at, form: 1, fragment: 0, point: 1, menace: Math.max(0.7, this.shown) };
+      case 'recoiling': {
+        const u = ease(e / HOLD.recoiling);
+        return { ...at, x: at.x + w * 0.06 * u, form: 1 - 0.3 * u, fragment: 0.85 * u, point: 0, menace: this.shown };
+      }
+      case 'critical':
+        return { ...at, form: 1, fragment: 0, point: Math.sin(t * 0.7) > 0.6 ? 1 : 0, menace: 1 };
+      default:
+        return { ...at, form: 1, fragment: 0, point: 0, menace: this.shown };
+    }
+  }
+  private lastPaint: number | null = null;
 }
 
 const ROOTS: Foothold[] = ['hidden-admin', 'hijacked-user', 'planted-file', 'forged-token'];
@@ -244,8 +320,12 @@ function layout(w: number, h: number) {
   return { shop, R, gates };
 }
 
-function deathAt(w: number, h: number, menace: number) {
-  return { x: w * (0.95 - 0.3 * clamp(menace)), y: h * 0.62 };
+/** How Death is drawn on the battlefield this frame (D-254). */
+interface DeathDraw extends Spot {
+  form: number;
+  fragment: number;
+  point: number;
+  menace: number;
 }
 
 function glow(g: G, x: number, y: number, r: number, c: string): void {
@@ -269,8 +349,15 @@ interface EndingView {
   e: number;
 }
 
-function paintBattle(g: G, w: number, h: number, dpr: number, t: number, v: BattleView, fx: Fx[], focus: GateId | null, menace: number, ending: EndingView | null): void {
+function paintBattle(g: G, w: number, h: number, dpr: number, t: number, v: BattleView, fx: Fx[], focus: GateId | null, menace: number, ending: EndingView | null, dd: DeathDraw | null, reduce: boolean, light = 1): void {
   const L = layout(w, h);
+  // the camera breathes: a slow drift and the slightest scale (none under reduced motion)
+  g.save();
+  if (!reduce) {
+    g.translate(w / 2 + Math.sin(t * 0.07) * w * 0.004, h / 2 + Math.cos(t * 0.05) * h * 0.005);
+    g.scale(1.012, 1.012);
+    g.translate(-w / 2, -h / 2);
+  }
   const health = clamp(v.heartbeat / 100);
   // the ground: night fog, a grid of streets fading out
   const bg = g.createRadialGradient(L.shop.x, L.shop.y, h * 0.05, L.shop.x, L.shop.y, w * 0.8);
@@ -339,39 +426,27 @@ function paintBattle(g: G, w: number, h: number, dpr: number, t: number, v: Batt
     gate(g, p.x, p.y, h * 0.05, v.gates[gd.id], gd.label, t, focus === gd.id);
   }
 
-  // Death: as close and as large as his menace, darker and more broken-in each stage; recoiling on a cut, lunging on
-  // a landing. His crimson aura grows with the menace; his eyes burn brighter.
-  const d = deathAt(w, h, menace);
-  const recoil = fx.filter((f) => f.kind === 'recoil').map((f) => t - f.start).find((e) => e < 1);
-  const lunge = fx.filter((f) => f.kind === 'lunge').map((f) => t - f.start).find((e) => e < 1);
-  const dx = recoil !== undefined ? Math.sin(recoil * Math.PI) * w * 0.05 : lunge !== undefined ? -Math.sin(lunge * Math.PI) * w * 0.06 : 0;
+  // Death (D-254): where his presence puts him, or, in an ending, where the ending takes him. No aura, nothing round
+  // him: a shadow under him, his robe, his eyes.
+  const d = dd ? { x: dd.x, y: dd.y - dd.s * 0.5 } : { x: w * 0.9, y: h * 0.62 };
   const end = ending ? endingDeath(ending, d, w, h, L) : null;
-  if ((v.stage > 0 || v.raids.length > 0 || end) && (end?.form ?? 1) > 0.01) {
-    const size = h * (0.34 + 0.3 * menace + 0.02 * v.stage) * (end?.scale ?? 1);
-    const at = end ? { x: end.x, y: end.y } : { x: d.x + dx, y: d.y };
-    glow(g, at.x, at.y - size * 0.5, size * (0.7 + 0.5 * menace), `rgba(150, 0, 20, ${(0.12 + 0.3 * menace).toFixed(3)})`);
-    // ink dripping from him once he has taken something (stage 4 on)
-    if (v.stage >= 4) {
-      for (let i = 0; i < 10; i++) {
-        const u = (t * 0.3 + rand(i)) % 1;
-        g.fillStyle = `rgba(10, 0, 4, ${(0.7 * (1 - u)).toFixed(3)})`;
-        g.beginPath();
-        g.ellipse(at.x + (rand(i + 3) - 0.5) * size * 0.6, at.y - size * 0.1 + u * size * 0.25, 2 + 3 * rand(i), 4 + 8 * u, 0, 0, Math.PI * 2);
-        g.fill();
-      }
+  if (ending?.kind === 'return' && ending.e >= 2.8) returnCrack(g, L, h, ending, t);
+  if (end) {
+    if (end.form > 0.01) {
+      const size = h * (0.34 + 0.3 * menace + 0.02 * v.stage) * end.scale;
+      drawDeath(g, end.x, end.y + size * 0.5, size, { t, form: end.form, point: end.point > 0.5 ? 1 : 0, fragment: end.fragment, eyes: 0.4 + 0.6 * menace, menace, reduce }, dpr);
     }
-    g.save();
-    g.globalAlpha = 0.92 * (end?.form ?? 1);
-    drawDeath(g, at.x, at.y + size * 0.72, size, { t, form: end?.form ?? 1, point: lunge !== undefined || (end?.point ?? 0) > 0.5 ? 1 : 0, fragment: end?.fragment ?? (recoil !== undefined ? 0.45 : 0.05 + 0.25 * (1 - menace)), eyes: 0.4 + 0.6 * menace }, dpr);
-    g.restore();
-    if (v.key && !end) key(g, at.x - size * 0.18, at.y - size * 0.2, h * 0.05, t, 1);
+  } else if (dd && dd.form > 0.01) {
+    drawDeath(g, dd.x, dd.y, dd.s, { t, form: dd.form, point: dd.point, fragment: dd.fragment, eyes: 0.3 + 0.7 * dd.menace, menace: dd.menace, lean: dd.lean, rim: '120, 200, 230', reduce }, dpr);
   }
   for (const raid of v.raids) {
     const p = L.gates.get(raid.gate)!;
+    // his shadows come in out of the dark at the field's edge, never out of him
+    const from = { x: w + h * 0.05, y: p.y + h * 0.1 };
     for (let i = 0; i < (raid.death ? 5 : 3); i++) {
       const u = (t * 0.35 + i / 5) % 1;
-      const x = d.x + (p.x - d.x) * u;
-      const y = d.y + (p.y - d.y) * u + Math.sin(u * 9 + i) * h * 0.02;
+      const x = from.x + (p.x - from.x) * u;
+      const y = from.y + (p.y - from.y) * u + Math.sin(u * 9 + i) * h * 0.02;
       shadow(g, x, y, h * (raid.death ? 0.035 : 0.022), raid.death, u);
     }
   }
@@ -394,7 +469,8 @@ function paintBattle(g: G, w: number, h: number, dpr: number, t: number, v: Batt
         soulsFx(g, L.shop.x, L.shop.y, d.x, d.y - h * 0.1, e, f.n ?? 3);
         break;
       case 'key':
-        shatterFx(g, d.x - h * 0.07, d.y - h * 0.08, h * 0.06, e);
+        // the stolen key revoked: the shop's lights steady (the key itself is a line in the top bar, not a symbol by him)
+        glow(g, L.shop.x, L.shop.y, h * 0.25 * (1 - clamp(e / 1.5)), 'rgba(70, 232, 255, 0.35)');
         break;
       case 'root':
         root(g, L.shop.x, L.shop.y, h, f.n ?? 0, t, 1 - ease(e / 1.5));
@@ -426,6 +502,18 @@ function paintBattle(g: G, w: number, h: number, dpr: number, t: number, v: Batt
     g.fillText(`EVIDENCE ×${v.evidence}`, w * 0.08, h * 0.91);
   }
   if (ending) paintEnding(g, w, h, t, v, ending, L, end ? { x: end.x, y: end.y } : d);
+  g.restore();
+  // the field's light answers the fight (D-255): a flicker at a breach, a lift when the player stops an attack
+  if (light < 0.999) {
+    g.fillStyle = `rgba(0, 0, 0, ${(0.85 * (1 - light)).toFixed(3)})`;
+    g.fillRect(0, 0, w, h);
+  } else if (light > 1.001) {
+    g.save();
+    g.globalCompositeOperation = 'lighter';
+    g.fillStyle = `rgba(70, 180, 230, ${(0.35 * (light - 1)).toFixed(3)})`;
+    g.fillRect(0, 0, w, h);
+    g.restore();
+  }
   // the vignette
   const vg = g.createRadialGradient(w / 2, h / 2, h * 0.3, w / 2, h / 2, w * 0.7);
   vg.addColorStop(0, 'rgba(0, 0, 0, 0)');
@@ -544,24 +632,6 @@ function shadow(g: G, x: number, y: number, s: number, his: boolean, u: number):
   g.restore();
 }
 
-function key(g: G, x: number, y: number, s: number, t: number, a: number): void {
-  glow(g, x, y, s * 1.6, `rgba(255, 200, 80, ${(0.4 * a * (0.7 + 0.3 * Math.sin(t * 4))).toFixed(3)})`);
-  g.save();
-  g.translate(x, y);
-  g.rotate(-0.6);
-  g.strokeStyle = `rgba(255, 210, 110, ${a.toFixed(3)})`;
-  g.lineWidth = s * 0.15;
-  g.beginPath();
-  g.arc(0, -s * 0.4, s * 0.3, 0, Math.PI * 2);
-  g.moveTo(0, -s * 0.1);
-  g.lineTo(0, s * 0.8);
-  g.moveTo(0, s * 0.55);
-  g.lineTo(s * 0.25, s * 0.55);
-  g.moveTo(0, s * 0.75);
-  g.lineTo(s * 0.2, s * 0.75);
-  g.stroke();
-  g.restore();
-}
 
 function root(g: G, x: number, y: number, h: number, i: number, t: number, a: number): void {
   if (a <= 0.01) return;
@@ -676,6 +746,20 @@ function endingDeath(en: EndingView, d: { x: number; y: number }, w: number, h: 
   }
 }
 
+/** The return's twist, under him (D-254: nothing over his face): the root of the way back he kept splits the shop's floor. */
+function returnCrack(g: G, L: Layout, h: number, en: EndingView, t: number): void {
+  const k = ROOTS.indexOf(en.through ?? 'hidden-admin');
+  root(g, L.shop.x, L.shop.y, h, k < 0 ? 0 : k, t, 1);
+  const crack = clamp((en.e - 2.8) / 0.4);
+  g.strokeStyle = `rgba(255, 40, 60, ${(0.9 * crack).toFixed(3)})`;
+  g.lineWidth = 3;
+  g.beginPath();
+  g.moveTo(L.shop.x - h * 0.08 * crack, L.shop.y + h * 0.1);
+  g.lineTo(L.shop.x, L.shop.y - h * 0.02);
+  g.lineTo(L.shop.x + h * 0.06 * crack, L.shop.y + h * 0.12);
+  g.stroke();
+}
+
 /** The ending's scene over the battlefield: light, darkness, the heart line, the souls, the twist. */
 function paintEnding(g: G, w: number, h: number, t: number, v: BattleView, en: EndingView, L: Layout, death: { x: number; y: number }): void {
   const e = en.e;
@@ -703,17 +787,7 @@ function paintEnding(g: G, w: number, h: number, t: number, v: BattleView, en: E
         glow(g, L.shop.x, L.shop.y, L.R * 1.8 * ease(e / 2.5), `rgba(190, 240, 255, ${(0.3 * clamp(e / 2.5)).toFixed(3)})`);
         break;
       }
-      // the way back he kept: its root splits the floor of the shop, crimson; the light dies from inside out
-      const k = ROOTS.indexOf(en.through ?? 'hidden-admin');
-      root(g, L.shop.x, L.shop.y, h, k < 0 ? 0 : k, t, 1);
-      const crack = clamp((e - 2.8) / 0.4);
-      g.strokeStyle = `rgba(255, 40, 60, ${(0.9 * crack).toFixed(3)})`;
-      g.lineWidth = 3;
-      g.beginPath();
-      g.moveTo(L.shop.x - h * 0.08 * crack, L.shop.y + h * 0.1);
-      g.lineTo(L.shop.x, L.shop.y - h * 0.02);
-      g.lineTo(L.shop.x + h * 0.06 * crack, L.shop.y + h * 0.12);
-      g.stroke();
+      // the floor's split is drawn under him (returnCrack); here the light dies from inside out
       if (e < 3.3) {
         g.fillStyle = `rgba(255, 20, 40, ${(0.35 * (1 - (e - 2.8) / 0.5)).toFixed(3)})`;
         g.fillRect(0, 0, w, h);

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { GameEvent } from '../../engine/log';
 import { DURATION, SHAKE, WALK_SECONDS, handshake, prompt, startFlow, step, type Flow, type Input } from './flow';
+import { CONFIG } from '../../engine/config';
 import { ENDINGS, STAGE_BEAT, anomalies, danger, kiroMood, kiroVerdict, reaction, whatKiroSees, type Readings } from './judge';
 
 const run = (f: Flow, ...inputs: Input[]) => inputs.reduce(step, f);
@@ -17,7 +18,19 @@ describe('the night-shift prologue, kept short (UI-10, D-223, D-224)', () => {
     expect(wait(f, 999).phase).toBe('offer');
     expect(prompt(f)).toBe('[E] Shake hand');
     const story = (['dark', 'eyes', 'wake', 'approach', 'intro'] as const).reduce((a, p) => a + (DURATION[p] ?? 0), 0);
-    expect(story).toBeLessThanOrEqual(18);
+    expect(story).toBeLessThanOrEqual(11.5); // D-252: was up to 18 s
+  });
+
+  it('reaches the desk in under 20 s of play, and the first threat comes within 10 s of the desk on every level (D-252)', () => {
+    const timed = (['dark', 'eyes', 'wake', 'approach', 'intro', 'shake', 'after', 'sitting', 'login'] as const).reduce((a, p) => a + (DURATION[p] ?? 0), 0);
+    expect(timed + WALK_SECONDS).toBeLessThan(20);
+    for (const level of ['easy', 'medium', 'hard'] as const) {
+      const { min, max } = CONFIG[level].firstMoveDelayRealMs;
+      expect(min, level).toBeGreaterThanOrEqual(5000);
+      expect(max, level).toBeLessThanOrEqual(10_000);
+    }
+    expect(CONFIG.easy.firstMoveDelayRealMs.min).toBeGreaterThanOrEqual(CONFIG.medium.firstMoveDelayRealMs.min);
+    expect(CONFIG.medium.firstMoveDelayRealMs.min).toBeGreaterThanOrEqual(CONFIG.hard.firstMoveDelayRealMs.min);
   });
 
   it('E plays the handshake: the hands reach, close, pump twice and let go, then she leads on', () => {
@@ -101,7 +114,13 @@ describe('the room reacts to the engine, and the endings are the engine\'s', () 
     expect(ENDINGS.banished).toMatchObject({ won: true, title: 'Death banished', line: 'The system survived. Did you?' });
     for (const e of ['souls-lost', 'flatline', 'return'] as const) expect(ENDINGS[e].scene).toBe('taken');
     expect(kiroVerdict({ detect: 'A', contain: 'B', eradicate: 'B', recover: 'D' })).toMatch(/followed the evidence/);
-    expect(kiroVerdict({ detect: 'C', contain: 'F', eradicate: 'B', recover: 'D' })).toMatch(/panicked/);
+    expect(kiroVerdict({ detect: 'C', contain: 'F', eradicate: 'B', recover: 'D' }, 'flatline')).toMatch(/panicked/);
+    // D-256: she never praises a lost night, and never scolds a won one as a panic
+    expect(kiroVerdict({ detect: 'A', contain: 'F', eradicate: 'A', recover: 'A' }, 'return')).toMatch(/one way in you missed/);
+    expect(kiroVerdict({ detect: 'A', contain: 'F', eradicate: 'A', recover: 'A' }, 'return')).not.toMatch(/still here/);
+    expect(kiroVerdict({ detect: 'A', contain: 'F', eradicate: 'A', recover: 'A' }, 'souls-lost')).toMatch(/faster with the records/);
+    expect(kiroVerdict({ detect: 'A', contain: 'F', eradicate: 'A', recover: 'A' }, 'flatline')).toMatch(/could not survive/);
+    expect(kiroVerdict({ detect: 'C', contain: 'F', eradicate: 'B', recover: 'D' }, 'clean-handover')).toMatch(/follow the evidence sooner/);
   });
 });
 

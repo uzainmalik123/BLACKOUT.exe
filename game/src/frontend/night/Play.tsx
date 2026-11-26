@@ -9,7 +9,7 @@
 // reads the playbook phase; during the change freeze change controls show locked with the engine's reason (SYS-22).
 // The shift begins when this screen shows (`engine.beginShift()`, D-243).
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { OPENING_TUTORIAL } from '../../content/kiro-fallback';
 import { gameClockLabel } from '../../engine/clock';
 import type { GameEvent } from '../../engine/log';
@@ -18,7 +18,7 @@ import { DIAL } from '../shared/dial';
 import { ConsolePanel, type ConsoleId } from './Consoles';
 import { Feed, Logs, metersOf, type Meters, type Toast } from './Desk';
 import { Dock, FloatWindow } from './Dock';
-import { Battle, type FxKind, type GateId } from './battle';
+import { Battle, battleOf, type FxKind, type GateId } from './battle';
 import { anomalies, danger as dangerOf, kiroMood, whatKiroSees } from './judge';
 import { KiroPanel, type KiroLine } from './KiroPanel';
 import { OUTCOME_KIRO, OUTCOME_WORDS, READS, liveAttacks, outcomeOf, type Outcome, type Pending } from './results';
@@ -29,6 +29,9 @@ import { PANEL_TOOL, TOOL_BY_ID, closeTool, dockFor, focusTool, isOpen, moveTool
 import { NOW_WORDS, battleGate, freezeReason, gateConsole, gateSentence, shiftLeft } from './words';
 import { CONFIG } from '../../engine/config';
 import { KiroCanvas } from '../shared/KiroCanvas';
+import { deathPortrait } from '../shared/reaper';
+import type { Rect } from './presence';
+import { markSeen, seen } from '../shared/seen';
 
 export interface Volumes {
   rain: number;
@@ -41,6 +44,11 @@ export type Sfx = 'shield' | 'gate' | 'key' | 'evidence' | 'breach' | 'recover';
 
 export interface PlayProps {
   run: Run;
+  /** Death's line now, shown in the Now strip (D-254), and the first alert's warning there. */
+  taunt?: string | null;
+  alarm?: boolean;
+  /** The first shift's tutorial is open: hold the night's clock (D-252). */
+  onHold?: (on: boolean) => void;
   tick: number;
   on: boolean;
   kiroLines: KiroLine[];
@@ -95,6 +103,8 @@ export function Play({ toasts, ...p }: PlayProps) {
   const [hi, setHi] = useState(-1);
   const [sound, setSound] = useState(false);
   const [lesson, setLesson] = useState(0);
+  // the tutorial plays on the player's first shift only; Kiro's panel can bring it back (D-252)
+  const [tutorial, setTutorial] = useState(() => !seen('tutorial'));
   const { wins, setWins } = p;
   const terminal = isOpen(wins, 'terminal');
   const view = () => ({ w: window.innerWidth, h: window.innerHeight });
@@ -112,6 +122,8 @@ export function Play({ toasts, ...p }: PlayProps) {
   /** Seconds since the battlefield's loop began, as of its last frame (the RESULT's clock). */
   const clockNow = useRef(0);
   const focusGate = useRef<GateId | null>(null);
+  // Death's reflection in the terminal when one of his attacks lands (D-254): behind the text, faint, brief
+  const [haunted, setHaunted] = useState(0);
   const files = useMemo(() => w.files.map((f) => f.path.split('/')[0]!), [w.files, p.tick]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
@@ -129,6 +141,10 @@ export function Play({ toasts, ...p }: PlayProps) {
     const g = c?.getContext('2d');
     if (!c || !g) return;
     const battle = new Battle();
+    // the browser checks read Death's presence from here (development only: the production build drops it)
+    if (import.meta.env.DEV) (window as unknown as { __battle?: Battle }).__battle = battle;
+    const reduce = !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    let lastStrike = -1;
     let raf = 0;
     const t0 = performance.now();
     let last = 0;
@@ -150,7 +166,18 @@ export function Play({ toasts, ...p }: PlayProps) {
         if (s) p.sfx(s);
       }
       last = t;
-      battle.paint(g, W, H, dpr, t, v, focusGate.current, world.ending ? { kind: world.ending, through: world.death.returnedThrough } : null);
+      // what lies over the battlefield on screen: he is placed where he can be seen past it, and drawn under it
+      const base = c.getBoundingClientRect();
+      const cover: Rect[] = [];
+      for (const el of document.querySelectorAll<HTMLElement>('.ns-win, .pl-alert, .pl-evidence, .pl-result')) {
+        const r = el.getBoundingClientRect();
+        if (r.width > 0 && r.right > base.left && r.left < base.right && r.bottom > base.top && r.top < base.bottom) cover.push({ x: r.left - base.left, y: r.top - base.top, w: r.width, h: r.height });
+      }
+      battle.paint(g, W, H, dpr, t, v, focusGate.current, world.ending ? { kind: world.ending, through: world.death.returnedThrough } : null, cover, reduce);
+      if (battle.presence.mode === 'striking' && battle.presence.since !== lastStrike) {
+        lastStrike = battle.presence.since;
+        setHaunted((n) => n + 1);
+      }
       const pend = pending.current;
       if (pend) {
         const o = outcomeOf(pend, world, t);
@@ -171,6 +198,12 @@ export function Play({ toasts, ...p }: PlayProps) {
     // the loop reads the engine itself; it starts once
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (!haunted) return;
+    const t = window.setTimeout(() => setHaunted(0), 2200);
+    return () => window.clearTimeout(t);
+  }, [haunted]);
 
   useEffect(() => {
     if (!result) return;
@@ -294,7 +327,18 @@ export function Play({ toasts, ...p }: PlayProps) {
 
   // ---- the opening's tutorial (CON-03, D-238): during the freeze, one step at a time, lighting what it names
   const steps = OPENING_TUTORIAL[run.difficulty];
-  const teaching = frozen && lesson < steps.length ? steps[lesson]! : null;
+  const teaching = tutorial && lesson < steps.length ? steps[lesson]! : null;
+  const endTutorial = () => {
+    markSeen('tutorial');
+    setTutorial(false);
+  };
+  // while it is open before anything has happened (the freeze), the clock waits for the player
+  const holding = !!teaching && !!frozen;
+  const { onHold } = p;
+  useEffect(() => {
+    onHold?.(holding);
+  }, [holding, onHold]);
+  useEffect(() => () => onHold?.(false), [onHold]);
   const lit = new Set<ToolId>();
   for (const panel of teaching?.panels ?? []) {
     const t = PANEL_TOOL[panel];
@@ -302,6 +346,13 @@ export function Play({ toasts, ...p }: PlayProps) {
   }
   if (gate && dial.gateSentence) lit.add(gateConsole(gate));
 
+  // the terminal takes the keyboard only when the player opens it (T, its button, a click in it, Kiro's insert): opened
+  // by the level or the tutorial it leaves 1, 2 and 3 to the actions (D-258, KI-251)
+  const openedByPlayer = useRef(false);
+  const toggleTerminal = () => {
+    openedByPlayer.current = true;
+    setTerminal((x) => !x);
+  };
   // keys: 1, 2, 3 and T when the player isn't typing
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -311,14 +362,15 @@ export function Play({ toasts, ...p }: PlayProps) {
       else if (e.key === '3') void ask();
       else if (e.key.toLowerCase() === 't' || e.key === '`') {
         e.preventDefault();
-        setTerminal((x) => !x);
+        toggleTerminal();
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   });
   useEffect(() => {
-    if (terminal) input.current?.focus();
+    if (terminal && openedByPlayer.current) input.current?.focus();
+    openedByPlayer.current = false;
   }, [terminal]);
 
   // Kiro's mood (D-250): the ending, the last real outcome, the meters and a fresh alert, all from the engine
@@ -335,6 +387,8 @@ export function Play({ toasts, ...p }: PlayProps) {
   const hb = meters.heartbeat;
   const soulsPct = (meters.souls / Math.max(1, meters.total)) * 100;
   const stage = Math.max(0, ...w.events.map((e) => (e.kind === 'move-started' ? e.stage : 0)));
+  // the stolen admin key is a line in the top bar, not a symbol by him (D-254)
+  const keyStolen = battleOf(w).key;
 
   const output = (e: Entry, max?: number) => {
     const lines = e.out.split('\n');
@@ -372,7 +426,7 @@ export function Play({ toasts, ...p }: PlayProps) {
 
   /** The terminal, in its own floating window: its bar is the window's handle, its close is the window's close. */
   const terminalWin = (
-    <div className="pl-term" onClick={() => input.current?.focus()}>
+    <div className={`pl-term${haunted ? ' is-haunted' : ''}`} style={haunted ? ({ '--death': `url(${deathPortrait()})` } as CSSProperties) : undefined} onClick={() => input.current?.focus()}>
       <div className="pl-term-bar" data-drag>
         <span className="dots" aria-hidden>
           <i />
@@ -495,6 +549,7 @@ export function Play({ toasts, ...p }: PlayProps) {
           <span>Death</span>
           <strong>{stage ? `Stage ${stage} · ${STAGE_NAMES[stage as 1]}` : 'Watching'}</strong>
           <em>{situation.key === 'quiet' ? 'no attack seen' : gate ? `attacking: the ${gate}` : 'attack under way'}</em>
+          {keyStolen && <em className="pl-keychip">he holds an admin key</em>}
         </div>
         <div className="pl-clock">
           <strong>{gameClockLabel(w)}</strong>
@@ -516,9 +571,17 @@ export function Play({ toasts, ...p }: PlayProps) {
 
       <main className="pl-main">
         <section className="pl-centre">
-          <p className="pl-now" aria-live="polite">
-            <span>Now:</span> <b>{NOW_WORDS[w.playbook.phase]}</b>
-            {frozen && <em>🔒 change freeze: no incident declared</em>}
+          <p className={`pl-now${p.alarm ? ' is-alarm' : ''}`} aria-live="polite">
+            {p.alarm ? (
+              <>
+                <span>Warning:</span> <b>Suspicious activity detected</b>
+              </>
+            ) : (
+              <>
+                <span>Now:</span> <b>{NOW_WORDS[w.playbook.phase]}</b>
+              </>
+            )}
+            {p.taunt ? <q className="pl-taunt">{p.taunt}</q> : frozen && <em>🔒 change freeze: no incident declared</em>}
           </p>
           <div className="pl-field">
             <canvas ref={canvas} className="pl-battle" aria-label="The battlefield: the shop, its seven entrances, Death" />
@@ -562,14 +625,33 @@ export function Play({ toasts, ...p }: PlayProps) {
           {teaching ? (
             <>
               <p className="pl-kiro-line">{teaching.lines.join(' ')}</p>
-              <button type="button" className="pl-lesson" onClick={() => setLesson((n) => n + 1)}>
-                {lesson + 1 < steps.length ? `Next (${lesson + 1}/${steps.length})` : 'Got it'}
-              </button>
+              <span className="pl-lesson-row">
+                <button type="button" className="pl-lesson" onClick={() => (lesson + 1 < steps.length ? setLesson((n) => n + 1) : endTutorial())}>
+                  {lesson + 1 < steps.length ? `Next (${lesson + 1}/${steps.length})` : 'Got it'}
+                </button>
+                {lesson + 1 < steps.length && (
+                  <button type="button" className="pl-lesson-skip" onClick={endTutorial}>
+                    Skip
+                  </button>
+                )}
+              </span>
             </>
           ) : (
             <p className={`pl-kiro-line${lastKiro?.urgent ? ' is-urgent' : ''}`}>{asking ? '…' : (lastKiro?.text ?? situation.kiro)}</p>
           )}
           {!teaching && lastKiro?.offline && <small className="pl-off">rule-written answer (Kiro offline)</small>}
+          {!teaching && (
+            <button
+              type="button"
+              className="pl-lesson-again"
+              onClick={() => {
+                setLesson(0);
+                setTutorial(true);
+              }}
+            >
+              Show the tutorial
+            </button>
+          )}
           <input
             className="pl-ask"
             placeholder="Ask Kiro anything…"
@@ -644,7 +726,7 @@ export function Play({ toasts, ...p }: PlayProps) {
           </div>
         )}
         <ActionButton n={3} step={{ label: 'Ask Kiro', what: anomalies(readingsOf(run.engine)).length ? 'She sees something' : 'A nudge, not the answer' }} onClick={() => void ask()} />
-        <button type="button" className={`pl-act pl-termbtn${terminal ? ' is-on' : ''}`} onClick={() => setTerminal((x) => !x)}>
+        <button type="button" className={`pl-act pl-termbtn${terminal ? ' is-on' : ''}`} onClick={toggleTerminal}>
           <kbd>T</kbd>
           <span>
             <b>Terminal</b>

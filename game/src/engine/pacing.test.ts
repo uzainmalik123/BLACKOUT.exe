@@ -167,7 +167,8 @@ describe('the ransom is the finale (D-41 rule 6)', () => {
     }
     expect(eventsOfKind(w, 'move-started')).toEqual([]);
     expect(w.ending).toBe('banished');
-    expect(eventsOfKind(w, 'ending')[0]!.t - start).toBeLessThanOrEqual(stuckFor + 3 * REAL_S);
+    // the director looks every tick (3 s here): he is first seen stuck a tick in, and banished at the first tick after
+    expect(eventsOfKind(w, 'ending')[0]!.t - start).toBeLessThanOrEqual(stuckFor + 2 * 3 * REAL_S);
   });
 
   it('closing his last route with no foothold left still banishes him (SYS-07); a WAF rule he never gets to attempt after the finale counts once he is stuck (D-231, D-46)', () => {

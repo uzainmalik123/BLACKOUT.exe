@@ -17,6 +17,8 @@ import { CAMS, kiroArmRoot, lerpCam, onScreen, paintEyes, paintHands, paintOffic
 import { talkLevel, type GhostPose, type Mood, type Speech } from '../shared/ghost';
 import type { Run } from './run';
 import { Soundscape, type Bus } from './sound';
+import { markSeen } from '../shared/seen';
+import { LASTS, envStep, lightAt, startEnv, urgencyOf } from './environment';
 
 /** What the director tells the screen. */
 export interface NightUi {
@@ -40,16 +42,18 @@ export interface NightHost {
   office: HTMLCanvasElement;
   haunt: HTMLCanvasElement;
   monitors(): Record<MonitorName, Rect> | null;
+  /** What the haunting must never cover while the shift is live: windows, panels, controls (D-254). */
+  exclude(): Rect[];
 }
 
 /** Kiro's lines in the prologue: phase, seconds into it, the line (the brief's words). */
 export const KIRO_LINES: ReadonlyArray<readonly [Phase, number, string]> = [
-  ['intro', 0.3, "You're late."],
-  ['intro', 1.9, "I'm Kiro. Your guide tonight."],
-  ['shake', 1.2, 'Welcome to the night shift. Try not to die.'],
-  ['after', 0.3, "Come on. Your shift's waiting."],
+  ['intro', 0.15, "You're late."],
+  ['intro', 1.3, "I'm Kiro. Your guide tonight."],
+  ['shake', 0.6, 'Welcome to the night shift. Try not to die.'],
+  ['after', 0.7, "Come on. Your shift's waiting."],
   ['seat', 0.2, "That's your kingdom for tonight."],
-  ['alarm', 1.0, "Well. That didn't last long."],
+  ['alarm', 0.5, "Well. That didn't last long."],
 ];
 
 /** Kiro's three warnings as the run nears its end (D-223's last chance). */
@@ -107,6 +111,10 @@ export class Night {
   private volume = 0.35;
   private menu = false;
   private paused = false;
+  /** The first shift's tutorial is open: the night's clock waits for the player (D-252). */
+  private held = false;
+  /** How the room answers the fight (D-255). */
+  private env = startEnv();
   private focused: MonitorName | null = null;
   private mouse: { x: number; y: number } | null = null;
   private offs: Array<() => void> = [];
@@ -228,7 +236,15 @@ export class Night {
     this.voicesVolume = v;
   }
 
-  /** Straight to the desk (the menu's skip, a retry). */
+  /**
+   * Hold the night's clock while the first shift's tutorial is open (D-252): nothing of his has begun and no change
+   * can be made (the freeze), so the short calm starts when the player has finished reading.
+   */
+  hold(on: boolean): void {
+    this.held = on;
+  }
+
+  /** Straight to the desk (the menu's skip, the skip button once it has been seen, a retry). */
   skip(): void {
     this.flow = step(this.flow, { kind: 'skip' });
     this.begin();
@@ -344,8 +360,10 @@ export class Night {
 
   private onEvent(e: GameEvent): void {
     const r = reaction(e);
+    this.env = envStep(this.env, this.t, [e]);
     if (r.beat) this.beat(r.beat);
-    if (r.cue) this.sound.cue(r.cue);
+    // his return: silence first, then his cue (D-255)
+    if (r.cue && e.kind !== 'return') this.sound.cue(r.cue);
     switch (e.kind) {
       case 'move-started': {
         const line = STAGE_LINE[e.stage];
@@ -360,7 +378,11 @@ export class Night {
         this.taunt(SPECIAL_TAUNTS.tippedOff, true);
         break;
       case 'return':
-        this.taunt(SPECIAL_TAUNTS.return, true);
+        this.sound.hush(LASTS.silence);
+        this.later(LASTS.silence * 1000, () => {
+          this.sound.cue('death');
+          this.taunt(SPECIAL_TAUNTS.return, true);
+        });
         break;
       case 'banished':
         this.taunt(SPECIAL_TAUNTS.banished, true);
@@ -402,6 +424,7 @@ export class Night {
     if (p === 'wake') this.sound.setRain(0.6);
     if (p === 'shake') this.later(1300, () => (this.shadow = this.t));
     if (p === 'login') this.begin();
+    if (p === 'shift') markSeen('prologue'); // the next night offers to skip it (D-252)
     if (p === 'alarm') {
       this.sound.alarm(5);
       this.sound.cue('death');
@@ -474,12 +497,12 @@ export class Night {
         this.say('Kiro', line, { urgent: true });
       }
     }
-    if (f.phase === 'eyes' && f.t > 1.6 && !this.said.has('death:eyes')) {
+    if (f.phase === 'eyes' && f.t > 0.8 && !this.said.has('death:eyes')) {
       this.said.add('death:eyes');
       this.say('Death', "I've been expecting you.");
     }
     // the engine's clock runs from the login
-    if (r && SEATED.has(f.phase) && !this.ending && !this.paused) {
+    if (r && SEATED.has(f.phase) && !this.ending && !this.paused && !this.held) {
       r.engine.advance(dt * 1000);
       // what happened before the alarm is played out when it sounds
       if (f.phase === 'shift' || f.phase === 'alarm') {
@@ -488,7 +511,8 @@ export class Night {
         this.events = evs.length;
       }
       const w = r.engine.world;
-      this.sound.setHealth(w.heartbeat / 100);
+      // the heartbeat reads the worse of the business and the records left (D-255)
+      this.sound.setHealth(urgencyOf(w.heartbeat, w.souls.stolen.length, w.souls.total));
       if (w.ending && !this.ending) this.startEnding(ENDINGS[w.ending].scene);
     }
     if (now - this.lastTick > 250) {
@@ -626,7 +650,7 @@ export class Night {
       t: this.t,
       cam,
       fade,
-      lights: f.phase === 'alarm' && !this.reduce ? this.lights * (Math.sin(this.t * 23) > 0.2 ? 1 : 0.35) : this.lights,
+      lights: (f.phase === 'alarm' && !this.reduce ? this.lights * (Math.sin(this.t * 12) > 0.2 ? 1 : 0.35) /* under 2 flashes a second (D-255; was 3.7) */ : this.lights) * lightAt(this.env, this.t, this.reduce),
       crimson: this.crimson,
       cold: this.cold,
       rain: this.rain,
@@ -694,6 +718,7 @@ export class Night {
       lastChance: this.lastChance >= 0 && this.t - this.lastChance < 6.5 ? Math.sin(clamp((this.t - this.lastChance) / 6.5) * Math.PI) : 0,
       kiroTalk: talkLevel(this.kiroSpeech, this.t, this.reduce),
       reduce: this.reduce,
+      exclude: seated && !this.ending ? this.host.exclude() : [],
       hand,
       ink,
     });

@@ -18,6 +18,7 @@ import { Play, type Volumes } from './Play';
 import { ReportWall } from './Report';
 import type { Run } from './run';
 import { BUS_DEFAULTS } from './sound';
+import { seen } from '../shared/seen';
 import { NO_WINDOWS, closeTool, openTool, startingTools, topTool, type Wins } from './windows';
 import './night.css';
 import './play.css';
@@ -59,6 +60,12 @@ export function NightShift({ difficulty, skipPrologue = false, onMenu, onAgain }
   const [ending, setEnding] = useState<Scene | null>(null);
   const [card, setCard] = useState(false);
   const [report, setReport] = useState(false);
+  // the report is the night's last screen (D-256): the ending's card shows the outcome, then the report opens
+  useEffect(() => {
+    if (!card || report) return;
+    const t = window.setTimeout(() => setReport(true), 6000);
+    return () => window.clearTimeout(t);
+  }, [card, report]);
   const [eyesInAccounts, setEyesInAccounts] = useState(false);
   const [shakeDesk, setShakeDesk] = useState(false);
   const [glitch, setGlitch] = useState(false);
@@ -68,6 +75,11 @@ export function NightShift({ difficulty, skipPrologue = false, onMenu, onAgain }
   const addKiro = useCallback((l: Omit<KiroLine, 'id'>) => {
     const id = lineId.current++;
     setKiroLines((ls) => [...ls.slice(-40), { ...l, id }]);
+  }, []);
+  /** At the desk Kiro's spoken lines go into her panel, not over the screen (D-254); a line already there is not repeated. */
+  const kiroSays = useCallback((text: string, urgent?: boolean) => {
+    const id = lineId.current++;
+    setKiroLines((ls) => (ls.length && ls[ls.length - 1]!.text === text ? ls : [...ls.slice(-40), { who: 'kiro', text, urgent, id }]));
   }, []);
 
   // the director: made once per mount, given the canvases and the screen's setters
@@ -84,11 +96,24 @@ export function NightShift({ difficulty, skipPrologue = false, onMenu, onAgain }
         const third = field.w / 3;
         return { left: { ...field, w: third }, centre: field, right: { ...field, x: field.x + 2 * third, w: third } };
       },
+      exclude: (): Rect[] => {
+        const base = office.current?.getBoundingClientRect();
+        if (!base) return [];
+        const out: Rect[] = [];
+        for (const el of office.current?.parentElement?.querySelectorAll<HTMLElement>('.pl-top, .pl-kiro, .pl-actions, .pl-dock, .pl-now, .pl-toasts, .ns-win, .pl-alert, .pl-evidence, .pl-result') ?? []) {
+          const r = rectOf(el, base);
+          if (r && r.w > 0 && r.h > 0) out.push(r);
+        }
+        return out;
+      },
     };
     const n = new Night(difficulty, skipPrologue, host, {
       phase: setPhase,
       prompt: (text) => setCue(text),
-      sub: setSub,
+      sub: (line) => {
+        setSub(line);
+        if (line?.who === 'Kiro' && SEATED.has(night.current?.phaseNow ?? 'dark')) kiroSays(line.text);
+      },
       run: (r) => {
         setRun(r);
         // the level's first windows (the dial, D-241: Easy the log and the alerts, Medium also the terminal, Hard the terminal)
@@ -157,6 +182,9 @@ export function NightShift({ difficulty, skipPrologue = false, onMenu, onAgain }
     setMuted(m);
   };
   const pause = () => setPaused(night.current?.togglePause() ?? false);
+  const hold = useCallback((on: boolean) => night.current?.hold(on), []);
+  // a player who has seen the prologue may skip it (D-252)
+  const [skippable] = useState(() => !skipPrologue && seen('prologue'));
 
   if (report && run) return <ReportWall run={run} onAgain={onAgain} onMenu={onMenu} />;
 
@@ -174,6 +202,8 @@ export function NightShift({ difficulty, skipPrologue = false, onMenu, onAgain }
           kiroLines={kiroLines}
           addKiro={addKiro}
           say={(text) => night.current?.say('Kiro', text)}
+          taunt={sub?.who === 'Death' ? sub.text : null}
+          alarm={phase === 'alarm'}
           sfx={(k) => night.current?.sfx(k)}
           onResult={onResult}
           toasts={toasts}
@@ -183,6 +213,7 @@ export function NightShift({ difficulty, skipPrologue = false, onMenu, onAgain }
           onFiles={() => setFiles(true)}
           paused={paused}
           onPause={pause}
+          onHold={hold}
           volumes={volumes}
           setVolumes={setVolumes}
           muted={muted}
@@ -199,7 +230,8 @@ export function NightShift({ difficulty, skipPrologue = false, onMenu, onAgain }
           <p className="ns-login-dots">{run ? 'status: monitoring' : 'logging in…'}</p>
         </div>
       )}
-      {phase === 'alarm' && <div className="ns-warning">WARNING — SUSPICIOUS ACTIVITY DETECTED</div>}
+      {/* at the desk the warning and the lines are shown in the play screen's own places, never over its text (D-254) */}
+      {phase === 'alarm' && !seated && <div className="ns-warning">WARNING — SUSPICIOUS ACTIVITY DETECTED</div>}
 
       {cue && !menu && (
         <div className="ns-prompt">
@@ -207,7 +239,7 @@ export function NightShift({ difficulty, skipPrologue = false, onMenu, onAgain }
         </div>
       )}
 
-      {sub && (
+      {sub && !seated && (
         <p className={`ns-sub who-${sub.who.toLowerCase() || 'none'}`} aria-live="polite">
           {sub.who && <b>{sub.who}</b>}
           {sub.text}
@@ -215,6 +247,11 @@ export function NightShift({ difficulty, skipPrologue = false, onMenu, onAgain }
       )}
 
       {!seated && phase !== 'dark' && phase !== 'eyes' && !menu && <p className="ns-controls">Mouse to look · A / D turn · E interact · Esc menu</p>}
+      {skippable && !seated && !menu && (
+        <button type="button" className="ns-skip" onClick={() => night.current?.skip()}>
+          Skip intro ▸
+        </button>
+      )}
 
       {menu && (
         <div className="ns-menu" role="dialog" aria-label="Menu">
@@ -247,14 +284,9 @@ export function NightShift({ difficulty, skipPrologue = false, onMenu, onAgain }
           <h1>{run?.engine.world.ending === 'banished' ? 'DEATH BANISHED' : end.scene === 'taken' ? 'YOU LOST' : end.title.toUpperCase()}</h1>
           <p>{end.line}</p>
           <nav>
-            <button type="button" onClick={() => onAgain(difficulty)}>
-              Try again
-            </button>
-            <button type="button" onClick={() => setReport(true)}>
-              View incident report
-            </button>
-            <button type="button" onClick={onMenu}>
-              Main menu
+            {/* retry, another level and the menu are on the report, the night's last screen (D-256) */}
+            <button type="button" autoFocus onClick={() => setReport(true)}>
+              Post-incident report ▸
             </button>
           </nav>
         </div>

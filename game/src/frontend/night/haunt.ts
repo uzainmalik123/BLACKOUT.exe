@@ -40,6 +40,8 @@ export interface HauntView {
   kiroTalk?: number;
   /** Reduced motion: no glitch on her. */
   reduce?: boolean;
+  /** What the haunting must never cover (windows, panels, controls, D-254): it shows only in the gaps. */
+  exclude?: readonly Rect[];
   /** 0..1 the ink closing in ("you're taken"). */
   ink: number;
   /** 0..1 his hand settling on the shoulder. */
@@ -54,6 +56,12 @@ const clamp = (v: number, a = 0, b = 1): number => Math.max(a, Math.min(b, v));
 
 export function paintHaunt(g: G, w: number, h: number, dpr: number, v: HauntView): void {
   g.clearRect(0, 0, w, h);
+  paintAll(g, w, h, dpr, v);
+  // then cleared from over every window, panel and control (overlapping ones included), so it shows only in the gaps
+  for (const r of v.exclude ?? []) g.clearRect(r.x, r.y, r.w, r.h);
+}
+
+function paintAll(g: G, w: number, h: number, dpr: number, v: HauntView): void {
   const m = v.monitors;
   if (m) {
     if (v.face && v.face.a > 0.01) monitorFace(g, m[v.face.at], v.face.a, v.t, dpr);
@@ -83,7 +91,7 @@ function monitorFace(g: G, r: Rect, a: number, t: number, dpr: number): void {
   g.globalAlpha = a * (0.55 + 0.35 * Math.sin(t * 13));
   g.globalCompositeOperation = 'screen';
   const s = r.h * 1.5;
-  drawDeath(g, r.x + r.w / 2 + jitter, r.y + r.h * 1.25, s, { t, form: 1, point: 0, fragment: 0.25, eyes: 1 }, dpr);
+  drawDeath(g, r.x + r.w / 2 + jitter, r.y + r.h * 1.25, s, { t, form: 1, point: 0, fragment: 0, eyes: 1 }, dpr);
   g.globalCompositeOperation = 'source-over';
   // scan tearing across it
   g.globalAlpha = a * 0.5;
@@ -101,7 +109,7 @@ function reflection(g: G, r: Rect, a: number, t: number, dpr: number): void {
   clip(g, r);
   g.globalAlpha = a * 0.42;
   g.globalCompositeOperation = 'screen';
-  drawDeath(g, r.x + r.w * 0.68, r.y + r.h * 1.12, r.h * 1.05, { t, form: 1, point: 0, fragment: 0.05, eyes: 0.8 }, dpr);
+  drawDeath(g, r.x + r.w * 0.68, r.y + r.h * 1.12, r.h * 1.05, { t, form: 1, point: 0, fragment: 0, eyes: 0.8 }, dpr);
   g.globalCompositeOperation = 'source-over';
   // the player's own head and shoulders, dark against the screen
   g.globalAlpha = a * 0.55;
@@ -121,7 +129,7 @@ function crimsonFace(g: G, r: Rect, a: number, t: number, k: string, dpr: number
   clip(g, r);
   g.globalAlpha = clamp(a) * 0.32 * (0.8 + 0.2 * Math.sin(t * 2 + k.length));
   g.globalCompositeOperation = 'screen';
-  drawDeath(g, r.x + r.w / 2, r.y + r.h * 1.6, r.h * 2.1, { t, form: 1, point: 0, fragment: 0.15, eyes: 1 }, dpr);
+  drawDeath(g, r.x + r.w / 2, r.y + r.h * 1.6, r.h * 2.1, { t, form: 1, point: 0, fragment: 0, eyes: 1 }, dpr);
   g.restore();
 }
 
@@ -194,7 +202,7 @@ function lunge(g: G, w: number, h: number, s: number, t: number, dpr: number): v
   g.save();
   g.globalAlpha = clamp(a) * 0.75;
   const size = h * (0.9 + u * 0.9);
-  drawDeath(g, w / 2, h * 0.55 + size * 0.88, size, { t, form: 1, point: clamp(u * 2), fragment: 0.1, eyes: 1 }, dpr);
+  drawDeath(g, w / 2, h * 0.55 + size * 0.88, size, { t, form: 1, point: clamp(u * 2), fragment: 0, eyes: 1 }, dpr);
   g.restore();
   g.fillStyle = `rgba(160, 0, 20, ${(0.22 * clamp(a)).toFixed(3)})`;
   g.fillRect(0, 0, w, h);
@@ -240,8 +248,8 @@ function hand(g: G, w: number, h: number, a: number): void {
   g.translate(x, y);
   g.rotate(0.5);
   g.globalAlpha = clamp(u * 1.6);
-  // the sleeve, ink black
-  g.fillStyle = '#050407';
+  // his sleeve, the robe's dark brown (D-253)
+  g.fillStyle = '#3b302b';
   g.beginPath();
   g.moveTo(-S * 0.25, -S * 1.2);
   g.lineTo(S * 0.25, -S * 1.2);
@@ -249,11 +257,14 @@ function hand(g: G, w: number, h: number, a: number): void {
   g.lineTo(-S * 0.18, -S * 0.15);
   g.closePath();
   g.fill();
-  g.strokeStyle = '#ddd5bd';
+  g.strokeStyle = '#16110f';
+  g.lineWidth = Math.max(1, S * 0.012);
+  g.stroke();
+  g.strokeStyle = '#f8f0e6';
   g.lineCap = 'round';
   g.shadowColor = 'rgba(0, 0, 0, 0.8)';
   g.shadowBlur = 12;
-  // metacarpals and fingers, bone
+  // small bony fingers, ivory
   for (let f = 0; f < 4; f++) {
     const fx = (f - 1.5) * S * 0.07;
     g.lineWidth = S * 0.028;

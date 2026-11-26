@@ -1,7 +1,8 @@
 // The night shift's prologue (UI-10, D-223, D-224) as pure state, free of the DOM so it can be tested: the dark,
 // Death's eyes, waking in the office, Kiro's approach and lines, the handshake, following her to the desk, sitting
 // down, the login, the alarm, and the shift. Time moves it on where the story carries itself; the player's keys move
-// it on where the player has to act (E to shake her hand and to sit, W to follow). Kept short on purpose (D-224).
+// it on where the player has to act (E to shake her hand and to sit, W to follow). Kept short on purpose (D-224), and
+// shorter again (D-252): the strongest beats stay, each brief; a player who has seen it can skip it.
 
 export type Phase =
   | 'dark' // black, breathing
@@ -37,23 +38,23 @@ export type Input =
 
 /** How long the story phases last on their own, in seconds. */
 export const DURATION: Partial<Record<Phase, number>> = {
-  dark: 2,
-  eyes: 4.5,
-  wake: 2,
-  approach: 3.5,
-  intro: 5,
-  shake: 3.4,
-  after: 2.2,
-  sitting: 1.8,
-  login: 2,
-  alarm: 3.5,
+  dark: 1.2,
+  eyes: 3,
+  wake: 1,
+  approach: 2.4,
+  intro: 3.4,
+  shake: 2.5,
+  after: 1.6,
+  sitting: 1,
+  login: 1.2,
+  alarm: 2.5,
 };
 
 /** The handshake's beats, in seconds into it: the hands reach, the fingers close, two pumps, they let go. */
-export const SHAKE = { reach: 0.6, grip: 1.1, pumpEnd: 2.6, release: 3.4 } as const;
+export const SHAKE = { reach: 0.45, grip: 0.8, pumpEnd: 1.9, release: 2.5 } as const;
 
 /** Seconds of W to reach the desk. */
-export const WALK_SECONDS = 2.2;
+export const WALK_SECONDS = 1.5;
 
 const NEXT: Partial<Record<Phase, Phase>> = {
   dark: 'eyes',
