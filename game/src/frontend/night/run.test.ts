@@ -8,9 +8,21 @@ import { ENDINGS, anomalies } from './judge';
 import { readingsOf, runOn } from './run';
 
 const baseline = () => new Uint8Array(readFileSync(new URL('../../recordings/juiceshop.sqlite', import.meta.url)));
-const newRun = (difficulty: 'easy' | 'medium' | 'hard' = 'medium', seed = 7) => runOn(new Engine({ seed, difficulty, baseline: baseline() }));
+/** A run whose shift has begun, as the play screen begins it when it shows (D-243). */
+const newRun = (difficulty: 'easy' | 'medium' | 'hard' = 'medium', seed = 7) => {
+  const r = runOn(new Engine({ seed, difficulty, baseline: baseline() }));
+  r.engine.beginShift();
+  return r;
+};
 
 describe('the night shift on the real engine (D-223)', () => {
+  it('a run does not begin the shift: the play screen does, when it shows (D-243, KI-230)', () => {
+    const { engine } = runOn(new Engine({ seed: 7, difficulty: 'medium', baseline: baseline() }));
+    for (let i = 0; i < 160; i++) engine.advance(250);
+    expect(engine.world.shift.beganAt).toBeUndefined();
+    expect(engine.world.events.some((e) => e.kind === 'move-started')).toBe(false);
+  });
+
   it('the first check reads Death\'s first scan in the live numbers', () => {
     const { engine } = newRun();
     for (let i = 0; i < 160; i++) engine.advance(250); // 40 real s: past the calm opening (D-230: 20–30 s on Medium)

@@ -1,62 +1,80 @@
-// The play screen's situations (UI-04, D-224) against the real shell and engine: every suggested look is a command
-// the shell runs, every action is one the engine accepts, Hard suggests nothing, and targets are picked from output.
+// The play screen's situations (UI-04, D-224, D-241) against the real shell and engine: every alert shows its symptom
+// and never who raised it, every suggested look is a command the shell runs, every action is one the engine accepts,
+// Hard suggests nothing, and targets are picked from output.
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { gateOf } from '../../engine/alerts';
 import { Engine } from '../../engine/engine';
-import { MINION_IDS, TAP_IDS } from '../../rules/vocabulary';
-import { MOVES } from '../../rules/moves';
+import { TAPS } from '../../rules/taps';
 import { runOn } from './run';
 import { commandFor, forLevel, situationOf, tokens, type Situation } from './situations';
 
 const baseline = () => new Uint8Array(readFileSync(new URL('../../recordings/juiceshop.sqlite', import.meta.url)));
-const fresh = () => runOn(new Engine({ seed: 11, difficulty: 'medium', baseline: baseline() }));
-const ACTORS = [...MOVES.map((m) => m.id), ...MINION_IDS, ...TAP_IDS];
+const fresh = () => {
+  const r = runOn(new Engine({ seed: 11, difficulty: 'medium', baseline: baseline() }));
+  r.engine.beginShift();
+  return r;
+};
+/** Every route an alert can name (engine/alerts.ts), with the gate the engine derives from it. */
+const ROUTES = ['/', '/rest/user/login', '/rest/user/login (passwords)', '/rest/products/search', '/api/Users (sign-up)', '/api/Users', '/api/Products', '/file-upload', '/api/Feedbacks', ...TAPS.map((t) => t.closedBy.rule.path)];
 
-/** The situation an open alert about `about` would show. */
-function about(run: ReturnType<typeof fresh>, about: string): Situation {
-  run.engine.world.alerts.push({ id: 900, about: about as never, openedAt: 0, route: '/', symptom: 'unusual activity on the site', gate: 'front door' });
+/** The situation an open alert on `route` would show; its `about` is a decoy that must never reach the screen. */
+function onRoute(run: ReturnType<typeof fresh>, route: string, about = 'ATK-08'): Situation {
+  run.engine.world.alerts.push({ id: 900, about: about as never, openedAt: 0, route: route.replace(/ \(.*\)$/, ''), symptom: `unusual activity on ${route}: 9 requests in 30 s`, gate: gateOf(route) });
   const s = situationOf(run.engine.world);
   run.engine.world.alerts.pop();
   return s;
 }
 
-describe('one problem at a time, in plain words (D-224)', () => {
-  it('has a plain alert, a line from Kiro and a way to look for everything that raises an alert', () => {
+describe('one problem at a time, in plain words (D-224, D-241)', () => {
+  it('shows the symptom and the route, a line from Kiro and a way to look, for every route an alert can name', () => {
     const r = fresh();
-    for (const a of ACTORS) {
-      const s = about(r, a);
-      expect(s.alert, a).not.toMatch(/ATK-|MIN-|TAP-|SQL|injection|T1\d/);
-      expect(s.kiro.length, a).toBeGreaterThan(5);
-      expect(s.look.cmd, a).toBeTruthy();
+    for (const route of ROUTES) {
+      const s = onRoute(r, route);
+      expect(s.alert, route).toMatch(/^unusual activity on /);
+      expect(s.route, route).toBe(route.replace(/ \(.*\)$/, ''));
+      expect(s.gate, route).toBe(gateOf(route));
+      expect(`${s.alert} ${s.kiro}`, route).not.toMatch(/ATK-|MIN-|TAP-|T1\d/);
+      expect(s.kiro.length, route).toBeGreaterThan(5);
+      expect(s.look.cmd, route).toBeTruthy();
     }
     expect(situationOf(r.engine.world).key).toBe('quiet');
+  });
+
+  it('never reads who raised the alert: the same route gives the same situation whoever it was (D-232)', () => {
+    const r = fresh();
+    for (const route of ROUTES) {
+      const a = onRoute(r, route, 'ATK-01');
+      const b = onRoute(r, route, 'MIN-02');
+      expect({ ...a, look: a.look.label, act: a.act?.label }).toEqual({ ...b, look: b.look.label, act: b.act?.label });
+    }
   });
 
   it('every look runs in the shell, and every action is one the engine knows', async () => {
     const r = fresh();
     for (let i = 0; i < 20; i++) r.engine.advance(500);
-    for (const a of ACTORS) {
-      const s = about(r, a);
+    for (const route of ROUTES) {
+      const s = onRoute(r, route);
       const res = await r.shell.run(commandFor(s.look, null)!);
-      expect(res.exitCode, `${a}: ${s.look.cmd}\n${res.output}`).toBe(0);
+      expect(res.exitCode, `${route}: ${s.look.cmd}\n${res.output}`).toBe(0);
       if (!s.act) continue;
       const target = s.act.needs === 'ip' ? '203.0.113.200' : s.act.needs === 'email' ? 'nobody@juice-sh.op' : s.act.needs === 'file' ? 'nothing.txt' : '';
-      if (s.act.cmd) expect(commandFor(s.act, target), a).not.toContain('{target}');
-      else expect(s.act.action!(target, r.engine.world).type, a).toMatch(/^DEF-\d\d$/);
+      if (s.act.cmd) expect(commandFor(s.act, target), route).not.toContain('{target}');
+      else expect(s.act.action!(target, r.engine.world).type, route).toMatch(/^DEF-\d\d$/);
     }
   });
 
   it('an action that needs a target waits for one', () => {
-    const s = about(fresh(), 'ATK-01');
+    const s = onRoute(fresh(), '/');
     expect(s.act?.needs).toBe('ip');
     expect(commandFor(s.act!, null)).toBeNull();
     expect(commandFor(s.act!, '203.0.113.11')).toBe('iptables -A INPUT -s 203.0.113.11 -j DROP');
   });
 
-  it('on Hard names no stage and suggests no action', () => {
-    const s = forLevel(about(fresh(), 'ATK-06'), 'hard');
-    expect(s).toMatchObject({ stage: null, act: null, alert: 'Suspicious activity detected.' });
-    expect(forLevel(about(fresh(), 'ATK-06'), 'easy')).toMatchObject({ stage: 3, alert: 'A new admin account just appeared.' });
+  it('on Hard suggests no action and gives no clue, but still shows the symptom', () => {
+    const s = forLevel(onRoute(fresh(), '/api/Users (sign-up)'), 'hard');
+    expect(s).toMatchObject({ act: null, kiro: 'Something is wrong. Find it.', alert: 'unusual activity on /api/Users (sign-up): 9 requests in 30 s' });
+    expect(forLevel(onRoute(fresh(), '/api/Users (sign-up)'), 'easy').act?.label).toBe('Lock an account');
   });
 
   it('picks addresses, accounts and upload files out of the output', () => {

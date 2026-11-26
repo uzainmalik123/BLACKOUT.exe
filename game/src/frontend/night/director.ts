@@ -86,6 +86,7 @@ export class Night {
   private flow: Flow;
   private run: Run | null = null;
   private starting = false;
+  private alarmed = false;
   private raf = 0;
   private last = 0;
   private lastTick = 0;
@@ -242,7 +243,7 @@ export class Night {
     this.starting = true;
     startRun(this.difficulty)
       .then((r) => {
-        this.run = r; // the shift began with the run (run.ts, D-230): the alarm comes with the first threshold alert
+        this.run = r; // the shift begins when the play screen shows (Play.tsx, D-243): the alarm comes with the first alert
         this.events = r.engine.world.events.length;
         this.ui.run(r);
       })
@@ -427,8 +428,13 @@ export class Night {
     if (this.keys.has('w') && f.phase === 'walk') f = step(f, { kind: 'walk', dt });
     f = step(f, { kind: 'time', dt });
     const r = this.run;
-    // the operator is logged in: the alarm comes when the engine shows him
-    if (f.phase === 'login' && r && r.engine.world.events.some((e) => e.kind === 'move-started' || e.kind === 'alert-opened')) f = step(f, { kind: 'alarm' });
+    // the operator is logged in once the run is ready: the desk shows and the calm begins (SYS-22, D-243)
+    if (f.phase === 'login' && r) f = step(f, { kind: 'ready' });
+    // the alarm sounds once, over the live desk, when the first alert opens
+    if (f.phase === 'shift' && r && !this.alarmed && r.engine.world.alerts.length > 0) {
+      this.alarmed = true;
+      f = step(f, { kind: 'alarm' });
+    }
     this.flow = f;
     if (f.phase !== this.lastPhase) {
       this.lastPhase = f.phase;
