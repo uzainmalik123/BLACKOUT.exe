@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { GameEvent } from '../../engine/log';
 import { DURATION, SHAKE, WALK_SECONDS, handshake, prompt, startFlow, step, type Flow, type Input } from './flow';
-import { ENDINGS, STAGE_BEAT, anomalies, danger, kiroVerdict, reaction, whatKiroSees, type Readings } from './judge';
+import { ENDINGS, STAGE_BEAT, anomalies, danger, kiroMood, kiroVerdict, reaction, whatKiroSees, type Readings } from './judge';
 
 const run = (f: Flow, ...inputs: Input[]) => inputs.reduce(step, f);
 const wait = (f: Flow, s: number) => run(f, { kind: 'time', dt: s });
@@ -102,5 +102,35 @@ describe('the room reacts to the engine, and the endings are the engine\'s', () 
     for (const e of ['souls-lost', 'flatline', 'return'] as const) expect(ENDINGS[e].scene).toBe('taken');
     expect(kiroVerdict({ detect: 'A', contain: 'B', eradicate: 'B', recover: 'D' })).toMatch(/followed the evidence/);
     expect(kiroVerdict({ detect: 'C', contain: 'F', eradicate: 'B', recover: 'D' })).toMatch(/panicked/);
+  });
+});
+
+describe("Kiro's mood comes from the engine and the last result (D-250)", () => {
+  const calm = { outcome: null, danger: 0, alertAge: null } as const;
+
+  it('at the end: happy when won, shocked at his return, sad at any other loss', () => {
+    expect(kiroMood({ ...calm, ending: 'banished' })).toBe('happy');
+    expect(kiroMood({ ...calm, ending: 'clean-handover' })).toBe('happy');
+    expect(kiroMood({ ...calm, ending: 'return' })).toBe('shock');
+    for (const e of ['souls-lost', 'flatline', 'rough-handover', 'walked-away'] as const) expect(kiroMood({ ...calm, ending: e }), e).toBe('sad');
+    // the ending outweighs everything else
+    expect(kiroMood({ ending: 'flatline', outcome: 'contained', danger: 0, alertAge: 1 })).toBe('sad');
+  });
+
+  it('happy after a defence that worked, a wince after a mistake, worried while he is still in', () => {
+    for (const o of ['contained', 'evidence', 'restored', 'deploying'] as const) expect(kiroMood({ ...calm, outcome: o }), o).toBe('happy');
+    for (const o of ['failed', 'shutdown', 'disrupted'] as const) expect(kiroMood({ ...calm, outcome: o }), o).toBe('oops');
+    expect(kiroMood({ ...calm, outcome: 'still-active' })).toBe('concern');
+    // a result still outweighs the danger behind it
+    expect(kiroMood({ outcome: 'contained', danger: 3, alertAge: 1, ending: undefined })).toBe('happy');
+  });
+
+  it('alarmed by a fresh alert or real danger, worried while an alert stays open, calm otherwise', () => {
+    expect(kiroMood({ ...calm, alertAge: 2 })).toBe('alarm');
+    expect(kiroMood({ ...calm, alertAge: 30 })).toBe('concern');
+    expect(kiroMood({ ...calm, danger: 2 })).toBe('alarm');
+    expect(kiroMood({ ...calm, danger: 1 })).toBe('concern');
+    expect(kiroMood(calm)).toBe('calm');
+    expect(kiroMood({ ...calm, outcome: 'applied' })).toBe('calm');
   });
 });

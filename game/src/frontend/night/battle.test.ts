@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { Engine } from '../../engine/engine';
 import { MOVES } from '../../rules/moves';
-import { Battle, GATES, battleOf, fxOf, gateOf } from './battle';
+import { Battle, GATES, battleOf, fxOf, gateOf, menaceStep } from './battle';
 import { liveAttacks, outcomeOf, type Pending } from './results';
 import { lab } from '../../engine/test-fixtures/lab';
 import { runOn } from './run';
@@ -65,6 +65,44 @@ describe('the battlefield is the engine, drawn (D-225)', () => {
     r.engine.act({ type: 'DEF-09' });
     expect(b.update(r.engine.world, 2).key).toBe(false);
     expect(b.fresh(2, 0.5)).toContain('key');
+  });
+});
+
+describe("Death's menace follows the engine (D-226)", () => {
+  it("his successes bring him closer, the player's cuts push him back, banishment ends him", () => {
+    const ev = (body: object) => ({ t: 0, id: 1, ...body }) as never;
+    expect(menaceStep(ev({ kind: 'move-landed', move: 'ATK-06', variant: 'a' }))).toBeGreaterThan(0);
+    expect(menaceStep(ev({ kind: 'souls-stolen', by: 'ATK-08', count: 5, stolen: 5, total: 325 }))).toBeGreaterThan(0);
+    expect(menaceStep(ev({ kind: 'move-cut', move: 'ATK-06', variant: 'a', by: 'DEF-14' }))).toBeLessThan(0);
+    expect(menaceStep(ev({ kind: 'door-shut', move: 'ATK-08', by: 'DEF-13' }))).toBeLessThan(0);
+    expect(menaceStep(ev({ kind: 'banished' }))).toBe(-1);
+    expect(menaceStep(ev({ kind: 'action', action: { type: 'DEF-01', query: 'x' }, ok: true }))).toBe(0);
+  });
+
+  it('over a run left alone he only comes closer; a fix that stops his move pushes him back', () => {
+    const r = fresh('hard', 3);
+    const b = new Battle();
+    b.update(r.engine.world, 0);
+    let t = 0;
+    let low = 1;
+    for (let i = 0; i < 400 && !r.engine.world.ending; i++) {
+      r.engine.advance(500);
+      t += 0.5;
+      b.update(r.engine.world, t);
+      low = Math.min(low, b.menace);
+    }
+    expect(b.menace).toBeGreaterThan(0.5);
+    const c = fresh('medium', 7);
+    const bc = new Battle();
+    bc.update(c.engine.world, 0);
+    for (let i = 0; i < 160 && !(c.engine.world.replays.some((x) => x.move === 'ATK-01') && c.engine.world.incident.declaredAt !== undefined); i++) c.engine.advance(250); // the calm opening, then the scan's first alert lifts the freeze (D-230, D-232)
+    expect(c.engine.world.replays.some((x) => x.move === 'ATK-01')).toBe(true);
+    bc.update(c.engine.world, 1);
+    const before = bc.menace;
+    c.engine.act({ type: 'DEF-12', rule: { kind: 'block-user-agent', pattern: 'Fuzz Faster U Fool' } });
+    c.engine.advance(250);
+    bc.update(c.engine.world, 2);
+    expect(bc.menace).toBeLessThan(before);
   });
 });
 

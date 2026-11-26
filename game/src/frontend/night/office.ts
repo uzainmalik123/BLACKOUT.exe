@@ -2,12 +2,14 @@
 // seen through one pinhole camera, so walking, turning and sitting down all come from moving that camera. A ground-
 // floor security office at 3 AM: floor-to-ceiling glass on the far wall, the rain outside, a wet street with cars and
 // sodium lamps, the city's lit windows beyond, fluorescent tubes, desks and chairs, a server rack on the dark side of
-// the room, a clock at three. Kiro is drawn by the briefing's own painter (characters.ts). Also the two close-ups that
-// are not the room: Death's eyes in the dark, and the hands meeting in the handshake.
+// the room, a clock at three. Kiro is the logo's ghost (shared/ghost.ts, D-250), floating at chest height with her light
+// on the floor under her. Also the two close-ups that are not the room: Death's eyes in the dark, and the handshake (her
+// small arm reaching toward the camera, the player's hand closing round it).
 //
 // Units are metres. X runs right, Y up, Z into the room (the windows are at Z = 12). The camera starts near Z = 0.
 
-import { drawDeath, drawKiro, type KiroPose } from '../screen3-briefing/cinema/characters';
+import { drawDeath } from '../screen3-briefing/cinema/characters';
+import { ARM_ROOT, drawGhost, drawGhostArm, type GhostPose } from '../shared/ghost';
 
 type G = CanvasRenderingContext2D;
 type V3 = readonly [number, number, number];
@@ -50,7 +52,7 @@ export interface OfficeView {
   clockMin: number;
   /** The DOM monitors cover the player's three: don't paint them. */
   hideDesk: boolean;
-  kiro: { x: number; z: number; pose: KiroPose } | null;
+  kiro: { x: number; z: number; pose: GhostPose } | null;
   /** A tall shape crossing outside the glass, 0..1 along its way (stage 1), or null. */
   shadow: number | null;
   /** Death standing in the room (the endings), or null. */
@@ -67,6 +69,15 @@ export const DESK = { x: 1.6, z: 6.8, depth: 0.8, width: 2.3, height: 0.75 };
 export const CHAIR = { x: 1.6, z: 6.1 };
 
 /** The camera's places: where the night starts, the walk to the desk, standing at the chair, seated. */
+/** Kiro in the room (D-250): her centre floats this high (m), and she is this tall (m). */
+export const KIRO_FLOAT = 1.42;
+export const KIRO_SIZE = 0.72;
+
+/** Where Kiro's flipper leaves her body, in the room (m), for her standing at (x, z). */
+export function kiroArmRoot(x: number, z: number): V3 {
+  return [x + ARM_ROOT.flipper[0] * KIRO_SIZE, KIRO_FLOAT - ARM_ROOT.flipper[1] * KIRO_SIZE, z];
+}
+
 export const CAMS = {
   start: { x: -0.4, y: 1.66, z: 0.4, yaw: 0, pitch: 0 },
   chair: { x: 1.55, y: 1.66, z: 4.9, yaw: 0.02, pitch: -0.12 },
@@ -203,10 +214,10 @@ function cityImage(h: number, dpr: number): CityCache {
   const yOf = (el: number) => (CITY_TOP - el) * ppr;
   // the sky: black-blue above, the city's sodium glow bleeding into the low cloud
   const sky = c.createLinearGradient(0, 0, 0, H);
-  sky.addColorStop(0, '#05070d');
-  sky.addColorStop(0.45, '#0c1222');
-  sky.addColorStop(0.78, '#2a2233');
-  sky.addColorStop(1, '#3a2a2c');
+  sky.addColorStop(0, '#070a14');
+  sky.addColorStop(0.45, '#141c33');
+  sky.addColorStop(0.75, '#3a2c44');
+  sky.addColorStop(1, '#5a3a3a');
   c.fillStyle = sky;
   c.fillRect(0, 0, W, H);
   // low cloud, lit from below
@@ -222,9 +233,9 @@ function cityImage(h: number, dpr: number): CityCache {
   }
   // three bands of buildings, the far ones paler in the haze
   const bands = [
-    { top: 0.2, base: 0.0, haze: 0.55, lit: 0.1, step: 0.05 },
-    { top: 0.3, base: -0.02, haze: 0.3, lit: 0.16, step: 0.07 },
-    { top: 0.46, base: -0.08, haze: 0.0, lit: 0.22, step: 0.11 },
+    { top: 0.2, base: 0.0, haze: 0.55, lit: 0.18, step: 0.05 },
+    { top: 0.3, base: -0.02, haze: 0.3, lit: 0.26, step: 0.07 },
+    { top: 0.46, base: -0.08, haze: 0.0, lit: 0.34, step: 0.11 },
   ];
   bands.forEach((band, bi) => {
     let az = -CITY_AZ;
@@ -279,9 +290,11 @@ function paintOutside(g: G, L: Lens, v: OfficeView, w: number, h: number, dpr: n
   const t = v.t;
   // the far city, at infinity: it moves only as the head turns
   const cc = cityImage(h, dpr);
-  const tl = L.sky(cc.az0, cc.el0);
-  const scale = (L.f / cc.ppr) * 1;
-  g.drawImage(cc.img, tl.x, tl.y, cc.img.width * scale, cc.img.height * scale);
+  const scale = L.f / cc.ppr;
+  // the image is linear in angle: put its centre (azimuth 0) where the camera's yaw puts it, its horizon at the pitch
+  const x0 = L.cx - L.f * L.c.yaw - CITY_AZ * L.f;
+  const y0 = L.cy + L.f * L.c.pitch - CITY_TOP * L.f;
+  g.drawImage(cc.img, x0, y0, cc.img.width * scale, cc.img.height * scale);
   // the aviation lights, blinking
   for (let i = 0; i < 5; i++) {
     if (Math.sin(t * 2 + i * 1.7) < 0.7) continue;
@@ -384,12 +397,14 @@ function tree(g: G, x: number, y: number, k: number, sway: number, i: number): v
   g.fillRect(-k * 0.12, -k * 2.6, k * 0.24, k * 2.6);
   g.translate(0, -k * 2.4);
   g.rotate(sway * 0.3);
-  for (let j = 0; j < 7; j++) {
-    const a = -Math.PI / 2 + (rand(i * 10 + j) - 0.5) * 2.2 + sway * 0.6;
-    const r = k * (1.1 + rand(i * 10 + j + 4) * 0.8);
+  for (let j = 0; j < 28; j++) {
+    const a = rand(i * 31 + j) * Math.PI * 2;
+    const r = k * (0.3 + 1.1 * Math.sqrt(rand(i * 17 + j)));
+    const cx = Math.cos(a) * r * 0.9 + sway * k * 0.3 * (r / k);
+    const cy = Math.sin(a) * r * 0.55 - k * 0.7;
     g.beginPath();
-    g.ellipse(Math.cos(a) * r * 0.7, Math.sin(a) * r * 0.6 - k * 0.6, r * 0.75, r * 0.6, a, 0, Math.PI * 2);
-    g.fillStyle = j % 2 ? '#08090a' : '#0b0d0c';
+    g.ellipse(cx, cy, k * (0.22 + 0.2 * rand(j + i)), k * (0.16 + 0.14 * rand(j * 3 + i)), a, 0, Math.PI * 2);
+    g.fillStyle = j % 3 ? 'rgba(6, 10, 9, 0.72)' : 'rgba(12, 18, 15, 0.6)';
     g.fill();
   }
   g.restore();
@@ -625,17 +640,50 @@ function paintShell(g: G, L: Lens, v: OfficeView): void {
         g.scale(1, 0.32);
         glow(g, 0, 0, f.k * 2.2, `rgba(${tubeCol[0]}, ${tubeCol[1]}, ${tubeCol[2]}, ${(0.07 * on).toFixed(3)})`);
         g.restore();
-        const r = L.at(x, -0.9, z);
-        if (r) {
-          const sg = g.createLinearGradient(0, f.y, 0, r.y);
-          sg.addColorStop(0, `rgba(${tubeCol[0]}, ${tubeCol[1]}, ${tubeCol[2]}, ${(0.07 * on).toFixed(3)})`);
-          sg.addColorStop(1, `rgba(${tubeCol[0]}, ${tubeCol[1]}, ${tubeCol[2]}, 0)`);
-          g.fillStyle = sg;
-          g.fillRect(f.x - f.k * 0.5, f.y, f.k, r.y - f.y);
+        // the tube's reflection in the polished floor: a soft streak, not a box (only for tubes well ahead)
+        if (f.d > 3.5) {
+        g.save();
+        g.globalCompositeOperation = 'lighter';
+        g.translate(f.x, f.y);
+        g.scale(0.25, 1);
+        glow(g, 0, 0, f.k * 1.2, `rgba(${tubeCol[0]}, ${tubeCol[1]}, ${tubeCol[2]}, ${(0.05 * on).toFixed(3)})`);
+        g.restore();
+        }
+        // a faint cone of light down through the haze
+        const top = L.at(x, ceil - 0.05, z);
+        if (top && top.d > 3.5) {
+          // only for tubes well ahead: one overhead would fill the frame with a wedge
+          const cone = g.createLinearGradient(0, top.y, 0, f.y);
+          cone.addColorStop(0, `rgba(${tubeCol[0]}, ${tubeCol[1]}, ${tubeCol[2]}, ${(0.035 * on).toFixed(3)})`);
+          cone.addColorStop(1, `rgba(${tubeCol[0]}, ${tubeCol[1]}, ${tubeCol[2]}, 0)`);
+          g.fillStyle = cone;
+          g.beginPath();
+          g.moveTo(top.x - top.k * 0.6, top.y);
+          g.lineTo(top.x + top.k * 0.6, top.y);
+          g.lineTo(f.x + f.k * 0.9, f.y);
+          g.lineTo(f.x - f.k * 0.9, f.y);
+          g.closePath();
+          g.fill();
         }
       }
     }
   }
+}
+
+/** The exit sign over the far door on the left wall, red in the dark, and its spill on the wall. */
+function exitSign(g: G, L: Lens, t: number, lights: number): void {
+  const p = L.at(-5.98, 2.45, 5.2);
+  if (!p) return;
+  const k = p.k;
+  const flick = Math.sin(t * 31) > 0.95 ? 0.5 : 1;
+  glow(g, p.x, p.y, k * 1.4, `rgba(255, 40, 50, ${(0.22 * flick).toFixed(3)})`);
+  L.fill(g, [[-5.97, 2.32, 4.85], [-5.97, 2.32, 5.55], [-5.97, 2.58, 5.55], [-5.97, 2.58, 4.85]], `rgba(${Math.round(160 + 60 * flick)}, 20, 30, 0.95)`);
+  g.fillStyle = `rgba(255, 220, 220, ${(0.85 * flick).toFixed(3)})`;
+  g.font = `700 ${Math.max(6, k * 0.13)}px "Share Tech Mono", monospace`;
+  g.textAlign = 'center';
+  g.fillText('EXIT', p.x, p.y + k * 0.05);
+  // the door under it, a darker rectangle
+  L.fill(g, [[-5.99, 0, 4.7], [-5.99, 0, 5.7], [-5.99, 2.2, 5.7], [-5.99, 2.2, 4.7]], `rgba(4, 4, 6, ${(0.6 + 0.2 * lights).toFixed(2)})`);
 }
 
 /** The server rack on the dark side of the room, its LEDs. */
@@ -704,8 +752,17 @@ function monitor(g: G, L: Lens, cx: number, z: number, wid: number, hgt: number,
     content(g, wid * c.k * Math.cos(angle), hgt * c.k);
     g.restore();
   }
-  // the glow it throws on the desk and the air
-  glow(g, c.x, c.y, c.k * wid * 0.9, `rgba(${r}, ${gg}, ${b}, ${(0.1 * a).toFixed(3)})`);
+  // the glow it throws on the desk and the air, and a pool on the floor in front
+  glow(g, c.x, c.y, c.k * wid * 0.9, `rgba(${r}, ${gg}, ${b}, ${(0.12 * a).toFixed(3)})`);
+  const fl = L.at(cx, 0, z - 0.9);
+  if (fl) {
+    g.save();
+    g.globalCompositeOperation = 'lighter';
+    g.translate(fl.x, fl.y);
+    g.scale(1, 0.3);
+    glow(g, 0, 0, fl.k * 1.1, `rgba(${r}, ${gg}, ${b}, ${(0.06 * a).toFixed(3)})`);
+    g.restore();
+  }
 }
 
 function chair(g: G, L: Lens, x: number, z: number, turn: number, lights: number): void {
@@ -877,6 +934,7 @@ export function paintOffice(g: G, w: number, h: number, dpr: number, v: OfficeVi
   g.restore();
   paintWindowWall(g, L, v, h);
   paintShell(g, L, v);
+  exitSign(g, L, v.t, v.lights);
   paintRack(g, L, v.t);
   // furniture and people, far to near
   const items: Array<{ z: number; draw: () => void }> = [];
@@ -888,9 +946,30 @@ export function paintOffice(g: G, w: number, h: number, dpr: number, v: OfficeVi
     items.push({
       z: k.z,
       draw: () => {
-        const p = L.at(k.x, 0, k.z);
+        const p = L.at(k.x, KIRO_FLOAT, k.z);
+        const f = L.at(k.x, 0, k.z);
         if (!p) return;
-        drawKiro(g, p.x, p.y, p.k * 1.78, k.pose, dpr);
+        // her light on the floor under her, and her shadow in it
+        const form = k.pose.form ?? 1;
+        if (f && form > 0.02) {
+          const rx = f.k * 0.55;
+          g.save();
+          g.translate(f.x, f.y);
+          g.scale(1, 0.28);
+          const pool = g.createRadialGradient(0, 0, 0, 0, 0, rx);
+          pool.addColorStop(0, `rgba(144, 70, 255, ${(0.32 * form).toFixed(3)})`);
+          pool.addColorStop(0.55, `rgba(144, 70, 255, ${(0.1 * form).toFixed(3)})`);
+          pool.addColorStop(1, 'rgba(144, 70, 255, 0)');
+          g.fillStyle = pool;
+          g.fillRect(-rx, -rx, rx * 2, rx * 2);
+          const shade = g.createRadialGradient(0, 0, 0, 0, 0, rx * 0.4);
+          shade.addColorStop(0, `rgba(0, 0, 0, ${(0.35 * form).toFixed(3)})`);
+          shade.addColorStop(1, 'rgba(0, 0, 0, 0)');
+          g.fillStyle = shade;
+          g.fillRect(-rx, -rx, rx * 2, rx * 2);
+          g.restore();
+        }
+        drawGhost(g, p.x, p.y, p.k * KIRO_SIZE, k.pose, dpr);
       },
     });
   }
@@ -926,6 +1005,17 @@ export function paintOffice(g: G, w: number, h: number, dpr: number, v: OfficeVi
     g.fillStyle = `rgba(255, ${Math.round(255 - 190 * v.crimson)}, ${Math.round(255 - 180 * v.crimson)}, 1)`;
     g.fillRect(0, 0, w, h);
     g.restore();
+  }
+  // Kiro glows: as the room darkens she shines through it, painted again over the dark (D-250)
+  const shine = clamp(dark * 1.6 + 0.4 * v.crimson);
+  if (v.kiro && shine > 0.02) {
+    const p = L.at(v.kiro.x, KIRO_FLOAT, v.kiro.z);
+    if (p) {
+      g.save();
+      g.globalAlpha = shine;
+      drawGhost(g, p.x, p.y, p.k * KIRO_SIZE, v.kiro.pose, dpr);
+      g.restore();
+    }
   }
   if (v.flash > 0.02) {
     g.fillStyle = `rgba(160, 180, 230, ${(0.12 * v.flash).toFixed(3)})`;
@@ -1037,13 +1127,13 @@ export function paintEyes(g: G, w: number, h: number, t: number, open: number, l
 }
 
 /**
- * The handshake, close (D-224): the player's right hand reaching from the lower right in a dark jacket (a red light
- * on the cuff), Kiro's hand from the left, stained black to the wrist, silver rings and a chain at the wrist. The hands
- * are built with volume (shaded palms, knuckles, three-jointed fingers with nails, a shadow where they meet) and
- * layered so that her fingers close over the back of the player's hand and the player's thumb lies over hers.
- * `reach` brings them together, `grip` closes the fingers, `pump` (0..1) shakes them twice, `release` opens them.
+ * The handshake, close (D-224, D-250): Kiro's small arm (her right, the logo's flipper) reaching from her side toward
+ * the camera, narrow where it leaves her and wide as it nears; the player's right hand from the lower right in a dark
+ * jacket (a red light on the cuff). Her soft round hand gives in the grip; the player's fingers close over it and the
+ * thumb lies across the top; her purple light falls on the player's hand. `reach` brings them together, `grip` closes
+ * the fingers, `pump` (0..1) shakes them twice, `release` opens them. `root` is where her arm leaves her, on screen.
  */
-export function paintHands(g: G, w: number, h: number, t: number, reach: number, grip: number, pump: number, release: number): void {
+export function paintHands(g: G, w: number, h: number, t: number, reach: number, grip: number, pump: number, release: number, root?: { x: number; y: number }): void {
   const r = ease(clamp(reach)) * (1 - 0.35 * ease(clamp(release)));
   const close = clamp(grip) * (1 - ease(clamp(release)));
   const bob = pump > 0 ? Math.sin(pump * Math.PI * 4) * h * 0.022 : 0;
@@ -1051,65 +1141,31 @@ export function paintHands(g: G, w: number, h: number, t: number, reach: number,
   const S = h * 0.42;
   const mx = w * 0.53;
   const my = h * 0.66 + bob;
-  // where each hand is: hers comes from the left and a little above, the player's from the lower right, near the eye
-  const her = { x: mix(-S * 0.7, mx - S * 0.12, r), y: mix(h * 0.42, my - S * 0.02, r) };
+  // her arm starts just inside her edge, so its round root never pokes out past her side
+  const base = root ? { x: root.x + S * 0.05, y: root.y } : { x: w * 0.45, y: h * 0.62 };
+  // her hand rises from her side to the meeting point, growing as it nears the camera
+  const her = { x: mix(base.x + S * 0.05, mx - S * 0.06, r), y: mix(base.y + S * 0.05, my, r) };
   const you = { x: mix(w + S * 0.5, mx + S * 0.12, r), y: mix(h + S * 0.6, my + S * 0.02, r) };
-  // the darkness round the meeting, so the hands read against the room
-  const pool = g.createRadialGradient(mx, my, S * 0.1, mx, my, S * 1.6);
-  pool.addColorStop(0, `rgba(0, 0, 0, ${(0.35 * r).toFixed(3)})`);
+  // a little darkness round the meeting, kept light: she is right behind it and glows (D-250); and her light in it
+  const pool = g.createRadialGradient(mx, my, S * 0.6, mx, my, S * 1.6);
+  pool.addColorStop(0, `rgba(0, 0, 0, ${(0.1 * r).toFixed(3)})`);
   pool.addColorStop(1, 'rgba(0, 0, 0, 0)');
   g.fillStyle = pool;
   g.fillRect(mx - S * 1.6, my - S * 1.6, S * 3.2, S * 3.2);
+  glow(g, her.x, her.y, S * 0.55, `rgba(144, 70, 255, ${(0.3 * r).toFixed(3)})`);
 
-  // ---- Kiro's arm and hand (behind the player's fingers)
+  // ---- her arm and soft hand, with its soft shadow on her body below it
   g.save();
-  g.translate(her.x, her.y);
-  g.rotate(0.12 + tilt);
-  // the sleeve: torn black layers, chains over it
-  const sl = g.createLinearGradient(-S * 1.5, 0, -S * 0.1, 0);
-  sl.addColorStop(0, '#040306');
-  sl.addColorStop(1, '#141019');
-  g.fillStyle = sl;
+  g.filter = 'blur(10px)';
+  g.strokeStyle = `rgba(60, 28, 120, ${(0.45 * r).toFixed(3)})`;
+  g.lineCap = 'round';
+  g.lineWidth = S * (0.09 + 0.08 * r);
   g.beginPath();
-  g.moveTo(-S * 1.8, -S * 0.42);
-  g.quadraticCurveTo(-S * 0.9, -S * 0.2, -S * 0.24, -S * 0.11);
-  g.lineTo(-S * 0.22, S * 0.12);
-  g.quadraticCurveTo(-S * 0.9, S * 0.2, -S * 1.8, S * 0.22);
-  g.closePath();
-  g.fill();
-  for (let i = 0; i < 3; i++) {
-    g.strokeStyle = `rgba(190, 190, 200, ${0.35 - i * 0.08})`;
-    g.lineWidth = Math.max(1, S * 0.008);
-    g.setLineDash([S * 0.018, S * 0.01]);
-    g.beginPath();
-    g.moveTo(-S * (0.3 + i * 0.12), -S * 0.12);
-    g.quadraticCurveTo(-S * (0.26 + i * 0.12), S * 0.02, -S * (0.3 + i * 0.12), S * 0.13);
-    g.stroke();
-  }
-  g.setLineDash([]);
-  // the back of her hand: ash skin darkening to black at the fingers
-  const back = g.createLinearGradient(-S * 0.2, 0, S * 0.15, 0);
-  back.addColorStop(0, '#5f5d58');
-  back.addColorStop(0.55, '#2a2826');
-  back.addColorStop(1, '#141211');
-  g.fillStyle = back;
-  g.beginPath();
-  g.moveTo(-S * 0.22, -S * 0.1);
-  g.quadraticCurveTo(-S * 0.02, -S * 0.15, S * 0.12, -S * 0.08);
-  g.quadraticCurveTo(S * 0.17, S * 0.02, S * 0.12, S * 0.1);
-  g.quadraticCurveTo(-S * 0.02, S * 0.15, -S * 0.22, S * 0.1);
-  g.closePath();
-  g.fill();
-  // tendons and sigils, faint
-  g.strokeStyle = 'rgba(0, 0, 0, 0.35)';
-  g.lineWidth = Math.max(0.8, S * 0.004);
-  for (let i = 0; i < 4; i++) {
-    g.beginPath();
-    g.moveTo(-S * 0.16, -S * 0.05 + i * S * 0.03);
-    g.lineTo(S * 0.08, -S * 0.07 + i * S * 0.045);
-    g.stroke();
-  }
+  g.moveTo(base.x, base.y + S * 0.07);
+  g.lineTo(her.x - S * 0.04, her.y + S * 0.1);
+  g.stroke();
   g.restore();
+  drawGhostArm(g, base, her, S * 0.065, S * (0.08 + 0.07 * r), close * 0.8);
 
   // ---- the player's arm and hand
   g.save();
@@ -1127,7 +1183,7 @@ export function paintHands(g: G, w: number, h: number, t: number, reach: number,
   g.quadraticCurveTo(S * 0.7, S * 0.5, S * 0.16, S * 0.15);
   g.closePath();
   g.fill();
-  g.strokeStyle = 'rgba(70, 180, 220, 0.18)';
+  g.strokeStyle = 'rgba(160, 110, 255, 0.22)';
   g.lineWidth = Math.max(1, S * 0.006);
   g.stroke();
   glow(g, S * 0.36, S * 0.16, S * 0.05, 'rgba(255, 30, 40, 0.9)');
@@ -1135,7 +1191,7 @@ export function paintHands(g: G, w: number, h: number, t: number, reach: number,
   g.beginPath();
   g.arc(S * 0.36, S * 0.16, S * 0.008, 0, Math.PI * 2);
   g.fill();
-  // the palm side, turned for a handshake: warm skin, lit cyan from the monitors on its edge
+  // the palm side, turned for a handshake: warm skin, lit purple-white by her on its edge
   const palm = g.createRadialGradient(-S * 0.02, -S * 0.04, S * 0.02, 0, 0, S * 0.2);
   palm.addColorStop(0, '#c99c7f');
   palm.addColorStop(0.7, '#9a6e56');
@@ -1148,7 +1204,7 @@ export function paintHands(g: G, w: number, h: number, t: number, reach: number,
   g.quadraticCurveTo(S * 0.04, S * 0.15, S * 0.2, S * 0.12);
   g.closePath();
   g.fill();
-  g.strokeStyle = 'rgba(70, 232, 255, 0.35)';
+  g.strokeStyle = 'rgba(214, 190, 255, 0.45)';
   g.lineWidth = Math.max(1, S * 0.006);
   g.beginPath();
   g.moveTo(S * 0.18, -S * 0.125);
@@ -1156,7 +1212,7 @@ export function paintHands(g: G, w: number, h: number, t: number, reach: number,
   g.stroke();
   g.restore();
 
-  // ---- fingers: hers wrap the back of the player's hand, the player's wrap hers
+  // ---- the player's fingers close over the front of her hand
   const finger = (x0: number, y0: number, ang: number, len: number, wid: number, curl: number, skin: [string, string], nail: string) => {
     // three segments, each bending by `curl`
     let x = x0;
@@ -1194,36 +1250,18 @@ export function paintHands(g: G, w: number, h: number, t: number, reach: number,
     g.ellipse(x - Math.cos(a) * wid * 0.15, y - Math.sin(a) * wid * 0.15, wid * 0.32, wid * 0.22, a, 0, Math.PI * 2);
     g.fill();
   };
-  // the player's fingers, reaching left; curl downward round her palm
+  // the shadow the player's fingers throw on her hand as they close
+  if (close > 0.1) {
+    g.fillStyle = `rgba(70, 40, 130, ${(0.3 * close).toFixed(3)})`;
+    g.beginPath();
+    g.ellipse(her.x + S * 0.02, her.y + S * 0.035, S * 0.13, S * 0.06, -0.1, 0, Math.PI * 2);
+    g.fill();
+  }
   for (let i = 0; i < 4; i++) {
     const y0 = you.y - S * 0.09 + i * S * 0.05;
     finger(you.x - S * 0.08, y0, Math.PI + 0.12 - i * 0.05 - tilt, S * (0.36 - i * 0.03), S * 0.046, -close * 0.9, ['#c49478', '#8a5e48'], 'rgba(235, 210, 195, 0.7)');
   }
-  // the contact shadow her hand throws on the player's
-  if (close > 0.1) {
-    g.fillStyle = `rgba(0, 0, 0, ${(0.35 * close).toFixed(3)})`;
-    g.beginPath();
-    g.ellipse(mx, my + S * 0.03, S * 0.16, S * 0.07, -0.1, 0, Math.PI * 2);
-    g.fill();
-  }
-  // her fingers, reaching right, closing over the back of the player's hand; long dark nails
-  for (let i = 0; i < 4; i++) {
-    const y0 = her.y - S * 0.07 + i * S * 0.045;
-    finger(her.x + S * 0.1, y0, 0.05 + i * 0.04 + tilt, S * (0.38 - i * 0.03), S * 0.04, close * 1.0, ['#2b2826', '#0f0d0c'], 'rgba(20, 18, 22, 0.95)');
-  }
-  // her rings, catching the light
-  for (const [i, c] of [
-    [0, '#c9cdd2'],
-    [2, '#a8946a'],
-  ] as const) {
-    const y0 = her.y - S * 0.07 + i * S * 0.045;
-    g.strokeStyle = c;
-    g.lineWidth = Math.max(1, S * 0.012);
-    g.beginPath();
-    g.ellipse(her.x + S * 0.17, y0, S * 0.012, S * 0.024, 0.1, 0, Math.PI * 2);
-    g.stroke();
-  }
-  // the player's thumb, over the back of her hand
+  // the player's thumb, across the top of her hand
   g.save();
   g.lineCap = 'round';
   const th = g.createLinearGradient(you.x, you.y - S * 0.2, you.x, you.y);
@@ -1240,11 +1278,13 @@ export function paintHands(g: G, w: number, h: number, t: number, reach: number,
   g.ellipse(you.x - S * (0.2 + 0.07 * close), you.y - S * (0.16 + 0.02 * close), S * 0.017, S * 0.012, -0.3, 0, Math.PI * 2);
   g.fill();
   g.restore();
-  // cyan motes round her fingers
-  for (let i = 0; i < 12; i++) {
+  // her light on the player's knuckles, and a few purple motes rising from her hand
+  g.save();
+  g.globalCompositeOperation = 'lighter';
+  glow(g, her.x + S * 0.05, her.y - S * 0.04, S * 0.22, `rgba(120, 70, 220, ${(0.22 * r).toFixed(3)})`);
+  g.restore();
+  for (let i = 0; i < 10; i++) {
     const life = (t * 0.4 + rand(i)) % 1;
-    glow(g, her.x + S * 0.1 + Math.sin(t + i) * S * 0.18, her.y - life * S * 0.4 + rand(i + 3) * S * 0.15, S * 0.018, `rgba(70, 232, 255, ${(0.45 * Math.sin(life * Math.PI) * r).toFixed(3)})`);
+    glow(g, her.x + Math.sin(t + i) * S * 0.16, her.y - life * S * 0.4 + rand(i + 3) * S * 0.12, S * 0.016, `rgba(190, 150, 255, ${(0.4 * Math.sin(life * Math.PI) * r).toFixed(3)})`);
   }
 }
-
-export type { KiroPose };

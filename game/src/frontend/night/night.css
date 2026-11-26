@@ -116,7 +116,7 @@
   margin-bottom: 2px;
 }
 .ns-sub.who-kiro b {
-  color: var(--cyan);
+  color: #c8a6ff;
 }
 .ns-sub.who-death b {
   color: var(--crimson);
@@ -125,12 +125,15 @@
   color: #ffd8d8;
   letter-spacing: 0.5px;
 }
+/* at the desk: subtitles sit in the battlefield under the alert; Kiro's lines are in her panel, so only Death's show */
 .phase-shift .ns-sub,
-.phase-alarm .ns-sub,
-.phase-check .ns-sub,
-.phase-verdict .ns-sub {
+.phase-alarm .ns-sub {
   bottom: auto;
-  top: 2.2vh;
+  top: calc(2vh + 210px);
+  z-index: 7;
+}
+.phase-shift .ns-sub.who-kiro {
+  display: none;
 }
 
 /* the login and the first check sit on the centre monitor */
@@ -1185,11 +1188,8 @@ button.is-armed {
   font-size: 11px;
 }
 .ns-kiro-sigil {
-  font-size: 26px;
-  color: var(--cyan);
-  text-shadow:
-    0 0 12px var(--cyan),
-    0 0 26px var(--violet);
+  display: inline-flex;
+  filter: drop-shadow(0 0 6px rgba(144, 70, 255, 0.8));
 }
 .ns-kiro-lines {
   flex: 1;
@@ -1356,6 +1356,8 @@ button.is-armed {
   --amber: #ffb23e;
   --crimson: #ff2a4a;
   --emerald: #3ddc97;
+  /* the report renders outside .ns-root, so it needs its own: without it the text fell back to black */
+  --bone: #ece5d3;
   --mono: 'Share Tech Mono', ui-monospace, Consolas, monospace;
   --caps: Cinzel, Georgia, serif;
 }
@@ -1409,8 +1411,8 @@ button.is-armed {
   padding: 10px 18px;
   font-size: 24px;
   font-style: italic;
-  border-left: 3px solid var(--cyan);
-  background: rgba(70, 232, 255, 0.05);
+  border-left: 3px solid #9046ff;
+  background: rgba(144, 70, 255, 0.07);
 }
 .ns-verdict cite {
   display: block;
@@ -1418,7 +1420,7 @@ button.is-armed {
   font-style: normal;
   font-size: 12px;
   letter-spacing: 4px;
-  color: var(--cyan);
+  color: #c8a6ff;
   margin-top: 4px;
 }
 .ns-rep-meters {
@@ -1629,8 +1631,8 @@ button.is-armed {
 .ns-rep-debrief {
   margin-top: 24px;
   padding: 16px 20px;
-  border: 1px solid rgba(70, 232, 255, 0.25);
-  background: rgba(70, 232, 255, 0.04);
+  border: 1px solid rgba(144, 70, 255, 0.35);
+  background: rgba(144, 70, 255, 0.05);
 }
 .ns-rep-debrief p {
   margin: 0;

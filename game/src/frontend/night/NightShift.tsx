@@ -40,7 +40,6 @@ const rectOf = (el: HTMLElement | null, base: DOMRect): Rect | null => {
 export function NightShift({ difficulty, skipPrologue = false, onMenu, onAgain }: NightShiftProps) {
   const office = useRef<HTMLCanvasElement>(null);
   const haunt = useRef<HTMLCanvasElement>(null);
-  const clip = useRef<HTMLVideoElement>(null);
   const night = useRef<Night | null>(null);
 
   const [phase, setPhase] = useState<Phase>(skipPrologue ? 'shift' : 'dark');
@@ -76,17 +75,14 @@ export function NightShift({ difficulty, skipPrologue = false, onMenu, onAgain }
     const host = {
       office: office.current!,
       haunt: haunt.current!,
-      clip: () => clip.current,
       monitors: (): Record<MonitorName, Rect> | null => {
         const base = office.current?.getBoundingClientRect();
         if (!base) return null;
-        // the play screen's alert, the battlefield and Kiro (the haunt reaches over them)
-        const q = (sel: string) => office.current?.parentElement?.querySelector<HTMLElement>(sel) ?? null;
-        const [l, c, r] = [q('.pl-alert'), q('.pl-field'), q('.pl-kiro')];
-        const a = rectOf(l, base);
-        const b = rectOf(c, base);
-        const d = rectOf(r, base);
-        return a && b && d ? { left: a, centre: b, right: d } : null;
+        // the play screen: the battlefield is the screen he haunts; its thirds stand in for the side monitors (D-226)
+        const field = rectOf(office.current?.parentElement?.querySelector<HTMLElement>('.pl-field') ?? null, base);
+        if (!field) return null;
+        const third = field.w / 3;
+        return { left: { ...field, w: third }, centre: field, right: { ...field, x: field.x + 2 * third, w: third } };
       },
     };
     const n = new Night(difficulty, skipPrologue, host, {
@@ -170,7 +166,6 @@ export function NightShift({ difficulty, skipPrologue = false, onMenu, onAgain }
   return (
     <main className={`ns-root phase-${phase}${ending ? ' is-ending' : ''}${shakeDesk ? ' is-shake' : ''}${glitch ? ' is-glitch' : ''}`}>
       <canvas ref={office} className="ns-office" aria-hidden />
-      <video ref={clip} className="ns-clip" src="/night/handshake.mp4" muted playsInline preload="auto" aria-hidden />
       {seated && run && phase !== 'login' && (
         <Play
           run={run}

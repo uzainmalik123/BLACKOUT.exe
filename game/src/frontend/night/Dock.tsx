@@ -3,6 +3,7 @@
 // window manager's state is pure (windows.ts); this file only draws it and turns the pointer into its moves.
 
 import type { PointerEvent as ReactPointerEvent, ReactNode } from 'react';
+import { KiroIcon } from '../shared/KiroCanvas';
 import { BAR, type Tool, type ToolId, type Win } from './windows';
 
 export interface DockProps {
@@ -29,7 +30,7 @@ export function Dock({ tools, open, lit, frozen, glow, onPick }: DockProps) {
           title={frozen && t.change ? `${t.label} (locked: no incident declared)` : t.label}
           onClick={() => onPick(t.id)}
         >
-          <i aria-hidden>{t.glyph}</i>
+          <i aria-hidden>{t.id === 'kiro' ? <KiroIcon size={16} /> : t.glyph}</i>
           <span>{t.label}</span>
           {frozen && t.change && (
             <s className="pl-dock-lock" aria-hidden>

@@ -4,7 +4,8 @@
 // one is cut, Kiro's face close in the centre monitor at the last chance, and the end of "you're taken": his hand on
 // the player's shoulder and the ink closing in. Each is driven by the engine's events through NightShift.tsx.
 
-import { drawDeath, drawKiro } from '../screen3-briefing/cinema/characters';
+import { drawDeath } from '../screen3-briefing/cinema/characters';
+import { drawGhost } from '../shared/ghost';
 
 type G = CanvasRenderingContext2D;
 
@@ -34,8 +35,11 @@ export interface HauntView {
   recoil: number;
   /** Seconds since souls were stolen (the wisps), or -1. */
   drain: number;
-  /** 0..1 Kiro's face in the centre monitor (the last chance). */
+  /** 0..1 Kiro close in the centre of the battlefield (the last chance), and how open her mouth is (her voice). */
   lastChance: number;
+  kiroTalk?: number;
+  /** Reduced motion: no glitch on her. */
+  reduce?: boolean;
   /** 0..1 the ink closing in ("you're taken"). */
   ink: number;
   /** 0..1 his hand settling on the shoulder. */
@@ -57,7 +61,7 @@ export function paintHaunt(g: G, w: number, h: number, dpr: number, v: HauntView
     if (v.crimsonFace > 0.01) for (const k of ['left', 'centre', 'right'] as const) crimsonFace(g, m[k], v.crimsonFace, v.t, k, dpr);
     if (v.ghosts > 0.01) ghosts(g, m, v.ghosts, v.t);
     if (v.drain >= 0 && v.drain < 3) wisps(g, m, v.drain, h);
-    if (v.lastChance > 0.01) kiroClose(g, m.centre, v.lastChance, v.t, dpr);
+    if (v.lastChance > 0.01) kiroClose(g, m.centre, v.lastChance, v.t, dpr, v.kiroTalk ?? 0, !!v.reduce);
   }
   if (v.lunge >= 0 && v.lunge < 0.9) lunge(g, w, h, v.lunge, v.t, dpr);
   if (v.recoil >= 0 && v.recoil < 1.2) recoil(g, w, h, v.recoil, v.t, dpr);
@@ -206,22 +210,23 @@ function recoil(g: G, w: number, h: number, s: number, t: number, dpr: number): 
   g.restore();
 }
 
-/** The last chance: Kiro's face, close, in the centre monitor, the screen glitching round her. */
-function kiroClose(g: G, r: Rect, a: number, t: number, dpr: number): void {
+/** The last chance (D-250): Kiro close in the centre, alarmed and speaking, the screen glitching slowly round her. */
+function kiroClose(g: G, r: Rect, a: number, t: number, dpr: number, talk: number, reduce: boolean): void {
   g.save();
   clip(g, r);
-  g.fillStyle = `rgba(4, 6, 12, ${(0.85 * a).toFixed(3)})`;
+  g.fillStyle = `rgba(6, 3, 14, ${(0.82 * a).toFixed(3)})`;
   g.fillRect(r.x, r.y, r.w, r.h);
   g.globalAlpha = a;
-  const s = r.h * 3.1;
-  drawKiro(g, r.x + r.w / 2, r.y + r.h * 0.52 + s * 0.86, s, { t, form: 1, talk: 0.6 + 0.4 * Math.sin(t * 9), look: Math.sin(t * 0.6) * 0.15, eyes: 0.85, glitch: 0.12 + 0.2 * (Math.sin(t * 17) > 0.7 ? 1 : 0), hand: null }, dpr);
-  // glitch bands
-  for (let i = 0; i < 6; i++) {
-    if (rand(Math.floor(t * 12) + i) < 0.6) continue;
-    const y = r.y + rand(i + Math.floor(t * 9)) * r.h;
-    g.fillStyle = i % 2 ? 'rgba(70, 232, 255, 0.18)' : 'rgba(180, 77, 255, 0.16)';
-    g.fillRect(r.x, y, r.w, 3 + rand(i) * 10);
-  }
+  const s = Math.min(r.h * 0.72, r.w * 0.45);
+  drawGhost(g, r.x + r.w / 2, r.y + r.h * 0.5, s, { t, mood: 'alarm', talk, look: 0, wander: 0, reduce, glitch: reduce ? 0 : 0.08 + (Math.sin(t * 5) > 0.85 ? 0.18 : 0) }, dpr);
+  // glitch bands, changing four times a second (never under reduced motion)
+  if (!reduce)
+    for (let i = 0; i < 6; i++) {
+      if (rand(Math.floor(t * 4) + i) < 0.6) continue;
+      const y = r.y + rand(i + Math.floor(t * 4)) * r.h;
+      g.fillStyle = i % 2 ? 'rgba(144, 70, 255, 0.16)' : 'rgba(255, 64, 128, 0.12)';
+      g.fillRect(r.x, y, r.w, 3 + rand(i) * 10);
+    }
   g.restore();
 }
 

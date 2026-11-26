@@ -41,7 +41,7 @@ export const TOOLS: readonly Tool[] = [
   { id: 'backups', label: 'Backups', glyph: '⟲', change: true },
   { id: 'comms', label: 'Comms', glyph: '✉' },
   { id: 'plug', label: 'The plug', glyph: '⏼', change: true },
-  { id: 'kiro', label: 'Kiro', glyph: '☾' },
+  { id: 'kiro', label: 'Kiro', glyph: '☾' }, // the dock draws her as the logo's ghost (KiroIcon, D-250); this stays for text
   { id: 'files', label: 'Briefing', glyph: '❏' },
 ];
 

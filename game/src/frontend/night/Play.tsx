@@ -19,7 +19,7 @@ import { ConsolePanel, type ConsoleId } from './Consoles';
 import { Feed, Logs, metersOf, type Meters, type Toast } from './Desk';
 import { Dock, FloatWindow } from './Dock';
 import { Battle, type FxKind, type GateId } from './battle';
-import { anomalies, whatKiroSees } from './judge';
+import { anomalies, danger as dangerOf, kiroMood, whatKiroSees } from './judge';
 import { KiroPanel, type KiroLine } from './KiroPanel';
 import { OUTCOME_KIRO, OUTCOME_WORDS, READS, liveAttacks, outcomeOf, type Outcome, type Pending } from './results';
 import { readingsOf, type Run } from './run';
@@ -27,7 +27,8 @@ import { STAGE_NAMES, commandFor, forLevel, situationOf, tokens, type Step, type
 import { AddressFlags, AlertsTool, CheatSheet, Freeze, TrafficTool, UploadsTool, type Act } from './Tools';
 import { PANEL_TOOL, TOOL_BY_ID, closeTool, dockFor, focusTool, isOpen, moveTool, openTool, toggleTool, type ToolId, type Wins } from './windows';
 import { NOW_WORDS, battleGate, freezeReason, gateConsole, gateSentence, shiftLeft } from './words';
-import { drawKiro } from '../screen3-briefing/cinema/characters';
+import { CONFIG } from '../../engine/config';
+import { KiroCanvas } from '../shared/KiroCanvas';
 
 export interface Volumes {
   rain: number;
@@ -149,7 +150,7 @@ export function Play({ toasts, ...p }: PlayProps) {
         if (s) p.sfx(s);
       }
       last = t;
-      battle.paint(g, W, H, dpr, t, v, focusGate.current);
+      battle.paint(g, W, H, dpr, t, v, focusGate.current, world.ending ? { kind: world.ending, through: world.death.returnedThrough } : null);
       const pend = pending.current;
       if (pend) {
         const o = outcomeOf(pend, world, t);
@@ -320,6 +321,14 @@ export function Play({ toasts, ...p }: PlayProps) {
     if (terminal) input.current?.focus();
   }, [terminal]);
 
+  // Kiro's mood (D-250): the ending, the last real outcome, the meters and a fresh alert, all from the engine
+  const newest = w.alerts.reduce<number | null>((t, a) => (a.closedAt === undefined && (t === null || a.openedAt > t) ? a.openedAt : t), null);
+  const mood = kiroMood({
+    ending: w.ending,
+    outcome: result?.outcome ?? null,
+    danger: dangerOf(w.heartbeat, w.souls.stolen.length, w.souls.total),
+    alertAge: newest === null ? null : (w.clock.gameMs - newest) / CONFIG[w.difficulty].gameMsPerRealMs / 1000,
+  });
   const act = situation.act;
   const needsPick = act?.needs && (!target || target.kind !== act.needs);
   const lastKiro = [...p.kiroLines].reverse().find((l) => l.who === 'kiro');
@@ -547,8 +556,8 @@ export function Play({ toasts, ...p }: PlayProps) {
           </div>
         </section>
 
-        <aside className="pl-kiro">
-          <Portrait />
+        <aside className={`pl-kiro mood-${mood}`}>
+          <KiroCanvas className="pl-portrait" mood={mood} line={teaching ? teaching.lines.join(' ') : (lastKiro?.text ?? situation.kiro)} />
           <div className="pl-kiro-name">Kiro</div>
           {teaching ? (
             <>
@@ -677,37 +686,5 @@ function SoundPanel({ volumes, set, muted, setMuted }: { volumes: Volumes; set: 
       </button>
     </div>
   );
-}
-
-/**
- * Kiro's face beside the terminal: the portrait in `public/night/kiro.png` when there is one (D-224: a generated
- * still of her), else the briefing's painter.
- */
-function Portrait() {
-  const [img, setImg] = useState(true);
-  const ref = useRef<HTMLCanvasElement>(null);
-  useEffect(() => {
-    if (img) return;
-    const c = ref.current;
-    const g = c?.getContext('2d');
-    if (!c || !g) return;
-    let raf = 0;
-    const t0 = performance.now();
-    const draw = (now: number) => {
-      const dpr = Math.min(2, window.devicePixelRatio || 1);
-      const W = c.clientWidth;
-      const H = c.clientHeight;
-      if (c.width !== Math.round(W * dpr)) c.width = Math.round(W * dpr);
-      if (c.height !== Math.round(H * dpr)) c.height = Math.round(H * dpr);
-      g.setTransform(dpr, 0, 0, dpr, 0, 0);
-      g.clearRect(0, 0, W, H);
-      const t = (now - t0) / 1000;
-      drawKiro(g, W / 2, H * 2.05, H * 2.25, { t, form: 1, talk: 0, look: Math.sin(t * 0.4) * 0.2, eyes: 0.7, glitch: 0, hand: null }, dpr);
-      raf = requestAnimationFrame(draw);
-    };
-    raf = requestAnimationFrame(draw);
-    return () => cancelAnimationFrame(raf);
-  }, [img]);
-  return img ? <img className="pl-portrait" src="/night/kiro.png" alt="" onError={() => setImg(false)} /> : <canvas ref={ref} className="pl-portrait" aria-hidden />;
 }
 
