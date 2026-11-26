@@ -67,6 +67,8 @@ export function startReplay(world: World, v: Variant, owner: 'death' | MinionId,
   if (owner === 'death' && isMove(v.move)) {
     if (world.death.noRepeat !== v.move) delete world.death.noRepeat; // D-41: he has started a different move
     world.death.pacingDelayed = false; // D-43: the next pick may be delayed again
+    // D-259: where his moves overlap, a second may start beside this one a breather after it started
+    if (overlaps(world)) world.death.alongsideAt = world.clock.gameMs + breather(world);
     emit(world, { kind: 'move-started', move: v.move, variant: v.variant, stage: MOVE_BY_ID[v.move].stage, ip: v.info.ip });
     noteFirstMove(world); // D-230: the minions and the taps count from his first move
   }
@@ -75,6 +77,24 @@ export function startReplay(world: World, v: Variant, owner: 'death' | MinionId,
 
 export function activeDeathReplay(world: World): Replay | undefined {
   return world.replays.find((r) => r.owner === 'death');
+}
+
+/** D-259: every one of Death's moves running now (frozen ones included: they still hold their place). */
+export function deathReplays(world: World): Replay[] {
+  return world.replays.filter((r) => r.owner === 'death');
+}
+
+/** D-259: more than one of his moves may run at once on this level (Medium, Hard). */
+export const overlaps = (world: World): boolean => CONFIG[world.difficulty].movesAtOnce > 1;
+
+/**
+ * When one of his moves ends: his next start waits `wait` from now (D-41's breather, D-24's IP wait, none for a paused
+ * visit), and never comes earlier than it was already due: with two of his moves at once (D-259) the other's wait or
+ * D-43's delay may already reach further.
+ */
+function waitAfter(world: World, wait: number): void {
+  world.death.nextMoveAt = Math.max(world.death.nextMoveAt, world.clock.gameMs + (world.death.skipWait ? 0 : wait));
+  world.death.skipWait = false;
 }
 
 function variantOf(library: RecordingLibrary, replay: Replay): Variant | undefined {
@@ -107,9 +127,7 @@ export function cutReplay(world: World, replay: Replay, by: ActionId, stopper?: 
   closeAlert(world, replay.move);
   // An address switch takes a short wait; a paused visit carries on at the next tick the way is open; a move that
   // ended earns him a breather.
-  const wait = by === 'DEF-06' ? CONFIG[world.difficulty].ipResumeGameMs : visit ? 0 : breather(world);
-  world.death.nextMoveAt = world.clock.gameMs + (world.death.skipWait ? 0 : wait);
-  world.death.skipWait = false;
+  waitAfter(world, by === 'DEF-06' ? CONFIG[world.difficulty].ipResumeGameMs : visit ? 0 : breather(world));
 }
 
 /**
@@ -270,8 +288,7 @@ function land(world: World, library: RecordingLibrary, replay: Replay, info: Var
   world.death.ipCutsInRow = 0;
   emit(world, { kind: 'move-landed', move: move.id, variant: replay.variant });
   closeAlert(world, move.id);
-  world.death.nextMoveAt = world.clock.gameMs + (world.death.skipWait ? 0 : breather(world));
-  world.death.skipWait = false;
+  waitAfter(world, breather(world));
 }
 
 /** One tick of every replay: cut what is now stopped, apply the events that are due, land what has finished. */

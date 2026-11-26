@@ -50,7 +50,9 @@ export function dialLines(d: Difficulty): string[] {
   out.push(dial.kiro === 'always' ? (dial.kiroApply ? 'Kiro explains, suggests, and runs her drafts for you' : 'Kiro explains and suggests') : dial.kiro === 'stuck' ? 'Kiro hints when you’re stuck' : 'Kiro stays quiet unless asked');
   out.push(c.pausable ? 'You can pause' : 'No pausing');
   out.push(`The calm before the first sign of trouble: ${range(c.firstMoveDelayRealMs.min / 1000, c.firstMoveDelayRealMs.max / 1000)} s`);
-  out.push(`Death rests ${range(realS(c.breatherGameMs.min, d), realS(c.breatherGameMs.max, d))} s between moves`);
+  const rest = range(realS(c.breatherGameMs.min, d), realS(c.breatherGameMs.max, d));
+  // D-259: on Medium and Hard a second move may start while one plays
+  out.push(`Death rests ${rest} s between moves${c.movesAtOnce > 1 ? `, and runs up to ${c.movesAtOnce === 2 ? 'two' : c.movesAtOnce} at once` : ''}`);
   out.push(`The shift lasts about ${Math.round(realS(c.shiftGameMs, d) / 60)} minutes`);
   return out;
 }

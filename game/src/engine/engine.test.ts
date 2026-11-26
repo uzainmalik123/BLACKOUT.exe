@@ -95,7 +95,10 @@ describe('a real run on the committed recordings, nobody at the keyboard (KI-17)
   it('seed 1, Medium: Death climbs the stages in order (scan, break in, admin, harvest), keeps robbing the search door, and the player loses; no false win', () => {
     const r = idle(1, 'medium');
     const landed = eventsOfKind(r.world, 'move-landed').map((e) => e.move);
-    expect(landed.slice(0, 4).map((m) => MOVE_BY_ID[m].stage)).toEqual([1, 2, 3, 4]);
+    // each new stage he reaches is the next one; with two of his moves at once a lower stage may still land in between (D-259)
+    const climb: number[] = [];
+    for (const m of landed) if (MOVE_BY_ID[m].stage > (climb.at(-1) ?? 0)) climb.push(MOVE_BY_ID[m].stage);
+    expect(climb.slice(0, 4)).toEqual([1, 2, 3, 4]);
     const harvests = eventsOfKind(r.world, 'move-started').filter((e) => e.move === 'ATK-08').map((e) => e.variant);
     expect(harvests[0]).toBe('d'); // D-42: the quiet halves on Medium
     expect(harvests.length).toBeGreaterThanOrEqual(3); // he keeps coming back to his door

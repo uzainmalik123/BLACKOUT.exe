@@ -1,6 +1,7 @@
 // D-41: pacing and fairness. Breathers, no same-move loops, the finale, one wave at a time, minions as pests.
 import { describe, expect, it } from 'vitest';
 import type { Recording } from '../recordings/format';
+import { MOVES } from '../rules/moves';
 import type { Difficulty, MinionId, MoveId } from '../rules/vocabulary';
 import { applyAction } from './actions';
 import { CONFIG } from './config';
@@ -9,7 +10,7 @@ import { gains } from './facts';
 import { libraryFrom, type RecordingLibrary } from './library';
 import { eventsOfKind } from './log';
 import { activeWaves, stepWaves } from './minions';
-import { activeDeathReplay, cutReplay, startReplay, stepReplays } from './replay';
+import { activeDeathReplay, cutReplay, deathReplays, startReplay, stepReplays } from './replay';
 import { initialWorld, type World } from './state';
 import { committedLibrary } from './test-fixtures/committed';
 import { lab } from './test-fixtures/lab';
@@ -87,6 +88,50 @@ describe('a breather after every Death move (D-41 rule 4)', () => {
     w.clock.gameMs += 10 * REAL_S;
     stepReplays(w, FIXTURE_LIBRARY);
     expect(w.death.nextMoveAt).toBe(w.clock.gameMs);
+  });
+});
+
+describe('two of his moves at once on Medium and Hard (D-259)', () => {
+  /** His login replayed slowly, two real minutes long, beside the fixture's other moves. */
+  const slow = libraryFrom([
+    fakeRecording('ATK-03', 'a', { ip: '203.0.113.9', durationMs: 120_000 }),
+    ...recordingsOf(FIXTURE_LIBRARY, MOVES.map((m) => m.id).filter((id) => id !== 'ATK-03')),
+  ]);
+  /** Starts the slow move, then plays the Director's 3 s ticks for `realS`; returns when each later move started and how many of his ran at most. */
+  function beside(level: Difficulty, realS: number) {
+    const w = scanned(1, level);
+    startReplay(w, slow.variantsOf('ATK-03')[0]!, 'death');
+    const t0 = w.clock.gameMs;
+    let most = 1;
+    for (let s = 0; s < realS; s += 3) {
+      w.clock.gameMs += 3 * REAL_S;
+      stepReplays(w, slow);
+      directorTick(w, slow);
+      most = Math.max(most, deathReplays(w).length);
+    }
+    const later = eventsOfKind(w, 'move-started').slice(1);
+    const slowEnd = eventsOfKind(w, 'move-landed').find((e) => e.move === 'ATK-03')?.t ?? Infinity;
+    return { w, t0, later, slowEnd, most };
+  }
+
+  for (const level of ['medium', 'hard'] as const) {
+    it(`${level}: while a long move plays, a second starts a breather after it began, never the same move, never a third`, () => {
+      const { min, max } = CONFIG[level].breatherGameMs;
+      const { t0, later, slowEnd, most } = beside(level, 100);
+      expect(later.length).toBeGreaterThan(0);
+      const second = later[0]!;
+      expect(second.t).toBeLessThan(slowEnd); // beside it, not after it
+      expect(second.move).not.toBe('ATK-03');
+      expect(second.t - t0).toBeGreaterThanOrEqual(min);
+      expect(second.t - t0).toBeLessThanOrEqual(max + CONFIG[level].directorPeriodGameMs);
+      expect(most).toBe(2);
+    });
+  }
+
+  it('easy: nothing else of his starts while the long move plays', () => {
+    const { later, slowEnd, most } = beside('easy', 100);
+    expect(most).toBe(1);
+    expect(later.every((e) => e.t >= slowEnd)).toBe(true);
   });
 });
 

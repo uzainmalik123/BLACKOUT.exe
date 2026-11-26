@@ -72,7 +72,7 @@ engine.beginShift();   // call it when the desk (the dashboard) is in view; idem
 | Comms | `comms`, `tickets` | Escalated / notified times. `tickets`: customers' support tickets (`t`, `ip`, `userAgent`, `about` what they were doing, `status` what they got: `503`, `429`, `403` or `'blocked'`, `text`), newest last; list them in the comms console (D-65) |
 | Customers | `customers.served`, `.failed`, `.lost` | How many customer requests went through, how many the player's actions failed, how many shoppers gave up (for the report) |
 | The ending | `ending` | `'banished'`, `'souls-lost'`, `'flatline'`, `'return'`, or the shift's verdict `'clean-handover'`, `'rough-handover'`, `'walked-away'` (D-118); undefined while playing |
-| The shift | `clock.shiftEndsAt` | Game ms when the shift ends (Easy ~20, Medium ~16, Hard ~13 real min): a countdown the dashboard may show; at the limit the run ends with a verdict |
+| The shift | `clock.shiftEndsAt` | Game ms when the shift ends (Easy ~20, Medium ~11, Hard ~9 real min, D-259): a countdown the dashboard may show; at the limit the run ends with a verdict |
 | Everything that happened | `events` | See §4. The source for animations and the report |
 
 ### 2.1 Detection data (SYS-20, D-110)

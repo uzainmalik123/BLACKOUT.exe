@@ -157,6 +157,7 @@ describe('every committed recording played alone (D-232)', { timeout: WHOLE_RUN_
       it(`${move}.${v.variant} opens one alert after its first lines, with a route it really used, a symptom and a gate, and no spoiler`, () => {
         const w = lab(initialWorld(1, 'hard')); // Hard: every variant may play
         startReplay(w, v, 'death');
+        w.death.nextMoveAt = Infinity; // alone: on Hard he may run a second move alongside (D-259); the Director starts none here
         expect(w.alerts).toEqual([]); // D-232: nothing at move start
         for (let i = 0; i < 4000 && w.replays.length > 0 && !w.ending; i++) advance(w, real, 100);
         const alerts = w.alerts.filter((a) => a.about === move);
