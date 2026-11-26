@@ -6,17 +6,17 @@ import { tar } from './commands/archive';
 import { sqlite3 } from './commands/database';
 import { cp, file, mkdir, rm, sha256sum } from './commands/filesys';
 import { curl, nmap, ping, ss, whois } from './commands/network';
-import { iptables, systemctl } from './commands/ops';
+import { flag as flagCommand, iptables, systemctl } from './commands/ops';
 import { clear, date, help, history, man } from './commands/session-cmds';
 import { awk, cat, cut, grep, head, sort, tail, uniq, wc } from './commands/textproc';
 import { fail } from './output';
 import type { CommandName, CommandSpec, FlagSpec, Handler } from './types';
 
-/** The 31 commands of .kiro/steering/game-shell.md, in that order. */
+/** The 32 commands of .kiro/steering/game-shell.md, in that order (`flag` since D-233). */
 export const COMMAND_NAMES = [
   'ls', 'cd', 'pwd', 'cat', 'head', 'tail', 'grep', 'awk', 'sort', 'uniq', 'wc', 'cut',
   'file', 'sha256sum', 'tar', 'cp', 'rm', 'mkdir', 'sqlite3', 'iptables', 'systemctl',
-  'ss', 'whois', 'ping', 'nmap', 'curl', 'date', 'history', 'clear', 'help', 'man',
+  'ss', 'whois', 'ping', 'nmap', 'curl', 'flag', 'date', 'history', 'clear', 'help', 'man',
 ] as const satisfies readonly CommandName[];
 
 // Compile-time check: every CommandName appears in COMMAND_NAMES.
@@ -35,7 +35,7 @@ function flag(name: string, summary: string, value?: FlagSpec['value'], valueNam
 type Def = Omit<CommandSpec, 'name' | 'handler'>;
 
 /** Handlers that exist so far; every other command keeps the placeholder. This is the one place they are wired. */
-const HANDLERS: Partial<Record<CommandName, Handler>> = { ls, cd, pwd, cat, head, tail, grep, awk, sort, uniq, wc, cut, rm, file, sha256sum, cp, mkdir, sqlite3, iptables, systemctl, tar, whois, ping, nmap, curl, ss, date, history, clear, help, man };
+const HANDLERS: Partial<Record<CommandName, Handler>> = { ls, cd, pwd, cat, head, tail, grep, awk, sort, uniq, wc, cut, rm, file, sha256sum, cp, mkdir, sqlite3, iptables, systemctl, tar, whois, ping, nmap, curl, flag: flagCommand, ss, date, history, clear, help, man };
 
 function def(name: CommandName, d: Def): CommandSpec {
   return { name, ...d, handler: HANDLERS[name] ?? notImplemented };
@@ -285,6 +285,14 @@ export const COMMANDS = {
     flags: [flag('-I', 'Headers only'), flag('-s', 'Silent')],
     examples: ['curl -I http://203.0.113.7/'],
     operands: { min: 0, max: INF },
+    readsStdin: false,
+  }),
+  flag: def('flag', {
+    summary: 'Flag an address as a suspected attacker (DEF-21)',
+    usage: 'flag <ip> [note...]',
+    flags: [],
+    examples: ['flag 203.0.113.9 scanner, thousands of 404s'],
+    operands: { min: 1, max: INF },
     readsStdin: false,
   }),
   date: def('date', {

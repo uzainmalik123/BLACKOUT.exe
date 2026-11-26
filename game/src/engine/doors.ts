@@ -4,6 +4,7 @@
 // again, with no new first entry needed. `refreshDoors` keeps world.death.shutDoors current and logs the changes.
 import { MOVES, SOUL_DOORS, type Move } from '../rules/moves';
 import { SOUL_TABLES, type MoveId, type Stopper } from '../rules/vocabulary';
+import { anyEvaded } from './bandages';
 import { CONFIG } from './config';
 import { stopperHolds } from './facts';
 import type { RecordingLibrary, Variant } from './library';
@@ -50,7 +51,10 @@ export function allowedVariants(world: World, move: Move): string[] | undefined 
 /** The halves of a door Death may play on this level, stopped or not. */
 export function doorHalves(world: World, library: RecordingLibrary, move: Move): Variant[] {
   const allowed = allowedVariants(world, move);
-  return library.variantsOf(move.id).filter((v) => allowed === undefined || allowed.includes(v.variant));
+  // D-231: an evaded rule unlocks the quiet halves the pin keeps for other levels (Hard: .d/.e), never a retired variant
+  const pin = CONFIG[world.difficulty].pinnedVariants[move.id];
+  const unlocked = pin !== undefined && anyEvaded(world, move.id) ? [...pin.normal, ...pin.tippedOff] : [];
+  return library.variantsOf(move.id).filter((v) => allowed === undefined || allowed.includes(v.variant) || (v.info.quiet && unlocked.includes(v.variant)));
 }
 
 /** The first of the door's own stoppers that holds for every half he may play: the fix that shuts it right now. */
@@ -61,11 +65,11 @@ export function closingStopper(world: World, library: RecordingLibrary, move: Mo
 }
 
 /**
- * D-45: the fixes that close a soul door for the win: its patch (DEF-13, never rolled back) or a WAF rule (DEF-12, never
- * removed). A flag (DEF-10), a revoke (DEF-09) and locking or deleting the account he uses (DEF-08, DEF-14) shut it
- * during play, but each lapses (a flag back on, a new session: D-44 ruling 1), so they are containment, not the fix.
+ * D-45, D-231: the one fix that closes a soul door for the win: its code patch (DEF-13, never rolled back). A WAF rule
+ * is a bandage he evades (D-231); a flag (DEF-10), a revoke (DEF-09) and locking or deleting the account he uses
+ * (DEF-08, DEF-14) shut it during play, but each lapses (a flag back on, a new session: D-44 ruling 1): containment.
  */
-export const LASTING_FIXES: ReadonlySet<Stopper['action']> = new Set(['DEF-12', 'DEF-13']);
+export const LASTING_FIXES: ReadonlySet<Stopper['action']> = new Set(['DEF-13']);
 
 /**
  * SYS-07, D-45, D-117: a soul door still open for the win. A door he has found (got into, landed or cut) is open until a

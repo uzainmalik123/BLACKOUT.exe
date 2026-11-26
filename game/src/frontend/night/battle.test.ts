@@ -7,11 +7,14 @@ import { Engine } from '../../engine/engine';
 import { MOVES } from '../../rules/moves';
 import { Battle, GATES, battleOf, fxOf, gateOf } from './battle';
 import { liveAttacks, outcomeOf, type Pending } from './results';
+import { lab } from '../../engine/test-fixtures/lab';
 import { runOn } from './run';
 import { commandFor, situationOf } from './situations';
 
 const baseline = () => new Uint8Array(readFileSync(new URL('../../recordings/juiceshop.sqlite', import.meta.url)));
 const fresh = (difficulty: 'easy' | 'medium' | 'hard' = 'medium', seed = 7) => runOn(new Engine({ seed, difficulty, baseline: baseline() }));
+/** The same run with the incident already declared, so an action lands at once (the change freeze, D-230). */
+const declared = (difficulty: 'easy' | 'medium' | 'hard' = 'medium', seed = 7) => { const r = fresh(difficulty, seed); lab(r.engine.world); return r; };
 const pendingFor = (run: ReturnType<typeof fresh>, type: Pending['type'], ok = true): Pending => ({ type, ok, message: '', from: run.engine.world.events.length, heartbeat: run.engine.world.heartbeat, max: run.engine.world.heartbeatMax, at: 0, live: liveAttacks(run.engine.world) });
 
 describe('the battlefield is the engine, drawn (D-225)', () => {
@@ -22,7 +25,7 @@ describe('the battlefield is the engine, drawn (D-225)', () => {
   });
 
   it('a gate seals when the engine says a fix holds for every attack through it', () => {
-    const r = fresh();
+    const r = declared();
     expect(battleOf(r.engine.world).gates.search).not.toBe('sealed');
     r.engine.act({ type: 'DEF-10', feature: 'search', enabled: false });
     expect(battleOf(r.engine.world).gates.search).toBe('sealed');
@@ -49,7 +52,7 @@ describe('the battlefield is the engine, drawn (D-225)', () => {
     expect(fxOf(ev({ kind: 'move-landed', move: 'ATK-08', variant: 'd' }))[0]).toEqual({ kind: 'breach', gate: 'search' });
     expect(fxOf(ev({ kind: 'souls-stolen', by: 'ATK-08', count: 4, stolen: 4, total: 325 }))).toEqual([{ kind: 'souls', n: 4 }]);
     expect(fxOf(ev({ kind: 'action', action: { type: 'DEF-01', query: 'x' }, ok: true }))).toEqual([]);
-    const r = fresh();
+    const r = declared();
     const b = new Battle();
     b.update(r.engine.world, 0);
     r.engine.world.sessions.push({ id: 99, email: 'admin@juice-sh.op', kind: 'admin', issuedBy: 'ATK-03', keyVersion: r.engine.world.signingKey.version });
@@ -71,7 +74,7 @@ describe('RESULT says what the engine did, never more (D-225)', () => {
   });
 
   it('a refused action is "didn\'t work"; a plug pulled is a shut-down shop, and it costs the customers', () => {
-    const r = fresh();
+    const r = declared();
     expect(outcomeOf({ ...pendingFor(r, 'DEF-06'), ok: false }, r.engine.world, 0)).toBe('failed');
     const p = pendingFor(r, 'DEF-11');
     r.engine.act({ type: 'DEF-11' });
@@ -84,7 +87,7 @@ describe('RESULT says what the engine did, never more (D-225)', () => {
   it('contained when the engine stops the running attack by that action (D-45 freezes it, then cuts it)', () => {
     const r = fresh('medium', 7);
     // wait for his scan, then block the scanner's tool, the fix that stops it (rules/moves.ts)
-    for (let i = 0; i < 40 && !r.engine.world.replays.some((x) => x.move === 'ATK-01'); i++) r.engine.advance(250);
+    for (let i = 0; i < 160 && !(r.engine.world.replays.some((x) => x.move === 'ATK-01') && r.engine.world.incident.declaredAt !== undefined); i++) r.engine.advance(250); // the calm opening, then the scan's first alert lifts the freeze (D-230, D-232)
     expect(r.engine.world.replays.some((x) => x.move === 'ATK-01')).toBe(true);
     const p = pendingFor(r, 'DEF-12');
     r.engine.act({ type: 'DEF-12', rule: { kind: 'block-user-agent', pattern: 'Fuzz Faster U Fool' } });
@@ -95,7 +98,7 @@ describe('RESULT says what the engine did, never more (D-225)', () => {
   it('the button and the typed command are the same engine action', async () => {
     const a = fresh('medium', 7);
     const b = fresh('medium', 7);
-    for (const r of [a, b]) for (let i = 0; i < 40; i++) r.engine.advance(250);
+    for (const r of [a, b]) for (let i = 0; i < 160; i++) r.engine.advance(250); // past the calm and the first alert: the freeze is lifted (D-230)
     const s = situationOf(a.engine.world);
     const ip = a.engine.topTalkers(1)[0]!.ip;
     // the button runs the situation's command; the player types the same line

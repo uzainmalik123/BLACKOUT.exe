@@ -7,6 +7,7 @@ import { Engine } from './engine';
 import { eventsOfKind } from './log';
 import { initialWorld, type AccessLine, type World } from './state';
 import { committedLibrary } from './test-fixtures/committed';
+import { lab } from './test-fixtures/lab';
 import { WHOLE_RUN_TIMEOUT_MS } from './test-fixtures/timeouts';
 
 const REAL_S = 30_000; // game ms (SYS-01)
@@ -93,6 +94,7 @@ describe('error rate (SYS-20 b)', () => {
 describe('on a seeded run (the committed recordings)', { timeout: WHOLE_RUN_TIMEOUT_MS }, () => {
   it("during the scan the scanner's address tops the talkers with thousands of requests, and the first minute's series carries its 500s; the Engine exposes both", () => {
     const engine = new Engine({ seed: 1, difficulty: 'medium', library: committedLibrary() });
+    lab(engine.world); // the lab: Death from 0 (D-230)
     for (let i = 0; i < 400; i++) engine.advance(100); // 40 real s: the scan (13 s) has landed
     const scan = eventsOfKind(engine.world, 'move-started').find((e) => e.move === 'ATK-01')!;
     const top = engine.topTalkers();

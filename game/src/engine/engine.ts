@@ -10,6 +10,7 @@ import { libraryFrom, type RecordingLibrary } from './library';
 import { emit, type KiroCall } from './log';
 import { notificationClock, type NotificationClock } from './notification';
 import { renderAccessLog, renderAppLog } from './replay';
+import { beginShift } from './shift';
 import { openBaseline, syncDb, type GameDb } from './sqldb';
 import { initialWorld, type Evidence, type VFile, type World } from './state';
 
@@ -44,6 +45,16 @@ export class Engine {
 
   advance(realMs: number): void {
     advance(this.world, this.library, realMs);
+    this.notify();
+  }
+
+  /**
+   * SYS-22 (D-230): the desk is in view: the shift begins. Death's first move waits its seeded delay from this call, the
+   * minions and the taps wait for that move, and every change action is refused until the incident is declared
+   * (the first alert, an escalation or a confirmed flag). Idempotent; nothing of his happens before it.
+   */
+  beginShift(): void {
+    beginShift(this.world);
     this.notify();
   }
 

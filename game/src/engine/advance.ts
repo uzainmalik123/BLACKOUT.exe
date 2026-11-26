@@ -1,7 +1,11 @@
 // The one time step: real milliseconds in, the world moved forward in fixed game-time sub-steps (D-24),
 // so the order of effects never depends on the frame rate. Everything the engine does over time happens here.
 import { applyPendingPatches, takeBackupIfDue } from './actions';
+import { stepAlerts } from './alerts';
 import { stepAssess } from './assess';
+import { stepBandages } from './bandages';
+import { stepFlags } from './flags';
+import { stepPlaybook } from './playbook';
 import { realToGameMs } from './clock';
 import { CONFIG } from './config';
 import { stepCustomers } from './customers';
@@ -35,6 +39,9 @@ function step(world: World, library: RecordingLibrary, dt: number): void {
   stepWaves(world, library);
   stepTaps(world);
   stepCustomers(world, library); // SYS-19: after Death and the minions, so their addresses are known (D-65)
+  stepAlerts(world); // SYS-20, D-232: the detectors over this tick's lines, changes and uploads
+  stepFlags(world); // DEF-21, D-233: a hostile line from a flagged address confirms it
+  stepBandages(world, library); // SYS-23, D-231: a bandage whose breathers are over has failed
   refreshDoors(world, library); // D-44: a door is shut only while its fix holds
   integrateHeartbeat(world, dt);
   stepNotificationClock(world); // SYS-14
@@ -44,6 +51,7 @@ function step(world: World, library: RecordingLibrary, dt: number): void {
     directorTick(world, library);
   }
   checkEndings(world, library);
+  stepPlaybook(world); // D-233: the "Now:" strip's phase, from visible events and the player's own acts
   stepAssess(world); // SYS-21: last, so the snapshot sees everything this step did, the ending included
   stepStruggle(world); // SYS-13: reads the assessor's verdicts and its biggest gap
 }

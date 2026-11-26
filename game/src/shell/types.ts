@@ -3,11 +3,11 @@
 import type { Engine } from '../engine/engine';
 import type { World } from '../engine/state';
 
-/** The 31 commands of .kiro/steering/game-shell.md, in that order. `registry.ts` owns the runtime tuple. */
+/** The 32 commands of .kiro/steering/game-shell.md, in that order (`flag` since D-233). `registry.ts` owns the runtime tuple. */
 export type CommandName =
   | 'ls' | 'cd' | 'pwd' | 'cat' | 'head' | 'tail' | 'grep' | 'awk' | 'sort' | 'uniq' | 'wc' | 'cut'
   | 'file' | 'sha256sum' | 'tar' | 'cp' | 'rm' | 'mkdir' | 'sqlite3' | 'iptables' | 'systemctl'
-  | 'ss' | 'whois' | 'ping' | 'nmap' | 'curl' | 'date' | 'history' | 'clear' | 'help' | 'man';
+  | 'ss' | 'whois' | 'ping' | 'nmap' | 'curl' | 'flag' | 'date' | 'history' | 'clear' | 'help' | 'man';
 
 export type DeepReadonly<T> = T extends (infer U)[]
   ? readonly DeepReadonly<U>[]

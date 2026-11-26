@@ -10,9 +10,10 @@ import { gameTimeIso } from './clock';
 import { CONFIG } from './config';
 import { stopperHolds } from './facts';
 import { emit } from './log';
+import { closeAlert, openTapAlert } from './alerts';
 import { bump, customerAddresses } from './pool';
-import { closeAlert, openAlert } from './replay';
 import { SEED_ACCOUNTS } from './seed';
+import { pestsMayStart } from './shift';
 import { steal } from './souls';
 import { mulberry, type World } from './state';
 
@@ -69,9 +70,9 @@ function open(world: World): void {
   const now = world.clock.gameMs;
   world.taps.opened.push(tap.id);
   world.taps.open.push({ id: tap.id, openedAt: now, nextDripAt: now + CONFIG[world.difficulty].taps.dripEveryGameMs, drips: 0 });
-  openAlert(world, tap.id);
   emit(world, { kind: 'tap-opened', tap: tap.id });
   line(world, tap.id, REQUESTS[tap.id][0]!); // a scraper finds it: the listing or the first page
+  openTapAlert(world, tap.id, REQUESTS[tap.id][0]!.target); // D-232: a tap's alert opens with the tap, from that first line
 }
 
 /** One drip: about 1 % of the total souls from the rows the tap really leaks, chosen from the taps' stream. */
@@ -106,7 +107,7 @@ export function stepTaps(world: World): void {
       t.nextDripAt += cfg.dripEveryGameMs;
     }
   }
-  if (now >= world.taps.nextAt && world.taps.open.length < cfg.maxOpen && world.taps.opened.length < TAPS.length) {
+  if (pestsMayStart(world) && now >= world.taps.nextAt && world.taps.open.length < cfg.maxOpen && world.taps.opened.length < TAPS.length) { // D-230: taps wait for his first move
     open(world);
     world.taps.nextAt = now + cfg.everyGameMs.min + Math.round(nextTapRandom(world) * (cfg.everyGameMs.max - cfg.everyGameMs.min));
   }

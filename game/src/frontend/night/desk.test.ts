@@ -7,6 +7,7 @@ import { Engine } from '../../engine/engine';
 import type { GameEvent } from '../../engine/log';
 import { deltaWords, metersOf } from './Desk';
 import { CAMS, lerpCam, onScreen, walkCam } from './office';
+import { lab } from '../../engine/test-fixtures/lab';
 import { runOn } from './run';
 import { Soundscape, heartAt } from './sound';
 import { alertWords, clockAt, eventWords, shiftLeft } from './words';
@@ -50,6 +51,7 @@ describe('the desk words what the player could see, and nothing more (D-223)', (
   it("shows a meter's change only when the engine made one", () => {
     const { engine, ...run } = runOn(new Engine({ seed: 7, difficulty: 'medium', baseline: baseline() }));
     const r = { engine, ...run };
+    lab(engine.world); // the incident declared: the plug may be pulled (the change freeze, D-230)
     engine.advance(2000);
     const before = metersOf(r);
     engine.act({ type: 'DEF-01', query: 'grep 404', shown: [], shownTotal: 0 });

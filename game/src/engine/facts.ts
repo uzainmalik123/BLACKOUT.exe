@@ -1,8 +1,8 @@
 // Derived facts (SYS-04, D-24): Death's gains and footholds are read off the data they rest on, never bookkept.
 // The Director (SYS-02), the replay engine (SYS-03) and banishment (SYS-07) all ask these questions.
 import { MOVES, type Move } from '../rules/moves';
-import { FEATURE_DEFAULTS, RETURN_GRANTS, type Foothold, type Gain, type Need, type Stopper, type WafRule } from '../rules/vocabulary';
-import { CONFIG } from './config';
+import { FEATURE_DEFAULTS, RETURN_GRANTS, type Foothold, type Gain, type MoveId, type Need, type Stopper } from '../rules/vocabulary';
+import { evaded, LOGIN_RATE_LIMIT, ruleOf, sameRule, tried } from './bandages';
 import type { Account, World } from './state';
 
 /** What the engine knows about one recorded variant when it evaluates stoppers. */
@@ -10,8 +10,9 @@ export interface VariantInfo {
   ip: string;
   quiet: boolean; // D-24: the label starts with "quiet"
   targets: string[]; // emails of the Users rows the recording touches (ATK-05's victim, ATK-12's victim)
-  move?: string; // the recording's move and variant, for per-variant dials (D-34)
+  move?: string; // the recording's move and variant, for the bandages (D-231)
   variant?: string;
+  userAgents?: string[]; // every user agent the recording's lines carry: a block-user-agent rule matches only what it saw (D-231)
 }
 
 const live = (a: Account) => a.lockedAt === undefined;
@@ -69,15 +70,6 @@ export function needsHold(world: World, move: Move): boolean {
   return move.needs.every((n) => needHolds(world, n));
 }
 
-function sameRule(a: WafRule, b: WafRule): boolean {
-  if (a.kind !== b.kind) return false;
-  if (a.kind === 'block-user-agent' && b.kind === 'block-user-agent') return a.pattern.toLowerCase() === b.pattern.toLowerCase();
-  if (a.kind === 'block-path' && b.kind === 'block-path') return a.method === b.method && a.path === b.path;
-  if (a.kind === 'rate-limit' && b.kind === 'rate-limit') return a.path === b.path;
-  return true; // sqli
-}
-
-const LEAKY_KINDS: ReadonlySet<WafRule['kind']> = new Set(['sqli', 'block-user-agent']);
 
 const account = (world: World, email: string) => world.accounts.find((a) => a.email === email);
 const lockedOrGone = (world: World, email: string) => { const a = account(world, email); return a === undefined || !live(a); };
@@ -91,7 +83,8 @@ export function stopperHolds(world: World, stopper: Stopper, variant?: VariantIn
     case 'DEF-06':
       return variant !== undefined && world.firewall.blocked.includes(variant.ip);
     case 'DEF-07':
-      return loginRateLimited(world);
+      // D-231: the rate limit is a bandage too: evaded by the move's quiet variants once its breathers are over
+      return loginRateLimited(world) && !(variant?.quiet === true && variant.move !== undefined && evaded(world, variant.move as MoveId, LOGIN_RATE_LIMIT));
     case 'DEF-08':
       return stopper.account === 'used' ? allLocked(world, usedAccountEmails(world)) : allLocked(world, variant?.targets ?? []);
     case 'DEF-09':
@@ -99,13 +92,14 @@ export function stopperHolds(world: World, stopper: Stopper, variant?: VariantIn
     case 'DEF-10':
       return world.features[stopper.feature] !== FEATURE_DEFAULTS[stopper.feature];
     case 'DEF-12': {
-      const present = world.waf.some((r) => sameRule(r, stopper.rule));
-      const config = CONFIG[world.difficulty];
-      const evasion = variant?.move !== undefined ? config.wafEvasion[variant.move as keyof typeof config.wafEvasion] : undefined;
-      const leaks = evasion !== undefined
-        ? (evasion[variant?.variant ?? ''] ?? []).includes(stopper.rule.kind) // a dialled move (D-34)
-        : config.leakyWaf && variant?.quiet === true && LEAKY_KINDS.has(stopper.rule.kind); // D-24's generic quiet leak
-      return present && !leaks;
+      if (!world.waf.some((r) => sameRule(r, stopper.rule))) return false;
+      // D-231: a user-agent rule only ever matches a variant whose recorded agent carries the pattern
+      if (stopper.rule.kind === 'block-user-agent' && variant?.userAgents !== undefined) {
+        const pattern = stopper.rule.pattern.toLowerCase();
+        if (!variant.userAgents.some((ua) => ua.toLowerCase().includes(pattern))) return false;
+      }
+      // D-231: once the bandage's breathers are over, the move's quiet variants slip the rule
+      return !(variant?.quiet === true && variant.move !== undefined && evaded(world, variant.move as MoveId, stopper.rule));
     }
     case 'DEF-13':
       return world.patches.applied.includes(stopper.patch);
@@ -123,4 +117,16 @@ export function stopperHolds(world: World, stopper: Stopper, variant?: VariantIn
 
 export function anyStopperHolds(world: World, move: Move, variant?: VariantInfo): boolean {
   return move.stoppedBy.some((s) => stopperHolds(world, s, variant));
+}
+
+/**
+ * D-231: what keeps the Director from picking a variant. A WAF rule or the rate limit that has not yet been tried
+ * against this move does not: he attempts the move, the rule cuts it (replay.ts) and only then holds.
+ */
+export function blocksPick(world: World, move: Move, variant: VariantInfo): boolean {
+  return move.stoppedBy.some((s) => {
+    if (!stopperHolds(world, s, variant)) return false;
+    const rule = ruleOf(s);
+    return rule === undefined || tried(world, move.id, rule);
+  });
 }

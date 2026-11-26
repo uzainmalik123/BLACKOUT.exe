@@ -99,10 +99,15 @@ describe('the playthrough sims (PRD §10, SYS-16)', { timeout: WHOLE_RUN_TIMEOUT
   });
 
   it("SIM-2: blocking every IP loses souls anyway (Death switches IP) and blocks Death's IPs at least 3 times", () => {
-    const r = sim(reactor((e, w, act) => {
-      const ips = e.kind === 'move-started' ? [e.ip] : e.kind === 'wave-started' ? e.ips : [];
-      for (const ip of ips) if (!w.firewall.blocked.includes(ip)) act({ type: 'DEF-06', ip, op: 'add' });
-    }, 4000));
+    // Every address seen, blocked 4 s later and kept on the list until the block takes (the change freeze refuses the first ones, D-230).
+    const wanted = new Set<string>();
+    const react = reactor((e) => {
+      for (const ip of e.kind === 'move-started' ? [e.ip] : e.kind === 'wave-started' ? e.ips : []) wanted.add(ip);
+    }, 4000);
+    const r = sim((w, ms) => {
+      react(w, ms);
+      return [...wanted].filter((ip) => !w.firewall.blocked.includes(ip)).map((ip) => ({ type: 'DEF-06', ip, op: 'add' }) as PlayerAction);
+    });
     const deathIps = new Set(eventsOfKind(r.world, 'move-started').map((e) => e.ip));
     const blocksOnDeath = eventsOfKind(r.world, 'action').filter((e) => e.ok && e.action.type === 'DEF-06' && deathIps.has(e.action.ip));
     expect(blocksOnDeath.length).toBeGreaterThanOrEqual(3); // SYS-11's whack-a-mole rule
@@ -271,14 +276,14 @@ describe('SYS-06 target times in a running game (D-33)', { timeout: WHOLE_RUN_TI
   const once = (actions: PlayerAction[]): ScriptedPlayer => { let done = false; return () => (done ? [] : ((done = true), actions)); };
 
   it('a player who pulls the plug and leaves it flatlines the shop about 3 real minutes later', () => {
-    const r = runSim({ seed: 1, player: once([{ type: 'DEF-11' }]), library: FIXTURE_LIBRARY, maxRealMs: 10 * REAL_MIN });
+    const r = runSim({ lab: true, seed: 1, player: once([{ type: 'DEF-11' }]), library: FIXTURE_LIBRARY, maxRealMs: 10 * REAL_MIN }); // the lab measures the drain, not the opening (D-230)
     expect(ending(r)).toBe('flatline');
     expect(r.realMs).toBeGreaterThanOrEqual(minutesToFlatline(cfg.drainPerRealMin.plug) - 1000);
     expect(r.realMs).toBeLessThanOrEqual(minutesToFlatline(cfg.drainPerRealMin.plug) + 1000);
   });
 
   it('one open door alone takes about half an hour to flatline the shop', () => {
-    const r = runSim({ setup: noShift, seed: 1, player: once(closeAllMinions), library: slowScan, maxRealMs: 45 * REAL_MIN }); // a 30-minute drain outlasts a shift (D-118)
+    const r = runSim({ lab: true, setup: noShift, seed: 1, player: once(closeAllMinions), library: slowScan, maxRealMs: 45 * REAL_MIN }); // a 30-minute drain outlasts a shift (D-118)
     expect(ending(r)).toBe('flatline');
     const perMinute = cfg.drainPerRealMin.openDoor; // D-65: the CAPTCHA on costs nothing (no shopper fails it)
     expect(r.realMs).toBeGreaterThan(30 * REAL_MIN);
@@ -287,7 +292,7 @@ describe('SYS-06 target times in a running game (D-33)', { timeout: WHOLE_RUN_TI
 
   it('a defacement left live (with his door open) flatlines the shop in under 5 real minutes', () => {
     const r = runSim({
-      seed: 1, player: once(closeAllMinions), library: slowScan, maxRealMs: 10 * REAL_MIN,
+      lab: true, seed: 1, player: once(closeAllMinions), library: slowScan, maxRealMs: 10 * REAL_MIN,
       setup: (w) => { w.defacements.push({ productId: 1, kind: 'deface', by: 'ATK-15' }); },
     });
     expect(ending(r)).toBe('flatline');
@@ -321,12 +326,13 @@ describe('SIM-9: WAF rules against the low-and-slow harvest (D-34, on the halves
 
   for (const [name, lib] of [['made-up', harvestOnly(FIXTURE_LIBRARY)], ['committed', harvestOnly(committedLibrary())]] as const) {
     const ready = lib.variantsOf('ATK-08').some((v) => v.variant === 'd') && lib.variantsOf('ATK-01').length > 0;
-    it.runIf(ready)(`a Medium player who only adds WAF rules loses every soul to the quiet halves over his visits (${name})`, () => {
+    it.runIf(ready)(`a Medium player who only adds WAF rules is spared one breather: the SQLi rule cuts the running half once, then the quiet halves slip it and he loses every soul over his visits (D-231; ${name})`, () => {
       const r = mediumHarvest(lib, wafOnly);
       const visits = eventsOfKind(r.world, 'move-started').filter((e) => e.move === 'ATK-08');
       expect(visits[0]?.variant).toBe('d');
       expect(new Set(visits.map((e) => e.variant))).toEqual(new Set(['d', 'e']));
-      expect(eventsOfKind(r.world, 'move-cut')).toEqual([]);
+      expect(eventsOfKind(r.world, 'move-cut').filter((e) => e.move === 'ATK-08')).toMatchObject([{ move: 'ATK-08', by: 'DEF-12' }]); // the bandage held once
+      expect(eventsOfKind(r.world, 'rule-evaded')).toMatchObject([{ move: 'ATK-08', rule: { kind: 'sqli' } }]); // and failed after the breather
       expect(soulsStolen(r.world)).toBe(r.world.souls.total);
     });
     it.runIf(ready)(`one who turns search off instead keeps most of them, and Death never comes back to search (${name})`, () => {

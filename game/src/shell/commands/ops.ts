@@ -1,9 +1,9 @@
-// Operations commands: iptables (PRD SYS-09, DEF-06, DEF-11, DEF-18; R9, R10).
+// Operations commands: iptables, systemctl, flag (PRD SYS-09, DEF-06, DEF-11, DEF-18, DEF-21; R9, R10, D-233).
 
 import type { PlayerAction } from '../../rules/vocabulary';
-import { parseForms } from '../argparse';
+import { parseArgs, parseForms } from '../argparse';
 import { isIPv4 } from '../netdata';
-import { ok, usage } from '../output';
+import { ok, unsupportedFlag, usage } from '../output';
 import type { Handler } from '../types';
 
 export const iptables: Handler = async (ctx, args) => {
@@ -47,4 +47,16 @@ export const systemctl: Handler = async (ctx, args) => {
   }
   if (messages.length === 0) return ok();
   return { stdout: '', stderr: `${messages.join('\n')}\n`, code: 1 };
+};
+
+/** `flag <ip> [note...]` (DEF-21, D-233): records a suspicion; the engine's answer prints as it is, a refusal on stderr. */
+export const flag: Handler = async (ctx, args) => {
+  const parsed = parseArgs(ctx.spec, args);
+  if (!parsed.ok) return parsed.kind === 'unsupported' ? unsupportedFlag(ctx.spec, parsed.flag) : usage(ctx.spec);
+  const [ip, ...rest] = parsed.operands;
+  if (ip === undefined || !isIPv4(ip)) return usage(ctx.spec);
+  const note = rest.join(' ').trim();
+  const result = await ctx.engine.act({ type: 'DEF-21', ip, ...(note && { note }) });
+  if (!result.ok) return { stdout: '', stderr: `${result.message}\n`, code: 1 };
+  return ok(`${result.message}\n`);
 };

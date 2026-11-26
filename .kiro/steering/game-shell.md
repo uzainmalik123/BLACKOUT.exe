@@ -6,11 +6,13 @@ inclusion: always
 
 The game's terminal is **our own emulated shell, not bash**. Only these commands exist:
 
-`ls cd pwd cat head tail grep awk sort uniq wc cut file sha256sum tar cp rm mkdir sqlite3 iptables systemctl ss whois ping nmap curl date history clear help man`
+`ls cd pwd cat head tail grep awk sort uniq wc cut file sha256sum tar cp rm mkdir sqlite3 iptables systemctl ss whois ping nmap curl flag date history clear help man`
 
 - Pipes (`|`) and `>` work, as do `*` globs and a leading `~` (D-93). `;`, `&&`, `>>`, `<`, `2>` and `$VAR` are syntax errors. Nothing else from bash exists: no `sudo`, editors, package managers, `docker`, subshells or scripts.
 - It starts in `/srv/juice-shop`. Only `/tmp` and `/evidence` are writable; `uploads/` accepts `rm` only (D-90).
 - `systemctl` takes `status`, `stop`, `start` and `restart`.
+- `flag <ip> [note]` flags an address as a suspected attacker (DEF-21, D-233): a suspicion until the engine sees that address act again; allowed during the change freeze.
+- Until an incident is declared (the first alert, an escalation or a confirmed flag), every change command (`iptables`, `systemctl`, `rm`, `tar czf /evidence/…`, `sqlite3` locks and deletes) answers `No incident declared. Change control forbids production changes outside an incident.` (SYS-22, D-230); reads and `flag` work.
 - `sqlite3` is real SQLite on the game's copy of the Juice Shop database, with `-header`, `.tables` and `.schema` (D-92).
 - `awk` is `{print <expr>, …}` over `$0`, `$N`, `$NF`, `NR`, plus `-F` and `/regex/`, nothing else (D-96).
 - A command line that reads the logs, the database or the uploads counts as the player's read action, once per kind (D-98).

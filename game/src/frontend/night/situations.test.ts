@@ -14,7 +14,7 @@ const ACTORS = [...MOVES.map((m) => m.id), ...MINION_IDS, ...TAP_IDS];
 
 /** The situation an open alert about `about` would show. */
 function about(run: ReturnType<typeof fresh>, about: string): Situation {
-  run.engine.world.alerts.push({ id: 900, about: about as never, openedAt: 0 });
+  run.engine.world.alerts.push({ id: 900, about: about as never, openedAt: 0, route: '/', symptom: 'unusual activity on the site', gate: 'front door' });
   const s = situationOf(run.engine.world);
   run.engine.world.alerts.pop();
   return s;

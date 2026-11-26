@@ -45,6 +45,7 @@ It is not bash. It runs exactly these commands, with pipes (`|`) and `>` redirec
 - `ping` `ping <ip>`: active, the target notices
 - `nmap` `nmap <ip>`: active, the target notices
 - `curl` `curl <url>`: active, the target notices
+- `flag` `flag <ip> [note]`: flag an address as a suspected attacker; confirmed only when it acts again (allowed during the change freeze)
 - `date` the date and time
 - `history` the command history
 - `clear` clear the screen

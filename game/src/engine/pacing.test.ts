@@ -12,6 +12,7 @@ import { activeWaves, stepWaves } from './minions';
 import { activeDeathReplay, cutReplay, startReplay, stepReplays } from './replay';
 import { initialWorld, type World } from './state';
 import { committedLibrary } from './test-fixtures/committed';
+import { lab } from './test-fixtures/lab';
 import { FIXTURE_LIBRARY, fakeRecording } from './test-fixtures/recordings';
 
 const REAL_S = 30_000;
@@ -35,7 +36,7 @@ function scanned(seed: number, difficulty: Difficulty = 'medium'): World {
   w.death.knowledge.push('map');
   w.death.played.push({ move: 'ATK-01', variant: 'a', outcome: 'landed' });
   w.nextWaveAt = { 'MIN-01': Infinity, 'MIN-02': Infinity, 'MIN-03': Infinity, 'MIN-04': Infinity };
-  return w;
+  return lab(w);
 }
 
 describe('a breather after every Death move (D-41 rule 4)', () => {
@@ -169,9 +170,12 @@ describe('the ransom is the finale (D-41 rule 6)', () => {
     expect(eventsOfKind(w, 'ending')[0]!.t - start).toBeLessThanOrEqual(stuckFor + 3 * REAL_S);
   });
 
-  it('closing his last route with no foothold left still banishes him (SYS-07 as before)', () => {
+  it('closing his last route with no foothold left still banishes him (SYS-07); a WAF rule he never gets to attempt after the finale counts once he is stuck (D-231, D-46)', () => {
     const w = afterRansom();
     applyAction(w, { type: 'DEF-12', rule: { kind: 'block-path', method: 'PUT', path: '/api/Products' } });
+    directorTick(w, strike);
+    expect(w.ending).toBeUndefined(); // the rule is untried: the route still counts until he is stuck
+    w.clock.gameMs += CONFIG.medium.stuckBreathers * CONFIG.medium.breatherGameMs.max;
     directorTick(w, strike);
     expect(w.ending).toBe('banished');
   });
@@ -180,6 +184,8 @@ describe('the ransom is the finale (D-41 rule 6)', () => {
     const w = afterRansom();
     w.accounts.push({ id: 400, email: 'support-ops@juice-sh.op', role: 'admin', createdBy: 'ATK-11' });
     applyAction(w, { type: 'DEF-12', rule: { kind: 'block-path', method: 'PUT', path: '/api/Products' } });
+    directorTick(w, strike);
+    w.clock.gameMs += CONFIG.medium.stuckBreathers * CONFIG.medium.breatherGameMs.max; // D-231: the untried rule counts once he is stuck
     directorTick(w, strike);
     expect(eventsOfKind(w, 'banished')).toHaveLength(1);
     w.clock.gameMs += CONFIG.medium.returnDelayGameMs;

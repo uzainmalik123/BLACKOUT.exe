@@ -9,6 +9,7 @@ import { CONFIG } from './config';
 import { emit, eventsOfKind, type GameEventBody } from './log';
 import { runSim } from './sim';
 import { initialWorld, type World } from './state';
+import { lab } from './test-fixtures/lab';
 import { FIXTURE_LIBRARY } from './test-fixtures/recordings';
 import { WHOLE_RUN_TIMEOUT_MS } from './test-fixtures/timeouts';
 
@@ -603,7 +604,7 @@ describe('the gaps: every type has a test, the biggest stands first with how lon
 
 describe('the assessor inside advance() (SYS-21)', () => {
   it('judges an action on the next tick, refreshes the snapshot once a real second and at the ending, and the state stays JSON-plain', () => {
-    const w = initialWorld(1, 'medium');
+    const w = lab(initialWorld(1, 'medium'));
     advance(w, FIXTURE_LIBRARY, 100);
     expect(w.assess.assessedAt).toBe(CONFIG.medium.tickGameMs);
     advance(w, FIXTURE_LIBRARY, 500);
@@ -627,7 +628,7 @@ describe('the assessor inside advance() (SYS-21)', () => {
   });
 
   it('the snapshot tracks the live run: the scan opens stage-unseen, a focused look closes it; the gap stands from the move start', () => {
-    const w = initialWorld(1, 'medium');
+    const w = lab(initialWorld(1, 'medium'));
     advance(w, FIXTURE_LIBRARY, 10_000);
     const start = w.events.find((e) => e.kind === 'move-started')!;
     expect(w.assess.gap).toMatchObject({ type: 'stage-unseen', since: start.t });

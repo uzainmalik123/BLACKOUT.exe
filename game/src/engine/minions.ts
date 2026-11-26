@@ -9,8 +9,10 @@ import { stopperHolds } from './facts';
 import type { RecordingLibrary } from './library';
 import { emit } from './log';
 import { bump, customerAddresses } from './pool';
-import { activeDeathReplay, closeAlert, grantMinionSession, openAlert, startReplay } from './replay';
+import { closeAlert } from './alerts';
+import { activeDeathReplay, grantMinionSession, startReplay } from './replay';
 import { nextRandom } from './rng';
+import { pestsMayStart } from './shift';
 import { stuffOneReuser } from './souls';
 import type { Wave, World } from './state';
 
@@ -47,8 +49,7 @@ function startWave(world: World, library: RecordingLibrary, id: MinionId): void 
   const ips = [freshIp(world), freshIp(world), freshIp(world)];
   const wave: Wave = { id: world.death.nextId++, minion: id, n, ips, startedAt: now, endsAt: now + waveDurationGameMs, successesDone: 0 };
   world.waves.push(wave);
-  openAlert(world, id);
-  emit(world, { kind: 'wave-started', minion: id, wave: n, ips });
+  emit(world, { kind: 'wave-started', minion: id, wave: n, ips }); // its alert opens when a detector sees it (D-232)
   const variants = library.variantsOf(id);
   if (variants.length > 0) {
     const v = variants[(n - 1) % variants.length]!;
@@ -100,7 +101,7 @@ export function stepWaves(world: World, library: RecordingLibrary): void {
     if (wave.minion === 'MIN-02' && library.variantsOf('MIN-02').length === 0) stuff(world, wave); // recorded waves succeed by their exfils
     if (now >= wave.endsAt) endWave(world, wave);
   }
-  if (world.nginx === 'stopped') return;
+  if (world.nginx === 'stopped' || !pestsMayStart(world)) return; // D-230: the pests wait for Death's first move
   const { periodGameMs, alongsideDeath } = CONFIG[world.difficulty].minions;
   for (const id of MINION_IDS) {
     if (now < world.nextWaveAt[id]) continue;
