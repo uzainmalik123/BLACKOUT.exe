@@ -346,6 +346,13 @@ export function Play({ toasts, ...p }: PlayProps) {
   }
   if (gate && dial.gateSentence) lit.add(gateConsole(gate));
 
+  // the terminal takes the keyboard only when the player opens it (T, its button, a click in it, Kiro's insert): opened
+  // by the level or the tutorial it leaves 1, 2 and 3 to the actions (D-258, KI-251)
+  const openedByPlayer = useRef(false);
+  const toggleTerminal = () => {
+    openedByPlayer.current = true;
+    setTerminal((x) => !x);
+  };
   // keys: 1, 2, 3 and T when the player isn't typing
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -355,14 +362,15 @@ export function Play({ toasts, ...p }: PlayProps) {
       else if (e.key === '3') void ask();
       else if (e.key.toLowerCase() === 't' || e.key === '`') {
         e.preventDefault();
-        setTerminal((x) => !x);
+        toggleTerminal();
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   });
   useEffect(() => {
-    if (terminal) input.current?.focus();
+    if (terminal && openedByPlayer.current) input.current?.focus();
+    openedByPlayer.current = false;
   }, [terminal]);
 
   // Kiro's mood (D-250): the ending, the last real outcome, the meters and a fresh alert, all from the engine
@@ -718,7 +726,7 @@ export function Play({ toasts, ...p }: PlayProps) {
           </div>
         )}
         <ActionButton n={3} step={{ label: 'Ask Kiro', what: anomalies(readingsOf(run.engine)).length ? 'She sees something' : 'A nudge, not the answer' }} onClick={() => void ask()} />
-        <button type="button" className={`pl-act pl-termbtn${terminal ? ' is-on' : ''}`} onClick={() => setTerminal((x) => !x)}>
+        <button type="button" className={`pl-act pl-termbtn${terminal ? ' is-on' : ''}`} onClick={toggleTerminal}>
           <kbd>T</kbd>
           <span>
             <b>Terminal</b>

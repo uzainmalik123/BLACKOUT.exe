@@ -44,7 +44,7 @@
 - **Under each difficulty, what it switches on (D-234):** a short list in plain words, generated from `game/src/engine/config.ts` (`CONFIG[level]`) and §0's table, never typed by hand, so the menu can't promise what the level doesn't do. One list per level, for example:
   - the help: buttons for every investigation (Easy, Medium), autocomplete (Easy), Kiro's hints and "apply it" (Easy; Medium hints when stuck), highlighted log lines with explanations (Easy; Medium without the explanations), pausing (`pausable`, Easy only);
   - the calm before the first sign of trouble (`firstMoveDelayRealMs`, SYS-22, D-252: Easy 8–10 s, Medium 6–9 s, Hard 5–8 s);
-  - how long Death rests between moves (`breatherGameMs`, shown in real seconds: 45–60, 30–45, 20–35);
+  - how long Death rests between moves (`breatherGameMs`, shown in real seconds, D-258: 25–35, 15–25, 10–18);
   - how long the shift is (`shiftGameMs`, in real minutes: about 20, 16, 13).
   - above the three lists, once: **identical at every level: the attacks, their consequences and the report's verdict.** The briefing has no timer on any level (D-183), so it isn't a dial.
 - **Training shift (UI-12):** a menu entry beside Start; see scene 10.

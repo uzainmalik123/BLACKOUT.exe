@@ -110,7 +110,7 @@ describe('whole runs against the shift (D-118)', { timeout: WHOLE_RUN_TIMEOUT_MS
       let snap = false;
       return runSim({
         seed, library: FIXTURE_LIBRARY, maxRealMs: 20 * REAL_MIN,
-        setup: (w) => { w.clock.shiftEndsAt = 7 * REAL_MIN; }, // the shift ends while his story is still going
+        setup: (w) => { w.clock.shiftEndsAt = 4 * REAL_MIN; }, // the shift ends while his story is still going (D-258: 4 min with his shorter rests; was 7)
         player: (w) => {
           const acts: PlayerAction[] = [];
           if (!snap && w.events.length > 0) { snap = true; acts.push({ type: 'DEF-05', name: 'first' }); }

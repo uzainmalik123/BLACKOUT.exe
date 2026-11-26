@@ -91,7 +91,7 @@ const MEDIUM: EngineConfig = {
   pausable: false,
   tickGameMs: 3_000,
   directorPeriodGameMs: 3 * REAL_S,
-  breatherGameMs: { min: 30 * REAL_S, max: 45 * REAL_S },
+  breatherGameMs: { min: 15 * REAL_S, max: 25 * REAL_S }, // D-258 (approved 2026-11-26): was 30-45 s
   ipResumeGameMs: 10 * REAL_S,
   pacing: { delayAtOpenAlerts: 2, bringForwardAfterQuietGameMs: 60 * REAL_S },
   returnDelayGameMs: 120 * REAL_S,
@@ -136,7 +136,7 @@ const MEDIUM: EngineConfig = {
 
 export const CONFIG: Readonly<Record<Difficulty, EngineConfig>> = {
   easy: {
-    ...MEDIUM, pausable: true, breatherGameMs: { min: 45 * REAL_S, max: 60 * REAL_S },
+    ...MEDIUM, pausable: true, breatherGameMs: { min: 25 * REAL_S, max: 35 * REAL_S }, // D-258: was 45-60 s
     firstMoveDelayRealMs: { min: 8_000, max: 10_000 }, bandage: { breathers: 2 }, // D-230, D-231, D-252: the longest calm (was 25-30 s), and a rule that holds for two breathers
     minions: { ...MEDIUM.minions, alongsideDeath: false }, customers: { ...MEDIUM.customers, share: 0.2 },
     taps: { ...MEDIUM.taps, everyGameMs: { min: 240 * REAL_S, max: 300 * REAL_S } },
@@ -145,7 +145,7 @@ export const CONFIG: Readonly<Record<Difficulty, EngineConfig>> = {
   },
   medium: MEDIUM,
   hard: {
-    ...MEDIUM, breatherGameMs: { min: 20 * REAL_S, max: 35 * REAL_S }, minions: { ...MEDIUM.minions, successesPerWave: 2 }, customers: { ...MEDIUM.customers, share: 0.8 },
+    ...MEDIUM, breatherGameMs: { min: 10 * REAL_S, max: 18 * REAL_S } /* D-258: was 20-35 s */, minions: { ...MEDIUM.minions, successesPerWave: 2 }, customers: { ...MEDIUM.customers, share: 0.8 },
     firstMoveDelayRealMs: { min: 5_000, max: 8_000 }, // D-252: was 15-25 s
     pinnedVariants: { 'ATK-08': { normal: ['f', 'g'], tippedOff: ['f', 'g'] } },
     shiftGameMs: 13 * 60 * REAL_S, // D-118: idle Hard runs flatline at 11.7–12.8 real min

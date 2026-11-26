@@ -18,9 +18,10 @@ describe("the difficulty pick's lists (UI-02)", () => {
     expect(dialLines('easy')).toContain('The calm before the first sign of trouble: 8–10 s');
     expect(dialLines('medium')).toContain('The calm before the first sign of trouble: 6–9 s');
     expect(dialLines('hard')).toContain('The calm before the first sign of trouble: 5–8 s');
-    expect(dialLines('easy')).toContain('Death rests 45–60 s between moves');
-    expect(dialLines('medium')).toContain('Death rests 30–45 s between moves');
-    expect(dialLines('hard')).toContain('Death rests 20–35 s between moves');
+    // D-258 (approved 2026-11-26): his rests shortened from 45–60, 30–45 and 20–35 s
+    expect(dialLines('easy')).toContain('Death rests 25–35 s between moves');
+    expect(dialLines('medium')).toContain('Death rests 15–25 s between moves');
+    expect(dialLines('hard')).toContain('Death rests 10–18 s between moves');
     expect(dialLines('easy')).toContain('The shift lasts about 20 minutes');
     expect(dialLines('medium')).toContain('The shift lasts about 16 minutes');
     expect(dialLines('hard')).toContain('The shift lasts about 13 minutes');
