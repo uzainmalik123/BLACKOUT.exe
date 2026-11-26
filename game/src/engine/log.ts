@@ -22,6 +22,9 @@ export type GameEventBody =
   | { kind: 'shift-begun' } // D-230: engine.beginShift(): the desk is in view; Death's first move waits its seeded delay from here
   | { kind: 'incident-declared'; by: 'alert' | 'escalation' | 'flag' } // D-230: the change freeze lifts
   | { kind: 'flag-confirmed'; ip: string; about: Actor } // D-233: a hostile request from a flagged address, after the flag (`about` is the spoiler: don't show it)
+  | { kind: 'training-step'; step: string; index: number } // SYS-24 (D-236): a training step started (`step` is its TRAINING_STEPS id)
+  | { kind: 'training-step-done'; step: string; index: number; by: 'action' | 'timeout' } // D-236: its taught action was done, or its timeout passed
+  | { kind: 'drill-complete' } // D-236: the last training step is over; time stops
   | { kind: 'rule-evaded'; move: MoveId; rule: WafRule } // D-231: the bandage failed: that move's quiet variants slip the rule from now on
   | { kind: 'tap-opened'; tap: TapId }
   | { kind: 'tap-closed'; tap: TapId; by?: ActionId } // no `by`: it ran dry

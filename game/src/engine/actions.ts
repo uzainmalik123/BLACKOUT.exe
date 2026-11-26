@@ -166,6 +166,13 @@ function run(world: World, action: PlayerAction): ActionResult {
       // D-233: a suspicion, confirmed by the next hostile request from that address (flags.ts); never judged here
       if (!IPV4.test(action.ip)) return no(`${action.ip} is not an IPv4 address`);
       if (world.flags.some((f) => f.ip === action.ip)) return no(`${action.ip} is already flagged`);
+      const cfg = CONFIG[world.difficulty];
+      const last = world.flags.at(-1);
+      const readyAt = last === undefined ? now : last.at + cfg.flag.cooldownRealMs * cfg.gameMsPerRealMs; // D-239: one flag per cooldown
+      if (now < readyAt) {
+        const waitS = Math.ceil((readyAt - now) / cfg.gameMsPerRealMs / 1000);
+        return no(`Too soon: one flag every ${cfg.flag.cooldownRealMs / 1000} s. Next flag in ${waitS} s`);
+      }
       const note = action.note?.trim();
       world.flags.push({ ip: action.ip, at: now, ...(note && { note }) });
       return ok(`${action.ip} flagged: a suspicion until it acts again`);

@@ -42,6 +42,24 @@ engine.beginShift();   // call it when the desk (the dashboard) is in view; idem
 - **Declared** by the first alert, an escalation (DEF-19) or a confirmed flag (DEF-21): `world.incident = { declaredAt, by: 'alert' | 'escalation' | 'flag' }` and the event `incident-declared`. The freeze never returns.
 - **The "Now:" strip** reads `world.playbook.phase` (D-233), never the assessor: `watch` (freeze on: look around), `identify` (find out who and how), `contain` (after the first confirmed flag, and again whenever a new Death move starts), `eradicate` (no Death move for one breather), `recover` (a patch deployed or a backup restored). `world.playbook.since` is when it changed (game ms).
 
+### 1.2 The training shift (SYS-24, D-236; the screens are UI-12)
+
+```ts
+import { TRAINING_STEPS, DRILL_COMPLETE } from './content/kiro-fallback';
+
+const engine = new Engine({ scenario: 'training' });   // seed 1 and Easy unless you pass `seed` / `difficulty`
+engine.beginShift();                                   // as in §1.1: when the desk shows; the drill waits for it
+
+const view = engine.training();   // undefined in the real game
+// { index, count, step, state: 'teach' | 'done', by?: 'action' | 'timeout', startedAt?, complete }
+```
+
+- **The same desk, a scripted drill.** The intruder is the shop's own security team ("a drill"), never Death: no taunts, no horror beats, no endings. It plays three loud attacks (a scan, password guessing, a database dump through search) one step at a time; alerts, the log, the top talkers, the meters, the freeze (§1.1, on for the first step) and every `engine.act` work exactly as in the night shift.
+- **The overlay reads `engine.training()`.** `step` is the `TrainingStep` itself (`TRAINING_STEPS[index]`: its `panels` to highlight, its `lines` to show). While `state` is `'teach'` show `lines` (or the live Kiro's rephrasing of them); when it turns `'done'` with `by: 'action'`, show `step.done`; with `by: 'timeout'` just move on (the player didn't do it, so the `done` line would be untrue). A few seconds later the next step starts. `startedAt` is unset until `beginShift()`: show step 1's text from the start anyway. The view never carries a move id.
+- **The end.** When `complete` is true (event `drill-complete`) the engine stops advancing and `world.ending` stays unset: show the "drill complete" card from `DRILL_COMPLETE` (Play the night shift, Main menu). There is no verdict and no report: `buildReport` refuses a training world. Don't call `kiro.hint()` during the drill (KI-235); `ask` and `explain` are fine.
+- **What it leaves out:** no minion waves, no leaky taps, no WAF evasion, no struggle suggestions, no souls-lost or flatline. Customers still flow and your changes still cost them (the heartbeat moves), but nobody gives up for good, the heartbeat never drops below 20 and the dump takes at most a tenth of the souls.
+- **Events:** `training-step { step, index }` (a step's text starts; `step` is its `TRAINING_STEPS` id), `training-step-done { step, index, by }`, `drill-complete`.
+
 ## 2. What to read (all on `engine.world`)
 
 | What | Field | Notes |
@@ -116,7 +134,7 @@ Every button, console and (later) shell command sends one of these. It returns `
 | Backups | `DEF-17` restore | `{ type: 'DEF-17', backupId: 3 }` |
 | The big red button | `DEF-11` pull the plug · `DEF-18` bring back | `{ type: 'DEF-11' }` · `{ type: 'DEF-18', what: 'nginx' }` |
 | Comms | `DEF-19` escalate · `DEF-20` notify | `{ type: 'DEF-20', to: 'customers' }` |
-| Flag an address (a log line, a top-talkers row, the terminal) | `DEF-21` | `{ type: 'DEF-21', ip: '203.0.113.9', note?: 'scanner' }`: a suspicion, confirmed by the next hostile request from it; allowed during the freeze; a second flag of the same address is refused. Two or more flags on addresses that never turn out hostile cost the report's detect grade a letter ("chased false leads") |
+| Flag an address (a log line, a top-talkers row, the terminal) | `DEF-21` | `{ type: 'DEF-21', ip: '203.0.113.9', note?: 'scanner' }`: a suspicion, confirmed by the next hostile request from it; allowed during the freeze; a second flag of the same address is refused. **Cooldown (D-239):** one accepted flag per `CONFIG[level].flag.cooldownRealMs` (15 real s, every level); a flag inside it answers `{ ok: false, message: 'Too soon: one flag every 15 s. Next flag in N s' }` and changes nothing, so show the message (the shell prints it on stderr) and, if you like, grey the button for the wait. Two or more flags on addresses that never turn out hostile cost the report's detect grade a letter ("chased false leads") |
 | Terminal (via the shell) | `DEF-01`–`06`, `08`, `11`, `14`, `15`, `18`, `21` | The shell sends these for you (§5). On **Easy**, the consoles also get buttons for them |
 
 **What a read showed (D-115, D-122).** A `DEF-01`, `DEF-02` or `DEF-03` may carry `shown: string[]`, the lines the shell or console printed (at most 200: pass the first 200 and set `shownTotal` to the real count; the engine cuts longer lists). The judging engine decides from those lines whether the read was relevant (it showed something of Death's, and was focused): an accidental `tail` that shows his lines counts, a `cat` of the whole log does not. A read with no `shown` is never relevant. Pass the lines exactly as printed (access-log lines in `combined` format, SQL rows as the shell renders them, file names as listed). **What the shell passes (D-160):** it sends `DEF-01`/`02`/`03` when the Command_Line finishes, with `shown` = the first 200 lines of the line's final screen output (stdout, not stderr; `[]` for a `>` redirect) and `shownTotal` = that output's line count. **The text is never stored:** the logged action keeps only `shownCount`, `shownHis` (lines of his), `shownAbout` and `shownTotal`.
@@ -152,6 +170,7 @@ Every button, console and (later) shell command sends one of these. It returns `
 | `banished` | Every door is closed (soul doors by their real fix, taps included) and no foothold is left, or provisionally with a foothold left (D-44, D-45) | The calm before the ending |
 | `return` | He came back through a missed foothold | The worst jump-scare of the game |
 | `ending` | The run is over (`ending`, final `souls`, `heartbeat`) | Go to the ending scene |
+| `training-step` / `training-step-done` / `drill-complete` | The training shift only (§1.2): a step's text starts (`step` its `TRAINING_STEPS` id) / its action was done or it timed out (`by`) / the drill is over | Overlay: next text / the `done` line / the card |
 | `action` | Something the player did (`ok`, `note`) | Usually nothing; the console already answered |
 | `kiro` | A Kiro call happened | Nothing; the Kiro panel handles it |
 
