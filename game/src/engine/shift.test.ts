@@ -86,8 +86,8 @@ describe('the verdict at the end of the shift (D-118)', () => {
     expect(JSON.parse(JSON.stringify(v.clock))).toEqual(v.clock);
   });
 
-  it('the shift is Easy ~20, Medium ~16, Hard ~13 real minutes', () => {
-    expect([CONFIG.easy.shiftGameMs, CONFIG.medium.shiftGameMs, CONFIG.hard.shiftGameMs].map((ms) => ms / REAL_MIN)).toEqual([20, 16, 13]);
+  it('the shift is Easy ~20, Medium ~11, Hard ~9 real minutes (D-259: were 16 and 13)', () => {
+    expect([CONFIG.easy.shiftGameMs, CONFIG.medium.shiftGameMs, CONFIG.hard.shiftGameMs].map((ms) => ms / REAL_MIN)).toEqual([20, 11, 9]);
   });
 });
 

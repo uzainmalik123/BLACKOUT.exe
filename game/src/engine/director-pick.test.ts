@@ -6,6 +6,7 @@ import { CONFIG } from './config';
 import { directorTick, openAlerts } from './director';
 import { eventsOfKind } from './log';
 import { libraryFrom } from './library';
+import { noShift } from './shift';
 import { initialWorld, type World } from './state';
 import { lab } from './test-fixtures/lab';
 import { FIXTURE_LIBRARY } from './test-fixtures/recordings';
@@ -133,6 +134,7 @@ describe('the Director (SYS-02)', () => {
   it('a library that only covers some stages skips the missing ones instead of ending the run', () => {
     const partial = libraryFrom(['ATK-01', 'ATK-03', 'ATK-08'].flatMap((m) => lib.variantsOf(m as 'ATK-01').map((v) => v.recording)));
     const w = lab(initialWorld(1, 'medium'));
+    noShift(w); // D-259: Medium's shift is 10 minutes now; the robbing is measured to 10 minutes, past it (D-118)
     for (let t = 0; t < 10 * 60 * REAL_S && !w.ending; t += REAL_S) advance(w, partial, REAL_S);
     const started = eventsOfKind(w, 'move-started').map((e) => e.move);
     expect(started.slice(0, 3)).toEqual(['ATK-01', 'ATK-03', 'ATK-08']);
