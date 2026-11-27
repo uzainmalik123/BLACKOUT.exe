@@ -1212,3 +1212,11 @@
   5. **The report** shows "Decisions in time: X of Y" as a fact and on its damage strip; no grade changes (D-256's formula is untouched).
   6. **Not in the training shift** (SYS-24, D-236): the drill waits for the trainee, like its other exceptions (no pests, no endings, no judge): no window, no dip, no countdown.
 - **Why the engine:** the dip changes the heartbeat, which only the engine may (SYS-06); deterministic and tested like every rule.
+
+### D-262: The title's enchantress and the office's red eyes come back; Death keeps the rest (amends D-253, UI-14; asked by the team lead 2026-11-27)
+- **Context:** (2026-11-27) The team lead saw the title's ASCII portrait and the prologue's eyes in the dark redrawn as the cute reaper (D-253) and asked for them back: "I want my enchantress back here… give me my red eyes back again".
+- **Decision:**
+  1. **The title** (screen 1) shows the ASCII enchantress again: the pale, gaunt face with long silver hair and glowing eyes, painted in characters (`screen1-title/death.ts` as it was before D-253, unchanged).
+  2. **The office's eyes in the dark** (the prologue's first beat, "I've been expecting you.") are the crimson, slit-pupilled eyes that follow the mouse again (`paintEyes` as before D-253).
+  3. **Everywhere else Death stays the cute reaper** (D-253): the briefing film, the office's shadow, the hauntings, the battlefield, the endings. Not asked to change.
+- **Also fixed** (KI-256): in the Traffic window the table and the chart sat side by side in two halves, so the block and flag buttons ran under the chart; the chart now goes under the table.
