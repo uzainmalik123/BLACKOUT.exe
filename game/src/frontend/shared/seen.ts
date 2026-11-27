@@ -2,7 +2,8 @@
 // the opening tutorial (shown on the first shift only). Kept in localStorage; when storage is missing or blocked
 // (a private window, a test) everything counts as never seen, so a player is never denied the first time.
 
-const KEY = { prologue: 'blackout.seen.prologue', tutorial: 'blackout.seen.tutorial' } as const;
+// and the drill finished (D-273: the desk's "Training first?" then defaults to No)
+const KEY = { prologue: 'blackout.seen.prologue', tutorial: 'blackout.seen.tutorial', drill: 'blackout.seen.drill' } as const;
 
 export type Seen = keyof typeof KEY;
 

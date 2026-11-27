@@ -9,6 +9,8 @@ export function installHook(night: Night): () => void {
   const hook = {
     phase: () => night.phaseNow,
     skip: () => night.skip(),
+    /** The pop-up's answer (D-273). */
+    choose: (mode: 'training' | 'shift') => night.choose(mode),
     input: (i: Input) => night.input(i),
     run: () => night.currentRun,
     /** Fast-forward the run by real milliseconds; returns where it stands. */

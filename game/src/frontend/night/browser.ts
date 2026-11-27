@@ -21,8 +21,9 @@ export function loadBaseline(): Promise<Uint8Array> {
   return baseline;
 }
 
-export async function startRun(difficulty: Difficulty): Promise<Run> {
+/** A run at the desk: the night shift at the chosen level, or the training shift (SYS-24, D-273: seed 1, always Easy). */
+export async function startRun(difficulty: Difficulty, training = false): Promise<Run> {
   const bytes = await loadBaseline();
-  const engine = new Engine({ seed: freshSeed(), difficulty, baseline: bytes });
+  const engine = training ? new Engine({ scenario: 'training', baseline: bytes }) : new Engine({ seed: freshSeed(), difficulty, baseline: bytes });
   return runOn(engine, (e) => console.error('shell:', e));
 }

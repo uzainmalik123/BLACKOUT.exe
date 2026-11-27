@@ -531,7 +531,7 @@ export const TRAINING_STEPS: readonly TrainingStep[] = [
     step: 6,
     panels: ['backups', 'terminal'],
     lines: [
-      `Before you change anything more, keep the evidence. Open the backups and evidence console and take a snapshot, or type \`tar czf /evidence/drill.tgz /var/log ${UPLOADS}\` in the terminal. Deleting and restoring destroy what happened; a snapshot keeps it for the report.`,
+      `Before you change anything more, keep the evidence. Open the terminal and type \`tar czf /evidence/drill.tgz /var/log ${UPLOADS}\` (on Easy, the firewall console's "Snapshot the logs" does the same); the backups and evidence console then lists what you kept. Deleting and restoring destroy what happened; a snapshot keeps it for the report.`,
     ],
     done: 'Snapshot taken. That is the drill.',
   },

@@ -5,6 +5,7 @@
 // prologue's keys live in the director (director.ts); this component shows what it says and passes on what the player does.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { DRILL_COMPLETE } from '../../content/kiro-fallback';
 import type { Difficulty } from '../../rules/vocabulary';
 import { BriefingFiles } from '../screen3-briefing/DocPanel';
 import { isMasterMuted, onMasterMute, setMasterMuted } from '../shared/audio';
@@ -19,7 +20,7 @@ import { ReportWall } from './Report';
 import { headlineOf } from './reportView';
 import type { Run } from './run';
 import { BUS_DEFAULTS } from './sound';
-import { seen } from '../shared/seen';
+import { markSeen, seen } from '../shared/seen';
 import { NO_WINDOWS, closeTool, openTool, startingTools, topTool, type Wins } from './windows';
 import './night.css';
 import './play.css';
@@ -31,6 +32,13 @@ export interface NightShiftProps {
   skipPrologue?: boolean;
   onMenu: () => void;
   onAgain: (d: Difficulty) => void;
+  /**
+   * The shift is already chosen (UI-12, D-273): the real one, handed over by the drill's card. Otherwise the desk asks
+   * "Training first?" before the run is made.
+   */
+  start?: 'shift';
+  /** The drill's card: play the real night shift at the level picked in the menu, straight at the desk. */
+  onShift?: () => void;
 }
 
 const rectOf = (el: HTMLElement | null, base: DOMRect): Rect | null => {
@@ -39,7 +47,7 @@ const rectOf = (el: HTMLElement | null, base: DOMRect): Rect | null => {
   return { x: r.left - base.left, y: r.top - base.top, w: r.width, h: r.height };
 };
 
-export function NightShift({ difficulty, skipPrologue = false, onMenu, onAgain }: NightShiftProps) {
+export function NightShift({ difficulty, skipPrologue = false, onMenu, onAgain, start, onShift }: NightShiftProps) {
   const office = useRef<HTMLCanvasElement>(null);
   const haunt = useRef<HTMLCanvasElement>(null);
   const night = useRef<Night | null>(null);
@@ -57,6 +65,8 @@ export function NightShift({ difficulty, skipPrologue = false, onMenu, onAgain }
   const [volumes, setVolumes] = useState<Volumes>({ ...BUS_DEFAULTS, voices: 0.8 });
   const [muted, setMuted] = useState(isMasterMuted);
   const [paused, setPaused] = useState(false);
+  // UI-12 (D-273): at the desk, before the run is made, the choice of the drill or the shift
+  const [chosen, setChosen] = useState<'training' | 'shift' | null>(start ?? null);
   const [menu, setMenu] = useState(false);
   const [ending, setEnding] = useState<Scene | null>(null);
   const [card, setCard] = useState(false);
@@ -139,6 +149,7 @@ export function NightShift({ difficulty, skipPrologue = false, onMenu, onAgain }
     });
     night.current = n;
     n.start();
+    if (start) n.choose(start);
     return () => {
       n.dispose();
       night.current = null;
@@ -194,6 +205,11 @@ export function NightShift({ difficulty, skipPrologue = false, onMenu, onAgain }
   if (report && run) return <ReportWall run={run} onAgain={onAgain} onMenu={onMenu} say={(text) => night.current?.say('Kiro', text, { urgent: true })} />;
 
   const seated = SEATED.has(phase);
+  const choose = (m: 'training' | 'shift') => {
+    setChosen(m);
+    night.current?.choose(m);
+  };
+  const drillDone = !!run?.engine.training()?.complete;
   const end = run?.engine.world.ending ? ENDINGS[run.engine.world.ending] : null;
 
   return (
@@ -203,7 +219,7 @@ export function NightShift({ difficulty, skipPrologue = false, onMenu, onAgain }
         <Play
           run={run}
           tick={tick}
-          on={!ending}
+          on={!ending && !drillDone}
           kiroLines={kiroLines}
           addKiro={addKiro}
           say={(text) => night.current?.say('Kiro', text)}
@@ -212,7 +228,7 @@ export function NightShift({ difficulty, skipPrologue = false, onMenu, onAgain }
           sfx={(k) => night.current?.sfx(k)}
           onResult={onResult}
           toasts={toasts}
-          wins={wins}
+          wins={drillDone ? NO_WINDOWS : wins} // the drill complete card stands alone (D-273)
           setWins={setWins}
           eyes={eyesInAccounts}
           onFiles={() => setFiles(true)}
@@ -281,6 +297,42 @@ export function NightShift({ difficulty, skipPrologue = false, onMenu, onAgain }
           <button type="button" onClick={onMenu}>
             Main menu
           </button>
+        </div>
+      )}
+
+      {seated && !chosen && !error && (
+        <div className="ns-menu ns-choose" role="dialog" aria-label="Training first?">
+          <h2>Training first?</h2>
+          <p>
+            A five-minute drill on this desk: your own security team plays a loud, slow intruder, and Kiro points at each
+            request worth reading and each tool that stops it. You do every step. Or go straight to the night shift.
+          </p>
+          <button type="button" autoFocus={!seen('drill')} onClick={() => choose('training')}>
+            Yes, the drill first
+          </button>
+          <button type="button" autoFocus={seen('drill')} onClick={() => choose('shift')}>
+            No, start the night shift
+          </button>
+        </div>
+      )}
+
+      {drillDone && (
+        <div className="ns-card-end is-won is-drill" role="dialog" aria-label={DRILL_COMPLETE.title}>
+          <h1>{DRILL_COMPLETE.title.toUpperCase()}</h1>
+          <ul>
+            {DRILL_COMPLETE.learned.map((l) => (
+              <li key={l}>{l}</li>
+            ))}
+          </ul>
+          <p>{DRILL_COMPLETE.next}</p>
+          <nav>
+            <button type="button" autoFocus onClick={() => (markSeen('drill'), onShift?.())}>
+              Play the night shift ▸
+            </button>
+            <button type="button" onClick={onMenu}>
+              Main menu
+            </button>
+          </nav>
         </div>
       )}
 

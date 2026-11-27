@@ -4,7 +4,11 @@
 
 /* ---- room for the dock on the left */
 .pl-root.has-dock {
-  padding-left: calc(2vw + 74px);
+  padding-left: calc(2vw + 136px);
+}
+/* the second dock column takes width from the actions row: the terminal's button keeps room for its name */
+.pl-root.has-dock .pl-actions {
+  grid-template-columns: repeat(3, minmax(0, 1fr)) minmax(215px, 0.55fr);
 }
 .pl-root.has-dock .pl-tools button {
   white-space: nowrap;
@@ -19,15 +23,30 @@
   z-index: 6;
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  width: 66px;
+  gap: 6px;
+  width: 128px;
   padding: 6px 4px;
   overflow-y: auto;
-  scrollbar-width: none;
   box-sizing: border-box;
   background: rgba(8, 10, 14, 0.86);
   border: 1px solid rgba(255, 255, 255, 0.07);
   border-radius: 10px;
+}
+/* D-270: two columns of the same entries, in four labelled groups, so all of them fit at 1366×768 */
+.pl-dock-group {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+}
+.pl-dock-cap {
+  grid-column: 1 / -1;
+  padding: 0 2px;
+  font-family: var(--mono);
+  font-size: 8.5px;
+  letter-spacing: 1.5px;
+  line-height: 1.2;
+  text-transform: uppercase;
+  color: rgba(236, 229, 211, 0.45);
 }
 .pl-dock.is-lit {
   border-color: var(--amber);
@@ -157,6 +176,74 @@
   height: auto;
   flex: 1;
   min-height: 0;
+}
+
+/* ---- D-272: resizing from the right edge, the bottom edge and the corner */
+.ns-win-grip {
+  position: absolute;
+  z-index: 3;
+  touch-action: none;
+}
+.ns-win-grip.is-e {
+  top: 0;
+  right: -6px;
+  bottom: 14px;
+  width: 10px;
+  cursor: ew-resize;
+}
+.ns-win-grip.is-s {
+  left: 0;
+  right: 14px;
+  bottom: -6px;
+  height: 10px;
+  cursor: ns-resize;
+}
+.ns-win-grip.is-se {
+  right: -6px;
+  bottom: -6px;
+  width: 20px;
+  height: 20px;
+  cursor: nwse-resize;
+  background: linear-gradient(135deg, transparent 52%, rgba(70, 232, 255, 0.4) 52% 58%, transparent 58% 68%, rgba(70, 232, 255, 0.4) 68% 74%, transparent 74%);
+}
+.ns-win.is-bare .ns-win-grip.is-e,
+.ns-win.is-bare .ns-win-grip.is-se {
+  right: 0;
+}
+.ns-win.is-bare .ns-win-grip.is-s,
+.ns-win.is-bare .ns-win-grip.is-se {
+  bottom: 0;
+}
+
+/* ---- D-271: thin scrollbars in the screen's own colours, on every scrolling panel and window */
+.ns-root,
+.ns-root *,
+.ns-report,
+.ns-report * {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--cyan, #46e8ff) 35%, transparent) transparent;
+}
+.ns-root ::-webkit-scrollbar,
+.ns-report ::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+.ns-root ::-webkit-scrollbar-track,
+.ns-report ::-webkit-scrollbar-track {
+  background: transparent;
+}
+.ns-root ::-webkit-scrollbar-thumb,
+.ns-report ::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--cyan, #46e8ff) 35%, transparent);
+  border-radius: 4px;
+}
+.ns-root ::-webkit-scrollbar-thumb:hover,
+.ns-report ::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--cyan, #46e8ff) 60%, transparent);
+}
+.ns-root ::-webkit-scrollbar-corner,
+.ns-report ::-webkit-scrollbar-corner {
+  background: transparent;
 }
 
 /* ---- the "Now:" strip */
@@ -409,4 +496,100 @@
 }
 .ns-cheats code.is-example {
   color: var(--green, #3fb950);
+}
+
+/* ---- the drill's coach (UI-12, D-274): a dim with a cut-out, an amber outline, a callout beside the real element */
+.pl-coach {
+  position: fixed;
+  inset: 0;
+  z-index: 9000;
+  pointer-events: none;
+}
+.pl-coach-dim {
+  position: absolute;
+  inset: 0;
+  fill: rgba(0, 0, 0, 0.32);
+}
+.pl-coach.is-reading .pl-coach-dim {
+  fill: rgba(0, 0, 0, 0.55);
+}
+.pl-coach-ring {
+  position: absolute;
+  box-sizing: border-box;
+  border: 2px solid var(--amber);
+  border-radius: 8px;
+  box-shadow: 0 0 24px rgba(227, 179, 65, 0.45);
+}
+.pl-coach-call {
+  position: absolute;
+  box-sizing: border-box;
+  display: grid;
+  gap: 8px;
+  width: min(380px, calc(100vw - 16px));
+  max-height: calc(100vh - 16px);
+  overflow-y: auto;
+  padding: 12px 14px;
+  pointer-events: auto;
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--bone);
+  background: rgba(8, 10, 14, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-left: 3px solid var(--amber);
+  border-radius: 8px;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.8);
+}
+.pl-coach-call p {
+  margin: 0;
+}
+.pl-coach-step {
+  font-size: 11px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: rgba(236, 229, 211, 0.55);
+}
+.pl-coach-open {
+  color: var(--amber);
+}
+.pl-coach-line {
+  display: block;
+  max-height: 5.5em;
+  overflow: hidden;
+  padding: 6px 8px;
+  font-family: var(--mono);
+  font-size: 11px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  color: #e8f7ff;
+  background: rgba(70, 232, 255, 0.06);
+  border: 1px solid rgba(70, 232, 255, 0.25);
+}
+.pl-coach-your {
+  font-style: normal;
+  color: var(--amber);
+}
+
+/* ---- the training pop-up and the drill-complete card (UI-12, D-273) */
+.ns-menu.ns-choose p,
+.ns-card-end.is-drill p {
+  max-width: 34em;
+  margin: 0 auto;
+  font-family: var(--mono);
+  font-size: 14px;
+  line-height: 1.5;
+}
+/* the drill's card has a list to read: the desk behind it is dimmed further than an ending's */
+.ns-card-end.is-drill {
+  z-index: 9500;
+  background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0.86), rgba(0, 0, 0, 0.95));
+}
+.ns-card-end.is-drill ul {
+  max-width: 34em;
+  margin: 0 auto;
+  padding-left: 1.2em;
+  text-align: left;
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.5;
 }

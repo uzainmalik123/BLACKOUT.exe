@@ -26,7 +26,11 @@ export interface Run {
  * here: the play screen calls `engine.beginShift()` when it shows (SYS-22, D-230, D-243; closes KI-230).
  */
 export function runOn(engine: Engine, onInternalError: (e: unknown) => void = () => undefined): Run {
-  return { engine, shell: createShell(engine, { onInternalError }), kiro: createKiro(engine), difficulty: engine.world.difficulty, seed: engine.world.seed };
+  const kiro = createKiro(engine);
+  // the drill (SYS-24, D-275): Kiro's hints are the real shift's (KI-235), so on a training run she volunteers none;
+  // the coach's TRAINING_STEPS are the tutor. Ask and explain still work.
+  if (engine.world.training) kiro.hint = () => Promise.resolve(null);
+  return { engine, shell: createShell(engine, { onInternalError }), kiro, difficulty: engine.world.difficulty, seed: engine.world.seed };
 }
 
 /** A fresh seed for a new shift. */

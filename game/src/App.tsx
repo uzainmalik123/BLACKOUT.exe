@@ -8,7 +8,7 @@ type Screen =
   | { kind: 'title' }
   | { kind: 'menu' }
   | { kind: 'briefing'; choice: MenuChoice }
-  | { kind: 'night'; choice: MenuChoice; briefing: BriefingResult; attempt: number };
+  | { kind: 'night'; choice: MenuChoice; briefing: BriefingResult; attempt: number; start?: 'shift' };
 
 export function App() {
   const [screen, setScreen] = useState<Screen>({ kind: 'title' });
@@ -55,6 +55,12 @@ export function App() {
         key={screen.attempt}
         difficulty={screen.choice.difficulty}
         skipPrologue={screen.attempt > 0}
+        start={screen.start}
+        // the drill's card hands over to the real shift, at the level picked in the menu, straight at the desk (D-273)
+        onShift={() => {
+          stopAllAudio();
+          setScreen({ ...screen, attempt: screen.attempt + 1, start: 'shift' });
+        }}
         onMenu={() => setScreen({ kind: 'menu' })}
         onAgain={(d) => {
           stopAllAudio();
