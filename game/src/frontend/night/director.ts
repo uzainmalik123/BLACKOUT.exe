@@ -145,6 +145,8 @@ export class Night {
   private lunge = -1;
   private recoil = -1;
   private drain = -1;
+  /** The report is open (D-263): no more thunder. */
+  private settled = false;
   private lastChance = -1;
   private lastTaunt = -99;
   private warned = new Set<number>();
@@ -234,6 +236,13 @@ export class Night {
   /** 0..1 Kiro's and Death's voices. */
   setVoices(v: number): void {
     this.voicesVolume = v;
+  }
+
+  /** The report is open (D-263): the storm settles to a low rain with no more thunder, the heartbeat slows to a stop; the voices stay. */
+  settle(): void {
+    this.settled = true;
+    this.sound.setRain(0.15);
+    this.sound.heartStop();
   }
 
   /**
@@ -569,7 +578,7 @@ export class Night {
     if (this.keys.has('d')) this.turn = Math.min(0.5, this.turn + dt * 0.8);
     if (!this.keys.has('a') && !this.keys.has('d')) this.turn *= 1 - Math.min(1, dt * 1.5);
     // lightning now and then, the thunder after it
-    if (this.t > this.nextFlash) {
+    if (this.t > this.nextFlash && !this.settled) {
       this.flash = 1;
       this.bolt = (Math.random() - 0.5) * 1.6;
       this.nextFlash = this.t + (this.crimsonSince >= 0 ? 25 : 45) + Math.random() * 50;
