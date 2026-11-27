@@ -22,6 +22,7 @@ import { anomalies, danger as dangerOf, kiroMood, whatKiroSees } from './judge';
 import { KiroPanel, type KiroLine } from './KiroPanel';
 import { OUTCOME_KIRO, OUTCOME_WORDS, READS, liveAttacks, outcomeOf, type Outcome, type Pending } from './results';
 import { readingsOf, type Run } from './run';
+import { countdownOf, countdownWords, URGENT_S } from './countdown';
 import { STAGE_NAMES, commandFor, forLevel, situationOf, tokens, type Step, type TargetKind } from './situations';
 import { AddressFlags, AlertsTool, CheatSheet, Freeze, TrafficTool, UploadsTool, type Act } from './Tools';
 import { TOOL_BY_ID, closeTool, dockFor, focusTool, isOpen, moveTool, openTool, resizeTool, toggleTool, type ToolId, type Wins } from './windows';
@@ -45,7 +46,7 @@ export interface PlayProps {
   /** Death's line now, shown in the Now strip (D-254), and the first alert's warning there. */
   taunt?: string | null;
   alarm?: boolean;
-  /** The drill's coach is waiting for the player to read: hold the night's clock (D-264). */
+  /** The drill's coach is waiting for the player to read: hold the night's clock (D-274). */
   onHold?: (on: boolean) => void;
   tick: number;
   on: boolean;
@@ -320,7 +321,7 @@ export function Play({ toasts, ...p }: PlayProps) {
     void run.kiro.explain(line).then((r) => p.addKiro({ who: 'kiro', text: r.text, offline: r.offline }));
   };
 
-  // the opening's tutorial left Kiro's column (D-263): the training shift is offered when a shift starts
+  // the opening's tutorial left Kiro's column (D-273): the training shift is offered when a shift starts
   const lit = new Set<ToolId>();
   if (gate && dial.gateSentence) lit.add(gateConsole(gate));
 
@@ -360,6 +361,8 @@ export function Play({ toasts, ...p }: PlayProps) {
     alertAge: newest === null ? null : (w.clock.gameMs - newest) / CONFIG[w.difficulty].gameMsPerRealMs / 1000,
   });
   const act = situation.act;
+  // UI-15 (D-261): the countdown on the choices, from the engine's clock (whole seconds under reduced motion)
+  const countdown = p.on ? countdownOf(w, !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) : null;
   const needsPick = act?.needs && (!target || target.kind !== act.needs);
   const lastKiro = [...p.kiroLines].reverse().find((l) => l.who === 'kiro');
   const hb = meters.heartbeat;
@@ -602,7 +605,7 @@ export function Play({ toasts, ...p }: PlayProps) {
           <div className="pl-kiro-name">Kiro</div>
           <p className={`pl-kiro-line${lastKiro?.urgent ? ' is-urgent' : ''}`}>{asking ? '…' : (lastKiro?.text ?? situation.kiro)}</p>
           {lastKiro?.offline && <small className="pl-off">rule-written answer (Kiro offline)</small>}
-          {/* her conversation window (drafts, explain, apply on Easy) opens from her column: she is not on the dock (D-260) */}
+          {/* her conversation window (drafts, explain, apply on Easy) opens from her column: she is not on the dock (D-270) */}
           <button type="button" className="pl-lesson-again" onClick={() => openWin('kiro')}>
             Open the conversation
           </button>
@@ -662,6 +665,13 @@ export function Play({ toasts, ...p }: PlayProps) {
       </div>
 
       <footer className="pl-actions">
+        {countdown && (
+          // UI-15 (D-261): the alert on screen waits for a decision; the bar empties over its window
+          <div className={`pl-decide is-${countdown.state}${countdown.state === 'deciding' && countdown.left <= URGENT_S ? ' is-urgent' : ''}`} role="timer">
+            <i style={{ width: `${countdown.share * 100}%` }} />
+            <span>{countdownWords(countdown)}</span>
+          </div>
+        )}
         <ActionButton n={1} step={{ ...situation.look, label: `Investigate: ${situation.look.label}` }} onClick={() => take(situation.look)} />
         {act ? (
           <ActionButton

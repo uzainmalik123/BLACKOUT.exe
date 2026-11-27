@@ -32,7 +32,7 @@
   border: 1px solid rgba(255, 255, 255, 0.07);
   border-radius: 10px;
 }
-/* D-260: two columns of the same entries, in four labelled groups, so all of them fit at 1366×768 */
+/* D-270: two columns of the same entries, in four labelled groups, so all of them fit at 1366×768 */
 .pl-dock-group {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -178,7 +178,7 @@
   min-height: 0;
 }
 
-/* ---- D-262: resizing from the right edge, the bottom edge and the corner */
+/* ---- D-272: resizing from the right edge, the bottom edge and the corner */
 .ns-win-grip {
   position: absolute;
   z-index: 3;
@@ -215,7 +215,7 @@
   bottom: 0;
 }
 
-/* ---- D-261: thin scrollbars in the screen's own colours, on every scrolling panel and window */
+/* ---- D-271: thin scrollbars in the screen's own colours, on every scrolling panel and window */
 .ns-root,
 .ns-root *,
 .ns-report,
@@ -416,9 +416,12 @@
   word-break: break-all;
   cursor: help;
 }
+/* in a window the chart goes under the table, so the block / flag column has room (KI-256: it ran under the chart) */
 .ns-traffic.is-window {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 10px;
+  max-height: none;
 }
 .ns-alertlist {
   list-style: none;

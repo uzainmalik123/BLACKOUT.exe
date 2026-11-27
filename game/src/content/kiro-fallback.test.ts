@@ -189,7 +189,7 @@ describe("Kiro's tutorial texts (CON-03 extended, D-238)", () => {
   it('the opening: Easy walks log, alerts, meters, terminal, dock; Medium three lines; Hard the one line', () => {
     expect(OPENING_TUTORIAL.easy.map((s) => s.panels[0])).toEqual(['logs', 'alerts', 'meters', 'terminal', 'dock']);
     expect(OPENING_TUTORIAL.medium.flatMap((s) => s.lines)).toHaveLength(3);
-    expect(OPENING_TUTORIAL.hard.flatMap((s) => s.lines)).toEqual(['Change freeze is on until an incident is declared. Look around.']);
+    expect(OPENING_TUTORIAL.hard.flatMap((s) => s.lines)).toEqual(['Change freeze is on until an incident is declared. Each alert gives you a few seconds to act. Look around.']); // D-261
     for (const s of OPENING_TUTORIAL.medium) for (const l of s.lines) expect(l.length).toBeLessThanOrEqual(160);
   });
 

@@ -90,7 +90,7 @@ export interface Aftermath {
   wrong: Array<{ phase: Phase; title: string; why: string }>;
   failed: string[];
   missed: string[];
-  damage: { soulsLost: number; total: number; heartbeat: number; max: number; downtime: string; customersLost: string };
+  damage: { soulsLost: number; total: number; heartbeat: number; max: number; downtime: string; customersLost: string; decisions: string }; // decisions: SYS-25's "X of Y", '' when no alert waited for one
   professional: Array<{ phase: Phase; text: string }>;
   lessons: string[];
   nextTime: string[];
@@ -157,6 +157,7 @@ export function aftermathOf(world: World): Aftermath {
     max: Math.round(world.heartbeatMax),
     downtime: fact('Downtime caused (plug pulled)'),
     customersLost: fact('Customers lost for good'),
+    decisions: fact('Decisions in time'), // UI-15 (D-261)
   };
 
   // ---- learning: the weak phases' practice, three lessons (the worst mistakes' reasons first), next time

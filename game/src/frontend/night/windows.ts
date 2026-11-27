@@ -12,7 +12,7 @@ export type ToolId =
   | 'waf' | 'firewall' | 'features' | 'flags' | 'accounts' | 'uploads' | 'sessions' | 'deploy' | 'backups' | 'comms' | 'plug'
   | 'kiro' | 'files';
 
-/** The dock's groups (D-260), in order: what to watch, what contains, what recovers, the shell and the files. */
+/** The dock's groups (D-270), in order: what to watch, what contains, what recovers, the shell and the files. */
 export type DockGroup = 'watch' | 'contain' | 'recover' | 'shell';
 
 export const DOCK_GROUPS: ReadonlyArray<{ id: DockGroup; label: string }> = [
@@ -27,7 +27,7 @@ export interface Tool {
   label: string;
   /** A glyph for the dock, in the screens' own set (no icon font). */
   glyph: string;
-  /** Its group on the dock; none means it is a window only, opened from elsewhere (Kiro's, from her column, D-260). */
+  /** Its group on the dock; none means it is a window only, opened from elsewhere (Kiro's, from her column, D-270). */
   group?: DockGroup;
   /** A console that changes production: locked during the change freeze (SYS-22). */
   change?: boolean;
@@ -35,7 +35,7 @@ export interface Tool {
   investigate?: boolean;
 }
 
-/** Every tool, in the dock's order (D-260: grouped; SCENES §5.1's list). Kiro is a window, not a dock entry. */
+/** Every tool, in the dock's order (D-270: grouped; SCENES §5.1's list). Kiro is a window, not a dock entry. */
 export const TOOLS: readonly Tool[] = [
   { id: 'logs', label: 'Logs', glyph: '≣', group: 'watch' },
   { id: 'alerts', label: 'Alerts', glyph: '⚠', group: 'watch' },
@@ -54,7 +54,7 @@ export const TOOLS: readonly Tool[] = [
   { id: 'terminal', label: 'Terminal', glyph: '>_', group: 'shell' },
   { id: 'cheats', label: 'Cheat sheet', glyph: '?', group: 'shell' },
   { id: 'files', label: 'Briefing', glyph: '❏', group: 'shell' },
-  { id: 'kiro', label: 'Kiro', glyph: '☾' }, // her column opens it (D-260); the window draws her as the logo's ghost (D-250)
+  { id: 'kiro', label: 'Kiro', glyph: '☾' }, // her column opens it (D-270); the window draws her as the logo's ghost (D-250)
 ];
 
 export const TOOL_BY_ID: Readonly<Record<ToolId, Tool>> = Object.fromEntries(TOOLS.map((t) => [t.id, t])) as Record<ToolId, Tool>;
@@ -96,7 +96,7 @@ export const NO_WINDOWS: Wins = { open: [], z: 10 };
 export const BAR = 30;
 const MARGIN = 8;
 
-/** Where the dock ends on screen (D-260: `left: 1vw`, 128 px wide), plus a gap: windows first open right of it. */
+/** Where the dock ends on screen (D-270: `left: 1vw`, 128 px wide), plus a gap: windows first open right of it. */
 export const DOCK_RIGHT = (view: View): number => Math.round(view.w * 0.01 + 128 + 8);
 
 /** Where a tool first opens, as fractions of the view, over the battlefield and clear of Kiro's column; the rest cascade. */
@@ -131,7 +131,7 @@ export function openTool(s: Wins, id: ToolId, view: View): Wins {
   const z = s.z + 1;
   const home = HOME[id];
   let rect: [number, number, number, number];
-  // right of the dock (two columns since D-260: its right edge is about 1vw + 128 px)
+  // right of the dock (two columns since D-270: its right edge is about 1vw + 128 px)
   if (home) rect = [Math.max(home[0] * view.w, DOCK_RIGHT(view)), home[1] * view.h, home[2] * view.w, home[3] * view.h];
   else {
     const [fw, fh] = SIZE[id] ?? [0.36, 0.44];
@@ -142,12 +142,12 @@ export function openTool(s: Wins, id: ToolId, view: View): Wins {
   return { open: [...s.open, win], z };
 }
 
-/** D-262: the smallest a window may be made. */
+/** D-272: the smallest a window may be made. */
 export const MIN_W = 260;
 export const MIN_H = 150;
 
 /**
- * D-262: a window resized from its right edge, bottom edge or corner: never below the minimum, never past the view's
+ * D-272: a window resized from its right edge, bottom edge or corner: never below the minimum, never past the view's
  * right or bottom edge. Its place does not change.
  */
 export function resizeTool(s: Wins, id: ToolId, w: number, h: number, view: View): Wins {

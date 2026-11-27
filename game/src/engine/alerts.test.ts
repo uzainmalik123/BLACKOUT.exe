@@ -9,6 +9,7 @@ import { stepCustomers } from './customers';
 import { eventsOfKind } from './log';
 import { libraryFrom } from './library';
 import { startReplay } from './replay';
+import { noShift } from './shift';
 import { initialWorld, type World } from './state';
 import { stepTaps } from './taps';
 import { committedLibrary } from './test-fixtures/committed';
@@ -156,6 +157,7 @@ describe('every committed recording played alone (D-232)', { timeout: WHOLE_RUN_
     for (const v of real.variantsOf(move).filter((x) => !SILENT.has(`${move}.${x.variant}`))) {
       it(`${move}.${v.variant} opens one alert after its first lines, with a route it really used, a symptom and a gate, and no spoiler`, () => {
         const w = lab(initialWorld(1, 'hard')); // Hard: every variant may play
+        noShift(w); // the longest recordings (ATK-04.b, ATK-08's halves) outlast Hard's 2.5-minute night (D-260)
         startReplay(w, v, 'death');
         w.death.nextMoveAt = Infinity; // alone: on Hard he may run a second move alongside (D-259); the Director starts none here
         expect(w.alerts).toEqual([]); // D-232: nothing at move start

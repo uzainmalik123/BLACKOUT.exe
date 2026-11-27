@@ -82,7 +82,7 @@ describe('the window manager (UI-11, D-240)', () => {
     expect(TOOL_BY_ID.flags.change).toBeFalsy(); // flagging works during the freeze (DEF-21)
   });
 
-  it('the dock fits: Kiro is not on it, every entry sits in one of four groups, two columns of at most nine rows (D-260)', () => {
+  it('the dock fits: Kiro is not on it, every entry sits in one of four groups, two columns of at most nine rows (D-270)', () => {
     for (const level of ['easy', 'medium', 'hard'] as const) {
       const dock = dockFor(level);
       expect(dock.map((t) => t.id)).not.toContain('kiro');
@@ -99,7 +99,7 @@ describe('the window manager (UI-11, D-240)', () => {
     for (const view of [VIEW, { w: 1366, h: 768 }]) for (const id of ['logs', 'alerts'] as const) expect(openTool(NO_WINDOWS, id, view).open[0]!.x).toBeGreaterThanOrEqual(DOCK_RIGHT(view));
   });
 
-  it('resizes a window from its edge or corner, above the minimum and inside the view, and keeps the size (D-262)', () => {
+  it('resizes a window from its edge or corner, above the minimum and inside the view, and keeps the size (D-272)', () => {
     let s = moveTool(openTool(NO_WINDOWS, 'waf', VIEW), 'waf', 400, 200, VIEW);
     s = resizeTool(s, 'waf', 700, 500, VIEW);
     expect(s.open[0]).toMatchObject({ x: 400, y: 200, w: 700, h: 500 });

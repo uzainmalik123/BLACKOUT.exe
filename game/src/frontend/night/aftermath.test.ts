@@ -55,6 +55,7 @@ describe("the report's reading comes from the engine (D-256)", () => {
     expect(m.professional.length).toBeGreaterThan(0);
     expect(m.nextTime.length).toBeGreaterThan(0);
     expect(m.damage.soulsLost).toBe(w.souls.stolen.length);
+    expect(m.damage.decisions).toMatch(/^0 of [1-9]\d*$/); // UI-15 (D-261): every alert left to run out
     expect(m.right.filter((l) => l.startsWith('Stopped'))).toHaveLength(0); // he was never stopped
   });
 

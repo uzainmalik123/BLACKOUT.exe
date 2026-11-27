@@ -101,6 +101,8 @@ export function reaction(e: GameEvent): { beat?: Beat; cue?: Cue } {
       return { cue: 'warn' };
     case 'customer-lost':
       return { cue: 'outage' };
+    case 'decision-missed': // UI-15 (D-261): the window ran out
+      return { cue: 'impact' };
     case 'return':
       return { beat: 'return', cue: 'death' };
     case 'banished':

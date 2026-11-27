@@ -411,7 +411,7 @@ export const OPENING_TUTORIAL: Readonly<Record<Difficulty, readonly TutorialStep
       id: 'alerts',
       panels: ['alerts'],
       lines: [
-        'This is the alerts panel. It is empty because nothing unusual has been seen yet. When the traffic on a path crosses a line, an alert opens here with the path and what looked wrong. An alert never tells you who did it: that part is your job.',
+        'This is the alerts panel. It is empty because nothing unusual has been seen yet. When the traffic on a path crosses a line, an alert opens here with the path and what looked wrong. An alert never tells you who did it: that part is your job. When one opens, a bar over the choices counts down a few seconds: act before it runs out, or it costs the shop.',
       ],
     },
     {
@@ -450,10 +450,10 @@ export const OPENING_TUTORIAL: Readonly<Record<Difficulty, readonly TutorialStep
     {
       id: 'freeze',
       panels: ['alerts'],
-      lines: ['Change freeze is on until an incident is declared: reads work, changes wait for the first alert.'],
+      lines: ['Change freeze until the first alert: reads work, changes wait. Then each alert gives you seconds to act: watch the bar over the choices.'],
     },
   ],
-  hard: [{ id: 'freeze', panels: [], lines: ['Change freeze is on until an incident is declared. Look around.'] }],
+  hard: [{ id: 'freeze', panels: [], lines: ['Change freeze is on until an incident is declared. Each alert gives you a few seconds to act. Look around.'] }],
 };
 
 export interface TrainingStep extends TutorialStep {

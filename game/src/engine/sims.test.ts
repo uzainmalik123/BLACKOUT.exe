@@ -16,16 +16,19 @@ import { runSim, type ScriptedPlayer, type SimResult } from './sim';
 import { soulsStolen } from './souls';
 import { committedLibrary } from './test-fixtures/committed';
 import { stepWaves } from './minions';
-import { stepReplays } from './replay';
+import { renderAccessLog, stepReplays } from './replay';
 import { initialWorld, type World } from './state';
 import { FIXTURE_LIBRARY, fakeRecording } from './test-fixtures/recordings';
 import { noShift } from './shift';
+import { noDecisions } from './decisions';
 import { WHOLE_RUN_TIMEOUT_MS } from './test-fixtures/timeouts';
 
 const SHIFT_VERDICTS: ReadonlySet<string> = new Set(['clean-handover', 'rough-handover', 'walked-away']);
 
 const REAL_MIN = 60_000;
 const sim = (player: ScriptedPlayer, maxRealMs = 20 * REAL_MIN, seed = 1): SimResult => runSim({ seed, player, library: FIXTURE_LIBRARY, maxRealMs });
+/** D-260: the night is 3 minutes; what needs his whole story (banishment, the return, his robbing pace) is measured past the shift. */
+const pastShift = (player: ScriptedPlayer, maxRealMs = 20 * REAL_MIN, seed = 1): SimResult => runSim({ seed, player, library: FIXTURE_LIBRARY, maxRealMs, setup: noShift });
 const ending = (r: SimResult) => eventsOfKind(r.world, 'ending')[0]?.ending;
 const kinds = (r: SimResult) => r.events.map((e) => e.kind);
 
@@ -39,6 +42,12 @@ function reactor(onEvent: (e: GameEvent, w: World, act: Act) => void, reactAfter
     for (; seen < w.events.length && w.events[seen]!.t / 30 + reactAfterRealMs <= realElapsed; seen++) onEvent(w.events[seen]!, w, act);
     return out;
   };
+}
+
+/** A focused read of an address's lines in the access log, as the player's grep shows them (a relevant look, D-115). */
+function investigate(w: World, ip: string): PlayerAction {
+  const shown = renderAccessLog(w).split('\n').filter((l) => l.startsWith(`${ip} `)).slice(-20);
+  return { type: 'DEF-01', query: `grep ${ip} /var/log/nginx/access.log`, shown, shownTotal: shown.length };
 }
 
 /** Close a minion wave with its one correct action (PRD §4). */
@@ -93,9 +102,11 @@ describe('the playthrough sims (PRD §10, SYS-16)', { timeout: WHOLE_RUN_TIMEOUT
     const r = sim(() => []);
     expect(['souls-lost', 'flatline', 'walked-away']).toContain(ending(r));
     expect(kinds(r)).not.toContain('banished');
-    const byTen = eventsOfKind(r.world, 'souls-stolen').filter((e) => e.t <= 10 * REAL_MIN * 30).at(-1)!.stolen;
-    expect(byTen).toBeGreaterThanOrEqual(r.world.souls.total / 2);
-    expect(eventsOfKind(r.world, 'souls-stolen').some((e) => e.by.startsWith('ATK-'))).toBe(true);
+    expect(eventsOfKind(r.world, 'souls-stolen').some((e) => e.by.startsWith('ATK-'))).toBe(true); // inside the 3-minute night (D-260)
+    const long = pastShift(() => []); // his robbing pace, past the shift (D-260)
+    expect(kinds(long)).not.toContain('banished');
+    const byTen = eventsOfKind(long.world, 'souls-stolen').filter((e) => e.t <= 10 * REAL_MIN * 30).at(-1)!.stolen;
+    expect(byTen).toBeGreaterThanOrEqual(long.world.souls.total / 2);
   });
 
   it("SIM-2: blocking every IP loses souls anyway (Death switches IP) and blocks Death's IPs at least 3 times", () => {
@@ -118,7 +129,7 @@ describe('the playthrough sims (PRD §10, SYS-16)', { timeout: WHOLE_RUN_TIMEOUT
     expect(comeback.length).toBeGreaterThanOrEqual(1); // he switched IP and carried on
     expect(comeback[0]!.ip).not.toBe(eventsOfKind(r.world, 'move-started').find((e) => e.move === cut[0]!.move)!.ip);
     expect(eventsOfKind(r.world, 'souls-stolen').some((e) => e.by.startsWith('ATK-'))).toBe(true);
-    expect(['souls-lost', 'flatline']).toContain(ending(r)); // D-42: he keeps robbing; the shop may flatline before the last soul goes
+    expect(['souls-lost', 'flatline', 'walked-away']).toContain(ending(r)); // D-42: he keeps robbing; inside the 3-minute night a loss at the shift's end (D-260)
   });
 
   it('SIM-3: pulling the plug at the first alert and leaving it flatlines', () => {
@@ -129,7 +140,7 @@ describe('the playthrough sims (PRD §10, SYS-16)', { timeout: WHOLE_RUN_TIMEOUT
         act({ type: 'DEF-11' });
       }
     }));
-    expect(ending(r)).toBe('flatline');
+    expect(['flatline', 'walked-away']).toContain(ending(r)); // D-260: a shop handed over down is walked away from
     expect(eventsOfKind(r.world, 'souls-stolen')).toEqual([]);
   });
 
@@ -138,7 +149,8 @@ describe('the playthrough sims (PRD §10, SYS-16)', { timeout: WHOLE_RUN_TIMEOUT
     // and gets rid of ATK-06's admin by deleting it (DEF-14, one of ATK-06's stoppers) instead.
     // The seed decides whether he plants ATK-11 or takes over a customer (ATK-12) at stage 5 before the ransom; the
     // finale then ends his story moves (D-41). SIM-4 checks every seed where he plants it (KI-80: the others stall).
-    const runs = [1, 2, 3, 4, 5, 6].map((seed) => sim(reactor((e, w, act) => {
+    // D-260: banishment and the return need his whole story, past the 3-minute night
+    const runs = [1, 2, 3, 4, 5, 6].map((seed) => pastShift(reactor((e, w, act) => {
       if (e.kind === 'move-started') contain(e.move, e.ip, w, act, { skipFeature: 'registration', skipPatch: 'registration' });
       if (e.kind === 'wave-started') closeMinion(e.minion, act);
       if (e.kind === 'move-landed' && e.move === 'ATK-06') for (const a of w.accounts) if (a.createdBy === 'ATK-06') act({ type: 'DEF-14', email: a.email });
@@ -161,13 +173,15 @@ describe('the playthrough sims (PRD §10, SYS-16)', { timeout: WHOLE_RUN_TIMEOUT
     expect(planted.filter((r) => eventsOfKind(r.world, 'return')[0]?.through === 'hidden-admin').length).toBeGreaterThanOrEqual(1);
   });
 
-  it('SIM-5: the playbook (snapshot, contain, find and remove footholds, patch, restore, bring back, close every tap) banishes Death with no return', () => {
-    let snapshotted = false;
-    const r = sim(withTaps(reactor((e, w, act) => {
+  it('SIM-5: the playbook (snapshot, contain, find and remove footholds, patch, restore, bring back, close every tap) hands over cleanly inside the night, and banishes Death with no return given his whole story', () => {
+    const playbook = () => { let snapshotted = false; return withTaps(reactor((e, w, act) => {
       if (e.kind === 'alert-opened' && !snapshotted) {
         snapshotted = true;
         act({ type: 'DEF-05', name: 'initial' });
       }
+      // what the change freeze refused before the first alert, applied once the incident is declared (D-230)
+      if (e.kind === 'incident-declared') for (const live of w.replays.filter((x) => x.owner === 'death')) contain(live.move as MoveId, live.ip, w, act);
+      if (e.kind === 'move-started') act(investigate(w, e.ip)); // detect first: read what the new address did (D-260's bands judge noticing in seconds)
       if (e.kind === 'move-started') contain(e.move, e.ip, w, act);
       if (e.kind === 'wave-started') closeMinion(e.minion, act);
       if (e.kind === 'move-landed') eradicate(e.move, w, act);
@@ -176,7 +190,11 @@ describe('the playthrough sims (PRD §10, SYS-16)', { timeout: WHOLE_RUN_TIMEOUT
         act({ type: 'DEF-19' });
         act({ type: 'DEF-20', to: 'legal' });
       }
-    })));
+    })); };
+    const night = sim(playbook()); // D-260: the 3-minute night ends with the shift's verdict
+    expect(ending(night)).toBe('clean-handover');
+    for (const phase of ['detect', 'contain', 'eradicate', 'recover'] as const) expect(['A', 'B'], `night ${phase}`).toContain(evaluate(night.world).grades[phase]);
+    const r = pastShift(playbook());
     expect(ending(r)).toBe('banished');
     expect(eventsOfKind(r.world, 'return')).toEqual([]);
     expect(eventsOfKind(r.world, 'action').some((e) => e.action.type === 'DEF-05')).toBe(true);
@@ -187,7 +205,7 @@ describe('the playthrough sims (PRD §10, SYS-16)', { timeout: WHOLE_RUN_TIMEOUT
   });
 
   it('SIM-6: ignoring minions and handling Death perfectly loses noticeable heartbeat and some souls to MIN-02 but can still win', () => {
-    const r = sim(withTaps(reactor((e, w, act) => {
+    const r = pastShift(withTaps(reactor((e, w, act) => { // his whole story, past the 3-minute night (D-260)
       if (e.kind === 'move-started') contain(e.move, e.ip, w, act, { noLoginRateLimit: true });
       if (e.kind === 'move-landed') eradicate(e.move, w, act);
       bringBack(e, act);
@@ -202,7 +220,7 @@ describe('the playthrough sims (PRD §10, SYS-16)', { timeout: WHOLE_RUN_TIMEOUT
     // the seed decides whether he reaches the forged token (ATK-14) before the player's containment leaves him nothing
     // (D-258: with his shorter rests, seed 1 no longer does); every seed where it lands must bring him back through it
     const runs = [1, 2, 3, 4, 5, 6].map((seed) =>
-      sim(
+      pastShift( // the return needs his whole story, past the 3-minute night (D-260)
         reactor((e, w, act) => {
           if (e.kind === 'move-started') contain(e.move, e.ip, w, act, { skipPatch: 'token-verify' });
           if (e.kind === 'wave-started') closeMinion(e.minion, act);
@@ -289,16 +307,18 @@ describe('SYS-06 target times in a running game (D-33)', { timeout: WHOLE_RUN_TI
   /** One Death move that keeps a door open for 40 real minutes and does nothing else. */
   const slowScan = libraryFrom([fakeRecording('ATK-01', 'a', { ip: '203.0.113.9', durationMs: 40 * REAL_MIN, events: Array.from({ length: 40 }, (_, i) => ({ t: 1 + i * REAL_MIN, kind: 'access', ip: '203.0.113.9', method: 'GET', target: `/s${i}`, protocol: 'HTTP/1.1', status: 404, bytes: 10, referer: '', userAgent: 'curl/8.0', requestTimeMs: 1 }) as RecEvent) })]);
   const once = (actions: PlayerAction[]): ScriptedPlayer => { let done = false; return () => (done ? [] : ((done = true), actions)); };
+  /** Each measures one drain: past the 3-minute shift and without SYS-25's decision dips (D-260, D-261). */
+  const measure = (w: World) => { noShift(w); noDecisions(w); };
 
   it('a player who pulls the plug and leaves it flatlines the shop about 3 real minutes later', () => {
-    const r = runSim({ lab: true, seed: 1, player: once([{ type: 'DEF-11' }]), library: FIXTURE_LIBRARY, maxRealMs: 10 * REAL_MIN }); // the lab measures the drain, not the opening (D-230)
+    const r = runSim({ lab: true, setup: measure, seed: 1, player: once([{ type: 'DEF-11' }]), library: FIXTURE_LIBRARY, maxRealMs: 10 * REAL_MIN }); // the lab measures the drain, not the opening (D-230)
     expect(ending(r)).toBe('flatline');
     expect(r.realMs).toBeGreaterThanOrEqual(minutesToFlatline(cfg.drainPerRealMin.plug) - 1000);
     expect(r.realMs).toBeLessThanOrEqual(minutesToFlatline(cfg.drainPerRealMin.plug) + 1000);
   });
 
   it('one open door alone takes about half an hour to flatline the shop', () => {
-    const r = runSim({ lab: true, setup: noShift, seed: 1, player: once(closeAllMinions), library: slowScan, maxRealMs: 45 * REAL_MIN }); // a 30-minute drain outlasts a shift (D-118)
+    const r = runSim({ lab: true, setup: measure, seed: 1, player: once(closeAllMinions), library: slowScan, maxRealMs: 45 * REAL_MIN }); // a 30-minute drain outlasts a shift (D-118)
     expect(ending(r)).toBe('flatline');
     const perMinute = cfg.drainPerRealMin.openDoor; // D-65: the CAPTCHA on costs nothing (no shopper fails it)
     expect(r.realMs).toBeGreaterThan(30 * REAL_MIN);
@@ -308,7 +328,7 @@ describe('SYS-06 target times in a running game (D-33)', { timeout: WHOLE_RUN_TI
   it('a defacement left live (with his door open) flatlines the shop in under 5 real minutes', () => {
     const r = runSim({
       lab: true, seed: 1, player: once(closeAllMinions), library: slowScan, maxRealMs: 10 * REAL_MIN,
-      setup: (w) => { w.defacements.push({ productId: 1, kind: 'deface', by: 'ATK-15' }); },
+      setup: (w) => { measure(w); w.defacements.push({ productId: 1, kind: 'deface', by: 'ATK-15' }); },
     });
     expect(ending(r)).toBe('flatline');
     const both = cfg.drainPerRealMin.defaced + cfg.drainPerRealMin.openDoor;
@@ -362,7 +382,7 @@ describe('SIM-9: WAF rules against the low-and-slow harvest (D-34, on the halves
 describe('D-41: pacing and fairness, in whole runs', { timeout: WHOLE_RUN_TIMEOUT_MS }, () => {
   const real = committedLibrary();
   const idle = (seed: number, difficulty: Difficulty, library: RecordingLibrary = real) =>
-    runSim({ seed, difficulty, library, maxRealMs: 20 * REAL_MIN, player: () => [] });
+    runSim({ seed, difficulty, library, maxRealMs: 20 * REAL_MIN, player: () => [], setup: noShift }); // his whole story, past the 3-minute night (D-260)
   const LEVELS: Difficulty[] = ['easy', 'medium', 'hard'];
 
   /** Walks the log counting running waves and Death moves; returns the most of each ever running at once. */

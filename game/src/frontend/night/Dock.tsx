@@ -1,6 +1,6 @@
 // The dock and the floating windows (UI-11, D-234, D-240): every tool one click on the dock along the left edge, each
 // opening as a window over the battlefield, dragged by its bar, resized from its right edge, bottom edge or corner
-// (D-262), closed at its top right, several open at once. The dock is two columns in four labelled groups (D-260). The
+// (D-272), closed at its top right, several open at once. The dock is two columns in four labelled groups (D-270). The
 // window manager's state is pure (windows.ts); this file only draws it and turns the pointer into its moves.
 
 import type { PointerEvent as ReactPointerEvent, ReactNode } from 'react';
@@ -59,7 +59,7 @@ export interface FloatWindowProps {
   onClose: () => void;
   onFocus: () => void;
   onMove: (x: number, y: number) => void;
-  /** D-262: a new size from a handle (the window manager keeps it inside the view and above the minimum). */
+  /** D-272: a new size from a handle (the window manager keeps it inside the view and above the minimum). */
   onResize: (w: number, h: number) => void;
   lit?: boolean;
   /**
@@ -86,7 +86,7 @@ export function FloatWindow({ win, title, onClose, onFocus, onMove, onResize, li
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', up);
   };
-  /** D-262: a handle on the right edge (e), the bottom edge (s) or the corner (se). */
+  /** D-272: a handle on the right edge (e), the bottom edge (s) or the corner (se). */
   const grip = (edge: 'e' | 's' | 'se') => (e: ReactPointerEvent) => {
     if (e.button !== 0) return;
     e.preventDefault();
