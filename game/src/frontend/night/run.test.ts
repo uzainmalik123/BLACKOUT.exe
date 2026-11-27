@@ -23,6 +23,16 @@ describe('the night shift on the real engine (D-223)', () => {
     expect(engine.world.events.some((e) => e.kind === 'move-started')).toBe(false);
   });
 
+  it('a training run volunteers no hint (KI-235, D-275); a real run keeps its hints', async () => {
+    const drill = runOn(new Engine({ scenario: 'training', baseline: baseline() }));
+    drill.engine.beginShift();
+    for (let i = 0; i < 200; i++) drill.engine.advance(250); // past the drill's first alert
+    expect(drill.engine.world.alerts.length).toBeGreaterThan(0);
+    expect(await drill.kiro.hint()).toBeNull();
+    const real = runOn(new Engine({ seed: 7, difficulty: 'easy', baseline: baseline() }));
+    expect(real.kiro.hint).not.toBe(drill.kiro.hint);
+  });
+
   it('the first check reads Death\'s first scan in the live numbers', () => {
     const { engine } = newRun();
     for (let i = 0; i < 160; i++) engine.advance(250); // 40 real s: past the calm opening (D-230: 20–30 s on Medium)
