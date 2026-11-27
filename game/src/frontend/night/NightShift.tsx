@@ -16,6 +16,7 @@ import { ENDINGS, type Scene } from './judge';
 import type { KiroLine } from './KiroPanel';
 import { Play, type Volumes } from './Play';
 import { ReportWall } from './Report';
+import { headlineOf } from './reportView';
 import type { Run } from './run';
 import { BUS_DEFAULTS } from './sound';
 import { seen } from '../shared/seen';
@@ -66,6 +67,10 @@ export function NightShift({ difficulty, skipPrologue = false, onMenu, onAgain }
     const t = window.setTimeout(() => setReport(true), 6000);
     return () => window.clearTimeout(t);
   }, [card, report]);
+  // on the report the storm settles to a low rain and the heartbeat stops (D-263)
+  useEffect(() => {
+    if (report) night.current?.settle();
+  }, [report]);
   const [eyesInAccounts, setEyesInAccounts] = useState(false);
   const [shakeDesk, setShakeDesk] = useState(false);
   const [glitch, setGlitch] = useState(false);
@@ -186,7 +191,7 @@ export function NightShift({ difficulty, skipPrologue = false, onMenu, onAgain }
   // a player who has seen the prologue may skip it (D-252)
   const [skippable] = useState(() => !skipPrologue && seen('prologue'));
 
-  if (report && run) return <ReportWall run={run} onAgain={onAgain} onMenu={onMenu} />;
+  if (report && run) return <ReportWall run={run} onAgain={onAgain} onMenu={onMenu} say={(text) => night.current?.say('Kiro', text, { urgent: true })} />;
 
   const seated = SEATED.has(phase);
   const end = run?.engine.world.ending ? ENDINGS[run.engine.world.ending] : null;
@@ -281,7 +286,8 @@ export function NightShift({ difficulty, skipPrologue = false, onMenu, onAgain }
 
       {card && end && (
         <div className={`ns-card-end ${end.won ? 'is-won' : 'is-lost'}`} role="dialog" aria-label={end.title}>
-          <h1>{run?.engine.world.ending === 'banished' ? 'DEATH BANISHED' : end.scene === 'taken' ? 'YOU LOST' : end.title.toUpperCase()}</h1>
+          {/* each loss its own name, never one "you lost" for all (D-263) */}
+          <h1>{run?.engine.world.ending === 'banished' ? 'DEATH BANISHED' : end.scene === 'taken' ? headlineOf(run?.engine.world.ending).title.toUpperCase() : end.title.toUpperCase()}</h1>
           <p>{end.line}</p>
           <nav>
             {/* retry, another level and the menu are on the report, the night's last screen (D-256) */}
