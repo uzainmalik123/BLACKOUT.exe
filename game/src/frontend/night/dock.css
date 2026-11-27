@@ -329,9 +329,12 @@
   word-break: break-all;
   cursor: help;
 }
+/* in a window the chart goes under the table, so the block / flag column has room (KI-256: it ran under the chart) */
 .ns-traffic.is-window {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 10px;
+  max-height: none;
 }
 .ns-alertlist {
   list-style: none;
