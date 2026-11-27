@@ -27,12 +27,17 @@ export interface PlanMark {
   para?: number;
   /** This callout is the suspicious request of this kind. */
   line?: LineKind;
+  /** The coach's own words, where a step's paragraph needs a second callout (the deploy button after reading the fix). */
+  say?: string;
   anchors: readonly Anchor[];
 }
 
 const win = (tool: ToolId, ...el: string[]): Anchor => ({ at: 'window', tool, ...(el.length ? { el } : {}) });
 /** A second place the same action can be done (the terminal), outlined only while its window is open. */
 const also = (tool: ToolId, ...el: string[]): Anchor => ({ at: 'window', tool, also: true, ...(el.length ? { el } : {}) });
+
+/** The deploy callout's words (the step's own paragraph asks to read the fix first). */
+export const PATCH_GO = 'Now press "Deploy this patch" under the fix. A deploy takes time: watch its line say deploying, then live. Then switch search back on in the feature flags console.';
 
 /** D-274: one entry per TRAINING_STEPS id. The last callout of each step waits for the player's action. */
 export const COACH_PLAN: Readonly<Record<string, readonly PlanMark[]>> = {
@@ -60,7 +65,11 @@ export const COACH_PLAN: Readonly<Record<string, readonly PlanMark[]>> = {
     { line: 'search', anchors: [{ at: 'line' }] },
     { para: 1, anchors: [win('features', 'feature:search')] },
   ],
-  patch: [{ para: 0, anchors: [win('deploy', 'deploy:search', 'patch:search')] }],
+  patch: [
+    // reading the fix waits (the clock holds); the deploy itself then takes its real time to go live
+    { para: 0, anchors: [win('deploy', 'deploy:search', 'patch:search')] },
+    { say: PATCH_GO, anchors: [win('deploy', 'deploy:search', 'patch:search')] },
+  ],
   evidence: [{ para: 0, anchors: [win('terminal', 'terminal-input'), also('backups')] }],
 };
 
@@ -76,7 +85,7 @@ export interface Mark {
 export function marksFor(step: TrainingStep): Mark[] {
   const plan = COACH_PLAN[step.id] ?? [{ para: 0, anchors: [{ at: 'center' }] }];
   return plan.map((m, i) => ({
-    text: m.para !== undefined ? (step.lines[m.para] ?? '') : '',
+    text: m.para !== undefined ? (step.lines[m.para] ?? '') : (m.say ?? ''),
     anchors: m.anchors,
     wait: i === plan.length - 1 ? 'action' : 'next',
     ...(m.line ? { line: m.line } : {}),

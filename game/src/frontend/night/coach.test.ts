@@ -21,6 +21,7 @@ describe('the coach plan (D-274)', () => {
       const marks = marksFor(step);
       expect(marks.map((m) => m.wait)).toEqual(marks.map((_, i) => (i === marks.length - 1 ? 'action' : 'next')));
       for (const m of marks) if (!m.line) expect(m.text.length).toBeGreaterThan(0);
+      for (const m of plan) if (m.say) expect(m.say, m.say).not.toMatch(SPOILER);
     }
   });
 

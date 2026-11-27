@@ -89,7 +89,11 @@ export function filterWords(f: LogFilter, text: string): string {
   return [f.ip && `ip ${f.ip.trim()}`, f.status && `status ${f.status}`, f.path && `path ${f.path.trim()}`, text.trim()].filter(Boolean).join(', ');
 }
 
-export function Logs({ run, tick, act, explain }: { run: Run; tick: number; act: Act; explain: (line: string) => void }) {
+/**
+ * `pin` (the drill's coach, D-274): an access line's index to keep shown and in view, outlined by the coach, even once
+ * newer lines have pushed it out of the window's newest lines (KI-234).
+ */
+export function Logs({ run, tick, act, explain, pin }: { run: Run; tick: number; act: Act; explain: (line: string) => void; pin?: number | null }) {
   const dial = DIAL[run.difficulty];
   const [tab, setTab] = useState<'access' | 'app'>('access');
   const [filter, setFilter] = useState('');
@@ -109,6 +113,10 @@ export function Logs({ run, tick, act, explain }: { run: Run; tick: number; act:
         if (f && !text.toLowerCase().includes(f)) continue;
         out.push({ key: i, text, cls: `s${statusClass(l.status)}`, ip: l.ip });
       }
+      if (pin != null && src[pin] && !out.some((r) => r.key === pin)) {
+        const l = src[pin]!;
+        out.push({ key: pin, text: renderCombined(w, l), cls: `s${statusClass(l.status)}`, ip: l.ip });
+      }
     } else {
       const src = w.logs.app;
       for (let i = src.length - 1; i >= Math.max(0, src.length - SCAN_LINES) && out.length < LOG_LINES; i--) {
@@ -119,10 +127,17 @@ export function Logs({ run, tick, act, explain }: { run: Run; tick: number; act:
     }
     return out.reverse();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tick, tab, filter, by]);
+  }, [tick, tab, filter, by, pin]);
   useEffect(() => {
-    if (follow && box.current) box.current.scrollTop = box.current.scrollHeight;
-  }, [rows, follow]);
+    const pinned = pin != null ? box.current?.querySelector<HTMLElement>('[data-coach="line"]') : null;
+    if (pinned && box.current) {
+      // only this list scrolls (scrollIntoView would also scroll the window's frame)
+      const b = box.current.getBoundingClientRect();
+      const r = pinned.getBoundingClientRect();
+      box.current.scrollTop += r.top - b.top - (b.height - r.height) / 2;
+    }
+    else if (follow && box.current) box.current.scrollTop = box.current.scrollHeight;
+  }, [rows, follow, pin]);
   const search = () => {
     const q = filterWords(tab === 'access' ? by : NO_FILTER, filter);
     if (!q) return;
@@ -190,7 +205,7 @@ export function Logs({ run, tick, act, explain }: { run: Run; tick: number; act:
       )}
       <div className="ns-loglines is-window" ref={box} onWheel={() => setFollow(false)}>
         {rows.map((r) => (
-          <div key={r.key} className={`ns-logline ${r.cls}`} title={dial.explainOnHover ? explainLine(r.text).text : 'Ask Kiro to explain this line'} onClick={() => explain(r.text)}>
+          <div key={r.key} className={`ns-logline ${r.cls}`} data-coach={tab === 'access' && r.key === pin ? 'line' : undefined} title={dial.explainOnHover ? explainLine(r.text).text : 'Ask Kiro to explain this line'} onClick={() => explain(r.text)}>
             {dial.rowActions && r.ip && (
               <>
                 <RowActions run={run} ip={r.ip} act={act} />{' '}

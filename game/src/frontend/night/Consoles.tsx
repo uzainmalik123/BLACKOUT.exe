@@ -120,7 +120,7 @@ function Waf({ run, act }: P) {
         <button type="button" disabled={lk} onClick={() => act({ type: 'DEF-12', rule: { kind: 'sqli' } })}>
           Enable SQL injection rule set
         </button>
-        <button type="button" disabled={lk} onClick={() => act({ type: 'DEF-07' })}>
+        <button type="button" data-coach="waf:login" disabled={lk} onClick={() => act({ type: 'DEF-07' })}>
           Rate-limit the login
         </button>
       </div>
@@ -239,7 +239,7 @@ function Flags({ run, act }: P) {
               <span>{FEATURE_WORDS[f]}</span>
               <button
                 type="button"
-                className={`ns-switch${on ? ' is-on' : ''}`}
+                className={`ns-switch${on ? ' is-on' : ''}`} data-coach={`feature:${f}`}
                 aria-pressed={on}
                 disabled={lk}
                 onClick={() => act(toDefault ? { type: 'DEF-18', what: f } : { type: 'DEF-10', feature: f, enabled: !on })}
@@ -333,7 +333,7 @@ function Deploy({ run, act }: P) {
           const pending = w.patches.pending.find((x) => x.patch === p);
           return (
             <li key={p} className={open === p ? 'is-on' : ''}>
-              <button type="button" onClick={() => setOpen(open === p ? null : p)}>
+              <button type="button" data-coach={`patch:${p}`} onClick={() => setOpen(open === p ? null : p)}>
                 {PATCH_BY_ID[p].title}
               </button>
               <span className={applied ? 'is-ok' : pending ? 'is-wait' : ''}>{applied ? 'live' : pending ? `deploying, ready ${clockAt(w, pending.readyAt)}` : 'not deployed'}</span>
@@ -347,7 +347,7 @@ function Deploy({ run, act }: P) {
             <b>{entry.file}</b> lines {entry.lines[0]}–{entry.lines[1]}. {entry.why}
           </p>
           <pre>{entry.diff}</pre>
-          <button type="button" disabled={lk} onClick={() => act({ type: 'DEF-13', patch: entry.patch })}>
+          <button type="button" data-coach={`deploy:${entry.patch}`} disabled={lk} onClick={() => act({ type: 'DEF-13', patch: entry.patch })}>
             Deploy this patch
           </button>
         </div>

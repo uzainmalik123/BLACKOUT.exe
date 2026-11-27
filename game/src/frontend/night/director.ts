@@ -151,6 +151,8 @@ export class Night {
   private lastTaunt = -99;
   private warned = new Set<number>();
   private ending: { start: number; scene: Scene } | null = null;
+  /** The pop-up's answer (D-273); null until the player has chosen. */
+  private mode: 'training' | 'shift' | null = null;
   private monitors = 0;
 
   constructor(
@@ -253,6 +255,21 @@ export class Night {
     this.held = on;
   }
 
+  /**
+   * The pop-up's answer when a shift starts (UI-12, D-273): the training shift or the real one. The run is made only
+   * once it is known; until then the login waits.
+   */
+  choose(mode: 'training' | 'shift'): void {
+    if (this.mode) return;
+    this.mode = mode;
+    if (SEATED.has(this.flow.phase)) this.begin();
+  }
+
+  /** Whether this night is the drill (no Death, no taunts, no horror beats, no last-chance hints: D-275). */
+  get training(): boolean {
+    return this.mode === 'training';
+  }
+
   /** Straight to the desk (the menu's skip, the skip button once it has been seen, a retry). */
   skip(): void {
     this.flow = step(this.flow, { kind: 'skip' });
@@ -271,9 +288,9 @@ export class Night {
 
   /** The workstation logs in: the run starts on the engine. */
   private begin(): void {
-    if (this.run || this.starting) return;
+    if (this.run || this.starting || !this.mode) return;
     this.starting = true;
-    startRun(this.difficulty)
+    startRun(this.difficulty, this.mode === 'training')
       .then((r) => {
         this.run = r; // the shift begins when the play screen shows (Play.tsx, D-243): the alarm comes with the first alert
         this.events = r.engine.world.events.length;
@@ -368,6 +385,8 @@ export class Night {
   }
 
   private onEvent(e: GameEvent): void {
+    // the drill (D-275): no reaction of the night's at all; the coach on the screen is the drill's voice
+    if (this.training) return;
     const r = reaction(e);
     this.env = envStep(this.env, this.t, [e]);
     if (r.beat) this.beat(r.beat);
@@ -414,7 +433,7 @@ export class Night {
   /** The last chance (D-223): three warnings as the run nears its end; the hint is `hint()`'s, or none. */
   private warn(level: 1 | 2 | 3): void {
     const r = this.run;
-    if (!r) return;
+    if (!r || this.training) return; // the drill has no last chance, and no hint() (KI-235)
     if (level === 3) {
       this.lastChance = this.t;
       this.ui.glitch(true);
@@ -486,7 +505,7 @@ export class Night {
     // the operator is logged in once the run is ready: the desk shows and the calm begins (SYS-22, D-243)
     if (f.phase === 'login' && r) f = step(f, { kind: 'ready' });
     // the alarm sounds once, over the live desk, when the first alert opens
-    if (f.phase === 'shift' && r && !this.alarmed && r.engine.world.alerts.length > 0) {
+    if (f.phase === 'shift' && r && !this.alarmed && !this.training && r.engine.world.alerts.length > 0) {
       this.alarmed = true;
       f = step(f, { kind: 'alarm' });
     }

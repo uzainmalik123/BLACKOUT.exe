@@ -188,6 +188,8 @@ export class Battle {
   private endedAt = -1;
   /** Death's presence (D-254) and where he is drawn (eased toward his spot). */
   presence: Presence = startPresence();
+  /** The training shift (D-275): the drill is the shop's own security team, so Death is never drawn. */
+  hideDeath = false;
   /** How the field's light answers the fight (D-255). */
   env: Env = startEnv();
   private target: Spot | null = null;
@@ -260,6 +262,7 @@ export class Battle {
 
   /** How Death is drawn this frame: his spot for his mode, eased; his form, tearing and gesture by the mode. */
   private death(w: number, h: number, t: number, cover: readonly Rect[]): DeathDraw | null {
+    if (this.hideDeath) return null;
     const p = this.presence;
     if (p.mode === 'away') {
       this.at = null;

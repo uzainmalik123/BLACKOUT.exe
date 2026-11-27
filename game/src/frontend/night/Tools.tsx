@@ -69,13 +69,13 @@ export function RowActions({ run, ip, act }: { run: Run; ip: string; act: Act })
   const tell = (r: { ok: boolean; message: string }) => setSaid(r.ok ? null : r.message);
   return (
     <span className="ns-rowacts" onClick={(e) => e.stopPropagation()}>
-      <button type="button" className="ns-mini" disabled={!!reason || blocked} title={reason ?? (blocked ? 'Blocked' : `iptables -A INPUT -s ${ip} -j DROP`)} onClick={() => tell(act({ type: 'DEF-06', ip, op: 'add' }))}>
+      <button type="button" className="ns-mini" data-coach={`block:${ip}`} disabled={!!reason || blocked} title={reason ?? (blocked ? 'Blocked' : `iptables -A INPUT -s ${ip} -j DROP`)} onClick={() => tell(act({ type: 'DEF-06', ip, op: 'add' }))}>
         {reason ? '🔒 block' : blocked ? 'blocked' : 'block'}
       </button>
       {flag ? (
-        <span className={`ns-flagstate${flag.confirmedAt !== undefined ? ' is-confirmed' : ''}`}>{flag.confirmedAt !== undefined ? 'confirmed' : 'flagged'}</span>
+        <span data-coach={`flag:${ip}`} className={`ns-flagstate${flag.confirmedAt !== undefined ? ' is-confirmed' : ''}`}>{flag.confirmedAt !== undefined ? 'confirmed' : 'flagged'}</span>
       ) : (
-        <button type="button" className="ns-mini" title={`flag ${ip}`} onClick={() => tell(act({ type: 'DEF-21', ip }))}>
+        <button type="button" className="ns-mini" data-coach={`flag:${ip}`} title={`flag ${ip}`} onClick={() => tell(act({ type: 'DEF-21', ip }))}>
           flag
         </button>
       )}

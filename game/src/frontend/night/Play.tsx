@@ -16,6 +16,7 @@ import type { PlayerAction } from '../../rules/vocabulary';
 import { DIAL } from '../shared/dial';
 import { ConsolePanel, type ConsoleId } from './Consoles';
 import { Feed, Logs, metersOf, type Meters, type Toast } from './Desk';
+import { Coach } from './Coach';
 import { Dock, FloatWindow } from './Dock';
 import { Battle, battleOf, type FxKind, type GateId } from './battle';
 import { anomalies, danger as dangerOf, kiroMood, whatKiroSees } from './judge';
@@ -102,6 +103,9 @@ export function Play({ toasts, ...p }: PlayProps) {
   const [hi, setHi] = useState(-1);
   const [sound, setSound] = useState(false);
   const { wins, setWins } = p;
+  // the training shift (SYS-24, UI-12): the coach on screen, the suspicious line pinned in the log, no Death (D-274, D-275)
+  const drill = run.engine.training();
+  const [pin, setPin] = useState<number | null>(null);
   const terminal = isOpen(wins, 'terminal');
   const view = () => ({ w: window.innerWidth, h: window.innerHeight });
   const setTerminal = (f: (on: boolean) => boolean) => setWins((s) => (f(isOpen(s, 'terminal')) ? openTool(s, 'terminal', view()) : closeTool(s, 'terminal')));
@@ -137,6 +141,7 @@ export function Play({ toasts, ...p }: PlayProps) {
     const g = c?.getContext('2d');
     if (!c || !g) return;
     const battle = new Battle();
+    battle.hideDeath = !!run.engine.world.training; // the drill is the shop's own security team, never Death (D-275)
     // the browser checks read Death's presence from here (development only: the production build drops it)
     if (import.meta.env.DEV) (window as unknown as { __battle?: Battle }).__battle = battle;
     const reduce = !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
@@ -436,6 +441,7 @@ export function Play({ toasts, ...p }: PlayProps) {
         <span className="pl-prompt">{PROMPT}</span>
         <input
           ref={input}
+          data-coach="terminal-input"
           value={cmd}
           spellCheck={false}
           autoComplete="off"
@@ -474,7 +480,7 @@ export function Play({ toasts, ...p }: PlayProps) {
   const body = (id: ToolId) => {
     switch (id) {
       case 'logs':
-        return <Logs run={run} tick={p.tick} act={actNow} explain={explain} />;
+        return <Logs run={run} tick={p.tick} act={actNow} explain={explain} pin={drill ? pin : null} />;
       case 'alerts':
         return (
           <>
@@ -526,15 +532,23 @@ export function Play({ toasts, ...p }: PlayProps) {
             {meters.souls}/{meters.total}
           </em>
         </div>
+        {drill ? (
+          <div className="pl-threat">
+            <span>Drill</span>
+            <strong>Your security team</strong>
+            <em>{situation.key === 'quiet' ? 'no attack seen' : 'a drill attack under way'}</em>
+          </div>
+        ) : (
         <div className="pl-threat">
           <span>Death</span>
           <strong>{stage ? `Stage ${stage} · ${STAGE_NAMES[stage as 1]}` : 'Watching'}</strong>
           <em>{situation.key === 'quiet' ? 'no attack seen' : gate ? `attacking: the ${gate}` : 'attack under way'}</em>
           {keyStolen && <em className="pl-keychip">he holds an admin key</em>}
         </div>
+        )}
         <div className="pl-clock">
           <strong>{gameClockLabel(w)}</strong>
-          <em>shift ends in {shiftLeft(w)}</em>
+          <em>{drill ? `drill step ${drill.step.step} of 6` : `shift ends in ${shiftLeft(w)}`}</em>
           {w.nginx === 'stopped' && <em className="pl-down">shop OFFLINE</em>}
         </div>
         <nav className="pl-tools">
@@ -654,6 +668,8 @@ export function Play({ toasts, ...p }: PlayProps) {
           );
         })}
       </Freeze.Provider>
+
+      {drill && <Coach run={run} view={drill} open={new Set(wins.open.map((x) => x.id))} onHold={p.onHold} onPin={setPin} />}
 
       <div className="pl-toasts" aria-live="polite">
         {toasts.map((t) => (
